@@ -1,0 +1,3 @@
+[submodule "libs/ppt_manager"]
+	path = libs/ppt_manager
+	url = https://github.com/domonic18/ppt_manager
