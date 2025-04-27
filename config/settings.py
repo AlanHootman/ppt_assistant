@@ -1,44 +1,77 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 """
-应用全局配置模块
+系统配置模块
+
+提供系统全局配置和环境变量处理。
 """
+
 import os
+import logging
 from pathlib import Path
 from typing import Dict, Any
 
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 class Settings:
-    """全局配置类"""
-    
-    # 项目基础路径
-    BASE_DIR: Path = Path(__file__).parent.parent.resolve()
-    
-    # 工作空间
-    WORKSPACE_DIR: Path = BASE_DIR / "workspace"
-    
-    # 配置文件路径
-    CONFIG_DIR: Path = BASE_DIR / "config"
-    
-    # 日志配置
-    LOG_DIR: Path = WORKSPACE_DIR / "logs"
-    LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
-    
-    # 工作流配置
-    WORKFLOW_CONFIG_DIR: Path = CONFIG_DIR / "workflow_config"
-    
-    # 模型配置
-    MODEL_CONFIG_PATH: Path = CONFIG_DIR / "model_config.yaml"
-    
-    # 会话存储
-    SESSION_DIR: Path = WORKSPACE_DIR / "sessions"
+    """系统配置类"""
     
     def __init__(self):
-        """初始化时创建必要目录"""
-        self._create_directories()
+        """初始化配置"""
+        # 获取项目根目录
+        self.BASE_DIR = Path(__file__).resolve().parent.parent
+        
+        # 工作空间目录
+        self.WORKSPACE_DIR = self.BASE_DIR / "workspace"
+        self.WORKSPACE_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # 输出目录
+        self.OUTPUT_DIR = self.WORKSPACE_DIR / "output"
+        self.OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # 临时文件目录
+        self.TEMP_DIR = self.WORKSPACE_DIR / "temp"
+        self.TEMP_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # 会话目录
+        self.SESSION_DIR = self.WORKSPACE_DIR / "sessions"
+        self.SESSION_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # 日志目录
+        self.LOG_DIR = self.WORKSPACE_DIR / "logs"
+        self.LOG_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # 配置文件目录
+        self.CONFIG_DIR = self.BASE_DIR / "config"
+        
+        # LLM模型配置
+        self.OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+        
+        # 模型配置路径
+        self.MODEL_CONFIG_PATH = self.CONFIG_DIR / "model_config.yaml"
+        
+        # 工作流配置
+        self.WORKFLOW_CONFIG_DIR = self.CONFIG_DIR / "workflow_config"
+        
+        logger.info(f"加载系统配置，项目根目录: {self.BASE_DIR}")
     
-    def _create_directories(self):
-        """创建必要的目录结构"""
-        for path in [self.WORKSPACE_DIR, self.LOG_DIR, 
-                    self.SESSION_DIR, self.WORKFLOW_CONFIG_DIR]:
-            path.mkdir(parents=True, exist_ok=True)
+    def get_workflow_config_path(self, workflow_name: str) -> Path:
+        """
+        获取工作流配置文件路径
+        
+        Args:
+            workflow_name: 工作流名称
+            
+        Returns:
+            配置文件路径
+        """
+        return self.WORKFLOW_CONFIG_DIR / f"{workflow_name}.yaml"
 
-# 全局配置实例
+# 创建全局配置实例
 settings = Settings() 
