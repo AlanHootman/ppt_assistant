@@ -39,12 +39,13 @@ class TestAgentState:
         state.record_failure("test error")
         
         # 验证
-        assert "test error" in state.failures
+        assert len(state.failures) == 1
+        assert state.failures[0]['error'] == "test error"
     
     def test_save_and_load(self, tmp_path):
         # 临时修改保存路径
-        original_session_dir = settings.SESSION_DIR
-        settings.SESSION_DIR = tmp_path
+        original_workspace_dir = settings.WORKSPACE_DIR
+        settings.WORKSPACE_DIR = tmp_path
         
         try:
             # 创建测试状态
@@ -58,7 +59,7 @@ class TestAgentState:
             state.save()
             
             # 验证文件创建
-            state_file = tmp_path / state.session_id / "state.json"
+            state_file = tmp_path / "sessions" / state.session_id / "state.json"
             assert state_file.exists()
             
             # 加载
@@ -76,4 +77,4 @@ class TestAgentState:
             
         finally:
             # 恢复原始设置
-            settings.SESSION_DIR = original_session_dir 
+            settings.WORKSPACE_DIR = original_workspace_dir 

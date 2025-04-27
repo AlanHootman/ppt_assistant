@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class AgentState:
     """工作流状态类"""
     
-    def __init__(self, session_id=None, raw_md=None, ppt_template_path=None, output_dir=None):
+    def __init__(self, session_id=None, raw_md=None, ppt_template_path=None, output_dir=None, content_structure=None):
         """
         初始化代理状态
         
@@ -29,6 +29,7 @@ class AgentState:
             raw_md (str, optional): 原始Markdown内容
             ppt_template_path (str, optional): PPT模板路径
             output_dir (str, optional): 输出目录路径
+            content_structure (dict, optional): 内容结构
         """
         # 如果没有提供会话ID，自动生成一个
         if not session_id:
@@ -42,7 +43,7 @@ class AgentState:
         self.output_dir = output_dir  # 输出目录
         
         # 处理结果
-        self.content_structure = None  # 解析后的内容结构
+        self.content_structure = content_structure  # 解析后的内容结构
         self.layout_features = None  # 模板布局特征
         self.decision_result = None  # 布局决策结果
         self.ppt_file_path = None  # 生成的PPT文件路径
@@ -92,8 +93,8 @@ class AgentState:
             error: 错误信息
         """
         self.failures.append({
-            "timestamp": datetime.now().isoformat(),
-            "error": error
+            "error": error,
+            "timestamp": datetime.now().isoformat()
         })
         logger.error(f"记录错误: {error}")
     
@@ -114,7 +115,11 @@ class AgentState:
             "layout_features": self.layout_features,
             "decision_result": self.decision_result,
             "ppt_file_path": self.ppt_file_path,
-            "validation_attempts": self.validation_attempts
+            "validation_attempts": self.validation_attempts,
+            "raw_md": self.raw_md,
+            "ppt_template_path": self.ppt_template_path,
+            "output_dir": self.output_dir,
+            "output_ppt_path": self.output_ppt_path
         }
     
     def save(self) -> None:
@@ -166,6 +171,10 @@ class AgentState:
         state.decision_result = data.get("decision_result")
         state.ppt_file_path = data.get("ppt_file_path")
         state.validation_attempts = data.get("validation_attempts", 0)
+        state.raw_md = data.get("raw_md")
+        state.ppt_template_path = data.get("ppt_template_path")
+        state.output_dir = data.get("output_dir")
+        state.output_ppt_path = data.get("output_ppt_path")
         
         logger.info(f"加载状态: {session_id}")
         return state 
