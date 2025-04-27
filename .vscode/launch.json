@@ -2,6 +2,47 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "运行PPT工作流(默认)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/run_workflow.py",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "运行PPT工作流(MCP介绍)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/run_workflow.py",
+            "args": [
+                "-m", "tests/testfiles/MCP介绍.md",
+                "-t", "tests/testfiles/Iphone16Pro.pptx"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "运行PPT工作流(自定义)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/run_workflow.py",
+            "args": [
+                "-m", "${input:markdownFile}",
+                "-t", "${input:templateFile}"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
             "name": "运行所有测试",
             "type": "python",
             "request": "launch",
@@ -27,5 +68,19 @@
             "purpose": ["debug-test"]
         }
     ],
-    "compounds": []
+    "compounds": [],
+    "inputs": [
+        {
+            "id": "markdownFile",
+            "type": "promptString",
+            "description": "Markdown文件路径",
+            "default": "tests/testfiles/MCP介绍.md"
+        },
+        {
+            "id": "templateFile",
+            "type": "promptString",
+            "description": "PPT模板文件路径",
+            "default": "tests/testfiles/Iphone16Pro.pptx"
+        }
+    ]
 } 
