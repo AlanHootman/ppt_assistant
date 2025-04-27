@@ -4,15 +4,18 @@
 """
 Markdown解析Agent模块
 
-负责解析Markdown文本，提取标题、段落、列表等结构化内容。
+负责解析Markdown文本，提取标题、段落、列表等结构化内容，并使用大模型对内容进行理解和分析。
 """
 
 import logging
 import re
+import json
+import os
 from typing import Dict, Any, List, Optional
 
 from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
+from core.llm.model_manager import ModelManager
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +30,11 @@ class MarkdownAgent(BaseAgent):
             config: Agent配置
         """
         super().__init__(config)
-        # 配置LLM模型，实际项目中会加载OpenAI等模型
+        # 配置LLM模型
         self.llm_model = config.get("llm_model", "gpt-4")
+        self.model_manager = ModelManager()
+        self.temperature = config.get("temperature", 0.2)  # 低温度以获得更确定性的输出
+        self.max_tokens = config.get("max_tokens", 4000)   # 足够长的输出以容纳完整结构
         logger.info(f"初始化MarkdownAgent，使用模型: {self.llm_model}")
     
     async def run(self, state: AgentState) -> AgentState:
@@ -50,12 +56,15 @@ class MarkdownAgent(BaseAgent):
             return state
         
         try:
-            # 使用本地解析方法解析Markdown
-            content_structure = self._parse_markdown(state.raw_md)
+            # 首先使用基础解析获取基本结构
+            basic_structure = self._parse_markdown(state.raw_md)
+            
+            # 使用大模型对内容进行深度理解
+            enhanced_structure = await self._enhance_with_llm(state.raw_md, basic_structure)
             
             # 更新状态
-            state.content_structure = content_structure
-            logger.info(f"Markdown解析完成，标题: {content_structure.get('title', '无标题')}")
+            state.content_structure = enhanced_structure
+            logger.info(f"Markdown解析完成，标题: {enhanced_structure.get('title', '无标题')}")
             
             # 记录检查点
             self.add_checkpoint(state)
@@ -68,13 +77,13 @@ class MarkdownAgent(BaseAgent):
     
     def _parse_markdown(self, markdown_text: str) -> Dict[str, Any]:
         """
-        解析Markdown文本
+        基础解析Markdown文本，提取基本结构
         
         Args:
             markdown_text: Markdown文本
             
         Returns:
-            解析后的结构化内容
+            解析后的基本结构化内容
         """
         # 初始化结构
         structure = {
@@ -103,9 +112,21 @@ class MarkdownAgent(BaseAgent):
                 structure["sections"].append({
                     "title": line[3:].strip(),
                     "content": [],
-                    "items": []
+                    "items": [],
+                    "code_blocks": []
                 })
                 current_section_index = len(structure["sections"]) - 1
+                
+            # 处理三级标题（子章节）
+            elif line.startswith("### ") and current_section_index >= 0:
+                if "subsections" not in structure["sections"][current_section_index]:
+                    structure["sections"][current_section_index]["subsections"] = []
+                
+                structure["sections"][current_section_index]["subsections"].append({
+                    "title": line[4:].strip(),
+                    "content": [],
+                    "items": []
+                })
                 
             # 处理列表项
             elif line.startswith("- ") and current_section_index >= 0:
@@ -117,8 +138,107 @@ class MarkdownAgent(BaseAgent):
                 # 将段落添加到当前章节
                 structure["sections"][current_section_index]["content"].append(line)
         
-        logger.debug(f"解析结果: 标题={structure['title']}, 章节数={len(structure['sections'])}")
+        logger.debug(f"基础解析结果: 标题={structure['title']}, 章节数={len(structure['sections'])}")
         return structure
+    
+    async def _enhance_with_llm(self, markdown_text: str, basic_structure: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        使用大模型增强Markdown解析结果，添加语义理解和关系分析
+        
+        Args:
+            markdown_text: 原始Markdown文本
+            basic_structure: 基础解析结果
+            
+        Returns:
+            增强后的结构化内容
+        """
+        logger.info(f"使用大模型({self.llm_model})进行内容增强分析")
+        
+        # 构建提示词
+        prompt = self._build_analysis_prompt(markdown_text, basic_structure)
+        
+        try:
+            # 调用大模型
+            response = await self.model_manager.generate_text(
+                model=self.llm_model,
+                prompt=prompt,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens
+            )
+            
+            # 解析JSON响应
+            enhanced_structure = self._parse_llm_response(response, basic_structure)
+            logger.info("大模型增强分析完成")
+            return enhanced_structure
+            
+        except Exception as e:
+            logger.error(f"大模型分析失败: {str(e)}")
+            # 如果大模型分析失败，返回基础结构
+            return basic_structure
+    
+    def _build_analysis_prompt(self, markdown_text: str, basic_structure: Dict[str, Any]) -> str:
+        """
+        构建用于大模型分析的提示词
+        
+        Args:
+            markdown_text: 原始Markdown文本
+            basic_structure: 基础解析结果
+            
+        Returns:
+            提示词
+        """
+        return f"""
+你是一个专业的PPT内容分析专家。请分析以下Markdown文本，并生成适合PPT制作的结构化JSON。
+每个部分除了保留原始内容外，还需添加以下分析信息：
+1. "semantic_type": 内容的语义类型，如"concept", "process", "comparison", "list", "timeline", "data", "case_study"等
+2. "relation_type": 内容之间的关系类型，如"sequence", "cause_effect", "problem_solution", "hierarchical"等
+3. "visualization_suggestion": 建议的可视化方式，如"bullet_points", "flowchart", "diagram", "chart", "table", "image"等
+4. "key_points": 提取的关键点列表，以便在PPT中突出显示
+5. "summary": 总结性描述，简明扼要表达该部分主旨
+
+Markdown文本:
+```
+{markdown_text}
+```
+
+基础解析结果:
+```
+{json.dumps(basic_structure, ensure_ascii=False, indent=2)}
+```
+
+请输出完整的增强JSON结构，确保输出是有效的JSON格式。
+只返回JSON数据，不要有其他回复。
+"""
+    
+    def _parse_llm_response(self, response: str, fallback_structure: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        解析大模型的响应，提取JSON结构
+        
+        Args:
+            response: 大模型响应
+            fallback_structure: 失败时的回退结构
+            
+        Returns:
+            解析后的结构
+        """
+        # 尝试从响应中提取JSON
+        try:
+            # 清理响应中的markdown格式代码块
+            json_text = response
+            if "```json" in response:
+                # 提取JSON代码块
+                pattern = r"```(?:json)?\s*([\s\S]*?)```"
+                matches = re.findall(pattern, response)
+                if matches:
+                    json_text = matches[0]
+            
+            # 解析JSON
+            enhanced_structure = json.loads(json_text)
+            return enhanced_structure
+            
+        except Exception as e:
+            logger.error(f"解析大模型响应失败: {str(e)}")
+            return fallback_structure
     
     def _extract_sections_with_llm(self, markdown_text: str) -> Dict[str, Any]:
         """
