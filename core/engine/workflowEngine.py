@@ -149,34 +149,39 @@ class WorkflowEngine:
             
             # 如果节点是markdown_parser并且有raw_md
             if node_name == "markdown_parser" and state.raw_md:
-                # 简单解析markdown（实际会在真实Agent中实现）
+                # 完全重写Markdown解析逻辑
                 try:
-                    # 简单结构化示例 - 实际解析会更复杂
                     lines = state.raw_md.split("\n")
-                    structure = {
-                        "title": "",
-                        "sections": []
-                    }
+                    structure = {"title": "", "sections": []}
                     
-                    current_section = None
+                    # 先找标题
+                    for line in lines:
+                        if line.strip().startswith("# "):
+                            structure["title"] = line.strip()[2:]
+                            break
+                    
+                    # 再处理章节，使用索引而不是对象引用
+                    current_section_index = -1  # -1表示没有当前章节
+                    
                     for line in lines:
                         line = line.strip()
-                        if line.startswith("# "):
-                            structure["title"] = line[2:]
-                        elif line.startswith("## "):
-                            # 创建新的章节
-                            current_section = {
-                                "title": line[3:],
+                        if not line:
+                            continue
+                            
+                        if line.startswith("## "):
+                            # 新章节
+                            section_title = line[3:]
+                            structure["sections"].append({
+                                "title": section_title,
                                 "content": []
-                            }
-                            structure["sections"].append(current_section)
-                        elif line.startswith("- ") and isinstance(current_section, dict):
-                            # 检查current_section是字典类型，并添加列表项
-                            current_section["content"].append(line[2:])
+                            })
+                            current_section_index = len(structure["sections"]) - 1
+                        elif line.startswith("- ") and current_section_index >= 0:
+                            # 安全地添加到当前章节的内容中
+                            structure["sections"][current_section_index]["content"].append(line[2:])
                     
                     state.content_structure = structure
                     logger.info(f"Markdown解析完成，标题: {structure.get('title')}, {len(structure.get('sections', []))}个章节")
-                    
                 except Exception as e:
                     logger.error(f"Markdown解析错误: {str(e)}")
                     state.record_failure(f"Markdown解析错误: {str(e)}")

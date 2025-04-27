@@ -32,11 +32,6 @@ conda activate ppt_gen
 pip install -r requirements.txt
 ```
 
-
-```bash
-pip install -r requirements.txt
-```
-
 ### 基本使用
 
 运行示例工作流：
