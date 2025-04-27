@@ -18,8 +18,9 @@
             "request": "launch",
             "program": "${workspaceFolder}/run_workflow.py",
             "args": [
-                "-m", "tests/testfiles/MCP介绍.md",
-                "-t", "tests/testfiles/Iphone16Pro.pptx"
+                "--md_file", "tests/testfiles/MCP介绍.md",
+                "--ppt_template", "tests/testfiles/Iphone16Pro.pptx",
+                "--output_dir", "workspace/output"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
@@ -33,8 +34,9 @@
             "request": "launch",
             "program": "${workspaceFolder}/run_workflow.py",
             "args": [
-                "-m", "${input:markdownFile}",
-                "-t", "${input:templateFile}"
+                "--md_file", "${input:markdownFile}",
+                "--ppt_template", "${input:templateFile}",
+                "--output_dir", "${input:outputDir}"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
@@ -81,6 +83,12 @@
             "type": "promptString",
             "description": "PPT模板文件路径",
             "default": "tests/testfiles/Iphone16Pro.pptx"
+        },
+        {
+            "id": "outputDir",
+            "type": "promptString",
+            "description": "输出目录",
+            "default": "workspace/output"
         }
     ]
 } 

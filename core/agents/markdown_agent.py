@@ -16,6 +16,7 @@ from typing import Dict, Any, List, Optional
 from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
+from config.prompts.markdown_agent_prompts import ANALYSIS_PROMPT, SECTION_EXTRACTION_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +156,10 @@ class MarkdownAgent(BaseAgent):
         logger.info(f"使用大模型({self.llm_model})进行内容增强分析")
         
         # 构建提示词
-        prompt = self._build_analysis_prompt(markdown_text, basic_structure)
+        prompt = ANALYSIS_PROMPT.format(
+            markdown_text=markdown_text,
+            basic_structure=json.dumps(basic_structure, ensure_ascii=False, indent=2)
+        )
         
         try:
             # 调用大模型
@@ -175,40 +179,6 @@ class MarkdownAgent(BaseAgent):
             logger.error(f"大模型分析失败: {str(e)}")
             # 如果大模型分析失败，返回基础结构
             return basic_structure
-    
-    def _build_analysis_prompt(self, markdown_text: str, basic_structure: Dict[str, Any]) -> str:
-        """
-        构建用于大模型分析的提示词
-        
-        Args:
-            markdown_text: 原始Markdown文本
-            basic_structure: 基础解析结果
-            
-        Returns:
-            提示词
-        """
-        return f"""
-你是一个专业的PPT内容分析专家。请分析以下Markdown文本，并生成适合PPT制作的结构化JSON。
-每个部分除了保留原始内容外，还需添加以下分析信息：
-1. "semantic_type": 内容的语义类型，如"concept", "process", "comparison", "list", "timeline", "data", "case_study"等
-2. "relation_type": 内容之间的关系类型，如"sequence", "cause_effect", "problem_solution", "hierarchical"等
-3. "visualization_suggestion": 建议的可视化方式，如"bullet_points", "flowchart", "diagram", "chart", "table", "image"等
-4. "key_points": 提取的关键点列表，以便在PPT中突出显示
-5. "summary": 总结性描述，简明扼要表达该部分主旨
-
-Markdown文本:
-```
-{markdown_text}
-```
-
-基础解析结果:
-```
-{json.dumps(basic_structure, ensure_ascii=False, indent=2)}
-```
-
-请输出完整的增强JSON结构，确保输出是有效的JSON格式。
-只返回JSON数据，不要有其他回复。
-"""
     
     def _parse_llm_response(self, response: str, fallback_structure: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -239,6 +209,27 @@ Markdown文本:
         except Exception as e:
             logger.error(f"解析大模型响应失败: {str(e)}")
             return fallback_structure
+    
+    def add_checkpoint(self, state: AgentState) -> None:
+        """
+        添加工作流检查点
+        
+        Args:
+            state: 工作流状态
+        """
+        state.add_checkpoint("markdown_parser_completed")
+        logger.info("添加检查点: markdown_parser_completed")
+    
+    def record_failure(self, state: AgentState, error: str) -> None:
+        """
+        记录失败信息
+        
+        Args:
+            state: 工作流状态
+            error: 错误信息
+        """
+        state.record_failure(error)
+        logger.error(f"记录失败: {error}")
     
     def _extract_sections_with_llm(self, markdown_text: str) -> Dict[str, Any]:
         """
