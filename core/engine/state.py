@@ -41,14 +41,14 @@ class AgentState(BaseModel):
         if self.checkpoints is None:
             self.checkpoints = []
         self.checkpoints.append(name)
-        logger.info(f"Session {self.session_id}: Added checkpoint '{name}'")
+        logger.info(f"会话 {self.session_id}: 添加检查点 '{name}'")
     
     def record_failure(self, error: str) -> None:
         """记录失败信息"""
         if self.failures is None:
             self.failures = []
         self.failures.append(error)
-        logger.error(f"Session {self.session_id}: Failure '{error}'")
+        logger.error(f"会话 {self.session_id}: 失败 '{error}'")
     
     def save(self) -> None:
         """保存当前状态到文件系统"""
@@ -59,7 +59,7 @@ class AgentState(BaseModel):
         with open(state_file, "w", encoding="utf-8") as f:
             f.write(self.model_dump_json(indent=2))
         
-        logger.info(f"Session {self.session_id}: State saved to {state_file}")
+        logger.info(f"会话 {self.session_id}: 状态已保存到 {state_file}")
     
     @classmethod
     def load(cls, session_id: str) -> "AgentState":
@@ -67,11 +67,11 @@ class AgentState(BaseModel):
         state_file = settings.SESSION_DIR / session_id / "state.json"
         
         if not state_file.exists():
-            logger.warning(f"Session {session_id}: State file not found")
+            logger.warning(f"会话 {session_id}: 状态文件不存在")
             return cls(session_id=session_id)
         
         with open(state_file, "r", encoding="utf-8") as f:
             data = json.load(f)
         
-        logger.info(f"Session {session_id}: State loaded from {state_file}")
+        logger.info(f"会话 {session_id}: 状态已从 {state_file} 加载")
         return cls(**data) 

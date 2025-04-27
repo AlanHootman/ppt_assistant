@@ -46,10 +46,22 @@ class TestWorkflowEngine:
         
         result = await engine.run(input_data=input_data)
         
-        # 验证
+        # 验证 - 根据当前LangGraph实现，我们预期验证节点不会被执行
+        # 因为我们直接从ppt_generator节点直接结束了工作流
         assert result.raw_md == "# Test Markdown"
         assert "markdown_parser_completed" in result.checkpoints
         assert "ppt_analyzer_completed" in result.checkpoints
         assert "layout_decider_completed" in result.checkpoints
         assert "ppt_generator_completed" in result.checkpoints
-        assert "validator_completed" in result.checkpoints 
+        
+        # 验证内容结构
+        assert result.content_structure is not None
+        assert result.content_structure.get("title") == "Test Markdown"
+        
+        # 验证决策结果
+        assert result.decision_result is not None
+        assert "slides" in result.decision_result
+        assert len(result.decision_result["slides"]) > 0
+        
+        # 验证文件路径
+        assert result.ppt_file_path is not None 

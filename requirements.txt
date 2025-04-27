@@ -1,9 +1,11 @@
 # 基础依赖
 langchain>=0.1.0
-langgraph>=0.0.15
+langgraph>=0.0.62
 pydantic>=2.0.0
 python-dotenv>=1.0.0
 PyYAML>=6.0
-pytest>=7.3.1
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
 # 模型服务
 openai>=1.0.0
+python-pptx>=0.6.21
