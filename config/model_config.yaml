@@ -1,0 +1,17 @@
+# 模型配置
+model_providers:
+  langgraph:
+    workflow_config: config/workflows/
+    agent_config: config/agents/
+    
+  llm:
+    - type: openai
+      models:
+        - name: gpt-4
+          api_key_env: OPENAI_API_KEY
+          
+  vision:
+    - type: openai
+      models:
+        - name: gpt-4-vision
+          api_key_env: OPENAI_API_KEY 

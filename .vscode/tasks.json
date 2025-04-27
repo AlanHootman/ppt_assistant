@@ -1,0 +1,28 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "运行所有测试",
+            "type": "shell",
+            "command": "cd ${workspaceFolder} && python -m tests.run_tests",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            },
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        },
+        {
+            "label": "运行当前测试文件",
+            "type": "shell",
+            "command": "cd ${workspaceFolder} && PYTHONPATH=${workspaceFolder} python -m pytest ${relativeFile} -v",
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "new"
+            }
+        }
+    ]
+} 
