@@ -21,6 +21,12 @@ from core.engine.configLoader import ConfigLoader
 from core.agents.markdown_agent import MarkdownAgent
 # 导入模拟模块
 from core.engine.mocks import WorkflowMocks
+# 引入监控功能（可选）
+try:
+    from core.monitoring import MLflowTracker, register_with_langgraph
+    HAS_MLFLOW = True
+except ImportError:
+    HAS_MLFLOW = False
 # 暂时注释掉不存在的导入
 # from core.agents.layout_agent import LayoutAgent
 # from core.agents.ppt_agent import PPTAgent
@@ -32,17 +38,30 @@ logger = logging.getLogger(__name__)
 class WorkflowEngine:
     """工作流引擎"""
     
-    def __init__(self, workflow_name: str = "ppt_generation"):
+    def __init__(self, workflow_name: str = "ppt_generation", enable_tracking: bool = False):
         """
         初始化工作流引擎
         
         Args:
             workflow_name: 工作流配置名称
+            enable_tracking: 是否启用MLflow跟踪
         """
         self.workflow_name = workflow_name
         self.config = ConfigLoader.load_workflow_config(workflow_name)
         self.execution_logs = []
         self.checkpoints = {}
+        self.enable_tracking = enable_tracking and HAS_MLFLOW
+        self.tracker = None
+        
+        # 如果启用跟踪，初始化MLflow跟踪器
+        if self.enable_tracking:
+            try:
+                self.tracker = MLflowTracker(experiment_name=workflow_name)
+                logger.info(f"已启用MLflow工作流跟踪: {workflow_name}")
+            except Exception as e:
+                logger.error(f"初始化MLflow跟踪器失败: {str(e)}")
+                self.enable_tracking = False
+        
         self.graph = self._build_workflow()
         logger.info(f"初始化工作流引擎: {workflow_name}")
     
@@ -114,6 +133,15 @@ class WorkflowEngine:
                 first_node = nodes[0].get("name")
                 workflow.set_entry_point(first_node)
                 logger.debug(f"设置默认入口点: {first_node}")
+        
+        # 如果启用了跟踪，添加MLflow处理器
+        if self.enable_tracking and self.tracker:
+            try:
+                # 使用新的注册方法
+                register_with_langgraph(self.tracker, workflow)
+                logger.info("已注册MLflow节点执行跟踪器")
+            except Exception as e:
+                logger.error(f"添加MLflow处理器失败: {str(e)}")
         
         # 获取节点数量
         node_count = len(workflow.nodes) if hasattr(workflow, "nodes") else 0
@@ -272,6 +300,10 @@ class WorkflowEngine:
         
         logger.info(f"启动工作流，会话: {state.session_id}")
         
+        # 启动MLflow跟踪
+        if self.enable_tracking and self.tracker:
+            self.tracker.start_workflow_run(state.session_id, self.workflow_name)
+        
         try:
             # 清除之前的执行日志
             self.execution_logs = []
@@ -299,6 +331,11 @@ class WorkflowEngine:
                 state.save()
                 
                 logger.info(f"工作流直接执行完成，节点执行次数: {len(self.execution_logs)}")
+                
+                # 结束MLflow跟踪
+                if self.enable_tracking and self.tracker:
+                    self.tracker.end_workflow_run("FINISHED")
+                    
                 return state
             
             # 如果不满足直接执行条件，尝试使用LangGraph执行
@@ -343,12 +380,22 @@ class WorkflowEngine:
             }
             
             logger.info(f"工作流完成，会话: {result.session_id}, 节点执行次数: {len(self.execution_logs)}")
+            
+            # 结束MLflow跟踪
+            if self.enable_tracking and self.tracker:
+                self.tracker.end_workflow_run("FINISHED")
+                
             return result
             
         except Exception as e:
             logger.error(f"工作流失败: {str(e)}")
             state.record_failure(str(e))
             state.save()
+            
+            # 结束MLflow跟踪，标记为失败
+            if self.enable_tracking and self.tracker:
+                self.tracker.end_workflow_run("FAILED")
+            
             raise
     
     def _execute_node_directly(self, node_name: str, state: AgentState) -> None:

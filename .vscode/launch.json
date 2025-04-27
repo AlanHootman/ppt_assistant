@@ -20,7 +20,8 @@
             "args": [
                 "--md_file", "tests/testfiles/MCP介绍.md",
                 "--ppt_template", "tests/testfiles/Iphone16Pro.pptx",
-                "--output_dir", "workspace/output"
+                "--output_dir", "workspace/output",
+                "--trace"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,

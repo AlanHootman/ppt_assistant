@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 import argparse
 import traceback
+import subprocess
 
 from core.engine.workflowEngine import WorkflowEngine
 
@@ -17,14 +18,50 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+def check_mlflow_installed():
+    """检查是否安装了MLflow"""
+    try:
+        import mlflow
+        return True
+    except ImportError:
+        return False
+
+def start_mlflow_server(port=5000, host="127.0.0.1"):
+    """启动MLflow服务器"""
+    try:
+        # 检查mlruns目录是否存在
+        if not os.path.exists("mlruns"):
+            logger.warning("没有找到MLflow跟踪数据，将在生成新数据后再显示")
+        
+        # 启动MLflow服务器
+        logger.info(f"正在启动MLflow服务器，地址 {host}:{port}...")
+        subprocess.Popen(
+            ["mlflow", "server", "--host", host, "--port", str(port)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE
+        )
+        logger.info(f"MLflow服务器已启动，请访问: http://{host}:{port}")
+    except Exception as e:
+        logger.error(f"启动MLflow服务器失败: {str(e)}")
+
 async def main():
     """主函数 - 处理命令行参数并执行工作流"""
     parser = argparse.ArgumentParser(description='运行PPT生成工作流')
     parser.add_argument('--md_file', type=str, required=True, help='输入的Markdown文件路径')
     parser.add_argument('--ppt_template', type=str, required=True, help='PPT模板文件路径')
     parser.add_argument('--output_dir', type=str, default='workspace/output', help='输出目录')
+    parser.add_argument('--trace', action='store_true', help='启用MLflow跟踪')
+    parser.add_argument('--ui', action='store_true', help='启动MLflow服务器')
+    parser.add_argument('--host', type=str, default="127.0.0.1", help='MLflow服务器主机地址')
+    parser.add_argument('--port', type=int, default=5000, help='MLflow服务器端口号')
     
     args = parser.parse_args()
+    
+    # 检查MLflow
+    has_mlflow = check_mlflow_installed()
+    if args.trace and not has_mlflow:
+        logger.warning("未安装MLflow，将无法使用工作流跟踪功能。请运行: pip install mlflow")
+        args.trace = False
     
     # 检查输入文件
     if not os.path.exists(args.md_file):
@@ -43,8 +80,8 @@ async def main():
         md_content = file.read()
     
     try:
-        # 初始化工作流引擎 - 使用默认的工作流名称"ppt_generation"
-        engine = WorkflowEngine()
+        # 初始化工作流引擎 - 使用默认的工作流名称"ppt_generation"，并启用跟踪（如果请求）
+        engine = WorkflowEngine(enable_tracking=args.trace)
         
         # 执行工作流
         result = await engine.run_async(
@@ -58,6 +95,11 @@ async def main():
         if output_path and os.path.exists(output_path):
             logger.info(f"PPT生成成功: {output_path}")
             print(f"\nPPT文件已生成: {output_path}")
+            
+            # 启动MLflow服务器（如果请求）
+            if args.ui and has_mlflow:
+                start_mlflow_server(port=args.port, host=args.host)
+                print(f"\nMLflow服务器已启动，请访问: http://{args.host}:{args.port}")
         else:
             logger.error("PPT生成失败，未找到输出文件")
             return 1
