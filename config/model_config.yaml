@@ -1,63 +1,46 @@
-# 模型配置
-model_providers:
-  langgraph:
-    workflow_config: config/workflows/
-    agent_config: config/agents/
+# 模型配置中心 - 所有模型配置的唯一数据源
+providers:
+  openai:
+    # 默认设置(当未指定时使用)
+    default:
+      api_base: ${OPENAI_API_BASE:https://api.openai.com/v1}
+      api_key: ${OPENAI_API_KEY:}
+      organization: ${OPENAI_ORGANIZATION:}
     
-  llm:
-    - type: openai
-      models:
-        - name: gpt-4
-          api_key_env: OPENAI_API_KEY
-          
-  vision:
-    - type: openai
-      models:
-        - name: gpt-4-vision
-          api_key_env: OPENAI_API_KEY 
+    # 按类型定义不同模型组
+    model_groups:
+      text:
+        api_base: ${LLM_API_BASE:${OPENAI_API_BASE:}}  # 级联回退机制
+        api_key: ${LLM_API_KEY:${OPENAI_API_KEY:}}
+        default_model: gpt-4
+        models:
+          gpt-4:
+            max_tokens: 8192
+            temperature: 0.7
+          gpt-3.5-turbo:
+            max_tokens: 4096
+            temperature: 0.7
+      
+      vision:
+        api_base: ${VISION_API_BASE:${OPENAI_API_BASE:}}
+        api_key: ${VISION_API_KEY:${OPENAI_API_KEY:}}
+        default_model: gpt-4-vision
+        models:
+          gpt-4-vision:
+            max_tokens: 4096
+            temperature: 0.7
+      
+      embedding:
+        api_base: ${EMBEDDING_API_BASE:${OPENAI_API_BASE:}}
+        api_key: ${EMBEDDING_API_KEY:${OPENAI_API_KEY:}}
+        default_model: text-embedding-3-large
+        models:
+          text-embedding-3-large:
+            dimensions: 3072
+          text-embedding-3-small:
+            dimensions: 1536
 
 # 大模型配置文件
-
-# 默认OpenAI配置（当模型类型没有专用配置时使用）
-openai:
-  # 基础设置
-  base_url: ${OPENAI_API_BASE:https://api.openai.com/v1}
-  api_key: ${OPENAI_API_KEY:}
-  organization: ${OPENAI_ORGANIZATION:}
-
-  # 文本模型
-  text:
-    base_url: ${LLM_API_BASE:${OPENAI_API_BASE:https://api.openai.com/v1}}
-    api_key: ${LLM_API_KEY:${OPENAI_API_KEY:}}
-    default: ${LLM_MODEL:gpt-4}
-    models:
-      - name: gpt-4
-        max_tokens: ${LLM_MAX_TOKENS:8192}
-        temperature: ${LLM_TEMPERATURE:0.7}
-      - name: gpt-3.5-turbo
-        max_tokens: 4096
-        temperature: 0.7
-  
-  # 嵌入模型  
-  embedding:
-    base_url: ${EMBEDDING_API_BASE:${OPENAI_API_BASE:https://api.openai.com/v1}}
-    api_key: ${EMBEDDING_API_KEY:${OPENAI_API_KEY:}}
-    default: ${EMBEDDING_MODEL:text-embedding-3-large}
-    models:
-      - name: text-embedding-3-large
-        dimensions: 3072
-      - name: text-embedding-3-small
-        dimensions: 1536
-  
-  # 视觉模型
-  vision:
-    base_url: ${VISION_API_BASE:${OPENAI_API_BASE:https://api.openai.com/v1}}
-    api_key: ${VISION_API_KEY:${OPENAI_API_KEY:}}
-    default: ${VISION_MODEL:gpt-4-vision}
-    models:
-      - name: gpt-4-vision
-        max_tokens: 4096
-        temperature: 0.7
 
 # 提示词配置
 prompts:

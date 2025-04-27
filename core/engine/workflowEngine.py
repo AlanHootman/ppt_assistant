@@ -19,6 +19,10 @@ from core.engine.state import AgentState
 from core.engine.configLoader import ConfigLoader
 # 引入MarkdownAgent
 from core.agents.markdown_agent import MarkdownAgent
+# 暂时注释掉不存在的导入
+# from core.agents.layout_agent import LayoutAgent
+# from core.agents.ppt_agent import PPTAgent
+from core.utils.markdown_parser import MarkdownParser
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -36,6 +40,7 @@ class WorkflowEngine:
         self.workflow_name = workflow_name
         self.config = ConfigLoader.load_workflow_config(workflow_name)
         self.execution_logs = []
+        self.checkpoints = {}
         self.graph = self._build_workflow()
         logger.info(f"初始化工作流引擎: {workflow_name}")
     
@@ -237,7 +242,7 @@ class WorkflowEngine:
         try:
             logger.info("执行真实的MarkdownAgent处理")
             
-            # 获取markdown_parser节点的配置
+            # 从配置中获取markdown_parser节点的配置
             node_config = None
             for node in self.config.get("workflow", {}).get("nodes", []):
                 if node.get("name") == "markdown_parser":
@@ -245,7 +250,7 @@ class WorkflowEngine:
                     break
             
             if not node_config:
-                node_config = {"llm_model": "gpt-4"}
+                node_config = {"model_type": "text", "model_name": "gpt-4"}
                 logger.warning("未找到markdown_parser节点配置，使用默认配置")
             
             # 创建MarkdownAgent实例
@@ -312,49 +317,53 @@ class WorkflowEngine:
     
     def _mock_layout_decider(self, state: AgentState) -> None:
         """模拟布局决策实现"""
-        structure = state.content_structure
-        layouts = state.layout_features.get("layouts", [])
+        logger.info(f"[模拟] 执行布局决策: 内容结构存在={state.content_structure is not None}, 布局特征存在={state.layout_features is not None}")
         
-        # 生成决策
-        slides = []
-        
-        # 标题页
-        if structure.get("title"):
-            slides.append({
-                "type": "title",
-                "content": {
-                    "title": structure.get("title")
+        # 模拟决策结果
+        state.decision_result = {
+            "slides": [
+                {
+                    "type": "title_slide",
+                    "content": {
+                        "title": state.content_structure.get("title", "演示文稿"),
+                        "subtitle": "自动生成的PPT"
+                    }
                 }
-            })
+            ]
+        }
         
-        # 根据章节生成内容页
-        for section in structure.get("sections", []):
-            section_title = section.get("title")
+        # 添加内容幻灯片
+        sections = state.content_structure.get("sections", [])
+        for section in sections:
+            section_title = section.get("title", "")
             section_content = section.get("content", [])
             
-            # 选择合适的布局
-            slide_type = "content"  # 默认
-            if len(section_content) > 3:
-                slide_type = "twoColumns" if "twoColumns" in layouts else "content"
-            
-            slides.append({
-                "type": slide_type,
+            slide = {
+                "type": "content_slide",
                 "content": {
                     "title": section_title,
                     "bullets": section_content
                 }
-            })
+            }
+            
+            state.decision_result["slides"].append(slide)
         
-        state.decision_result = {
-            "slides": slides,
-            "template": state.layout_features.get("templateName")
-        }
-        logger.info(f"[模拟] 布局决策完成，共{len(slides)}张幻灯片")
+        logger.info(f"[模拟] 布局决策完成: 生成了{len(state.decision_result.get('slides', []))}张幻灯片")
     
     def _mock_ppt_generator(self, state: AgentState) -> None:
         """模拟PPT生成实现"""
         slides = state.decision_result.get("slides", [])
-        output_path = settings.WORKSPACE_DIR / "temp" / f"{state.session_id}.pptx"
+        
+        # 检查输出目录设置
+        output_dir = getattr(state, 'output_dir', None)
+        if output_dir:
+            # 确保输出目录存在
+            os.makedirs(output_dir, exist_ok=True)
+            output_path = Path(output_dir) / f"{state.session_id}.pptx"
+        else:
+            # 使用默认路径
+            output_path = settings.WORKSPACE_DIR / "temp" / f"{state.session_id}.pptx"
+            output_path.parent.mkdir(exist_ok=True)
         
         # 生成空文件作为测试
         output_path.parent.mkdir(exist_ok=True)
@@ -364,6 +373,7 @@ class WorkflowEngine:
             json.dump(state.decision_result, f, ensure_ascii=False, indent=2)
         
         state.ppt_file_path = str(output_path)
+        state.output_ppt_path = str(output_path)  # 添加这个属性以保持一致性
         logger.info(f"[模拟] PPT文件将保存至: {output_path}")
     
     def _mock_validator(self, state: AgentState) -> None:
@@ -578,640 +588,154 @@ class WorkflowEngine:
         """
         return self.execution_logs
 
-    async def run_async(self, raw_md, ppt_template_path, output_dir="workspace/output"):
+    async def run_async(self, session_id=None, raw_md=None, ppt_template_path=None, output_dir=None):
         """
         异步执行工作流
         
         Args:
-            raw_md (str): Markdown原始内容
-            ppt_template_path (str): PPT模板路径
-            output_dir (str): 输出目录
-            
+            session_id (str, optional): 会话ID，如果为None则自动生成
+            raw_md (str): 原始Markdown文本
+            ppt_template_path (str, optional): PPT模板路径，默认None
+            output_dir (str, optional): 输出目录路径，默认None
+        
         Returns:
-            dict: 包含工作流执行结果的字典
+            dict: 工作流执行结果状态
         """
-        logger.info("开始异步执行工作流...")
+        # 如果没有提供会话ID，生成一个
+        if not session_id:
+            session_id = str(uuid.uuid4())
         
-        # 检查输入
-        if not raw_md:
-            logger.warning("Markdown内容为空")
-            
-        if not ppt_template_path or not os.path.exists(ppt_template_path):
-            logger.warning(f"PPT模板路径无效: {ppt_template_path}")
-        
-        # 创建会话ID
-        session_id = str(uuid.uuid4())
-        logger.info(f"创建新会话: {session_id}")
+        logger.info(f"开始执行工作流，会话ID: {session_id}")
         
         # 初始化状态
-        state = {
-            "session_id": session_id,
-            "created_at": datetime.now().isoformat(),
-            "raw_md": raw_md,
-            "ppt_template_path": ppt_template_path,
-            "output_dir": output_dir,
-            "current_node": None,
-            "checkpoints": [],
-            "failures": []
-        }
+        agent_state = AgentState(
+            session_id=session_id,
+            raw_md=raw_md,
+            ppt_template_path=ppt_template_path,
+            output_dir=output_dir
+        )
         
-        # 模拟直接执行工作流节点
         try:
-            # Markdown解析
-            state["current_node"] = "markdown_parser"
-            state = await self._execute_markdown_parser_async(state)
-            state["checkpoints"].append("markdown_parser_completed")
+            # 1. 执行Markdown解析节点
+            logger.info("执行节点: markdown_agent")
             
-            # PPT模板分析
-            state["current_node"] = "ppt_analyzer"
-            state = await self._execute_ppt_analyzer_async(state)
-            state["checkpoints"].append("ppt_analyzer_completed")
+            # 从配置中获取markdown_agent节点的配置
+            node_config = None
+            for node in self.config.get("workflow", {}).get("nodes", []):
+                if node.get("name") == "markdown_agent":
+                    node_config = node.get("config", {})
+                    break
             
-            # 布局决策
-            state["current_node"] = "layout_decider"
-            state = await self._execute_layout_decider_async(state)
-            state["checkpoints"].append("layout_decider_completed")
+            if not node_config:
+                node_config = {"model_type": "text"}
+                logger.warning("未找到markdown_agent节点配置，使用默认配置")
             
-            # PPT生成
-            state["current_node"] = "ppt_generator"
-            state = await self._execute_ppt_generator_async(state)
-            state["checkpoints"].append("ppt_generator_completed")
+            # 创建MarkdownAgent实例
+            markdown_agent = MarkdownAgent(node_config)
             
-            # 验证
-            state["current_node"] = "validator"
-            state = await self._execute_validator_async(state)
-            state["checkpoints"].append("validator_completed")
+            # 执行Markdown解析
+            agent_state = await markdown_agent.run(agent_state)
+            
+            # 添加检查点
+            self._add_checkpoint("markdown_parser", agent_state.to_dict())
+            
+            # 2. 执行PPT模板分析节点 - 使用mock实现
+            logger.info("执行节点: ppt_analyzer (mock实现)")
+            if agent_state.ppt_template_path:
+                self._mock_ppt_analyzer(agent_state)
+                self._add_checkpoint("ppt_analyzer", agent_state.to_dict())
+            else:
+                logger.warning("缺少PPT模板路径，跳过模板分析节点")
+            
+            # 3. 执行布局决策节点 - 使用mock实现
+            logger.info("执行节点: layout_decider (mock实现)")
+            if agent_state.content_structure and agent_state.layout_features:
+                self._mock_layout_decider(agent_state)
+                self._add_checkpoint("layout_decider", agent_state.to_dict())
+            else:
+                logger.warning("缺少内容结构或布局特征，跳过布局决策节点")
+            
+            # 4. 执行PPT生成节点 - 使用mock实现
+            logger.info("执行节点: ppt_generator (mock实现)")
+            if agent_state.decision_result:
+                self._mock_ppt_generator(agent_state)
+                self._add_checkpoint("ppt_generator", agent_state.to_dict())
+            else:
+                logger.warning("缺少决策结果，跳过PPT生成节点")
+            
+            # 5. 执行验证节点 - 使用mock实现
+            logger.info("执行节点: validator (mock实现)")
+            self._mock_validator(agent_state)
+            self._add_checkpoint("validator", agent_state.to_dict())
+            
+            # 6. 返回最终状态
+            return agent_state.to_dict()
             
         except Exception as e:
             logger.error(f"工作流执行出错: {str(e)}")
-            state["failures"].append({
-                "node": state["current_node"],
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
-            traceback.print_exc()
-            
-        # 保存最终状态
-        self._save_state(state)
+            agent_state.record_failure(f"工作流引擎错误: {str(e)}")
+            return agent_state.to_dict()
         
-        # 记录执行信息
-        logger.info(f"工作流执行完成")
-        logger.info(f"会话ID: {session_id}")
-        logger.info(f"执行的节点数: {len(state['checkpoints'])}")
+    def _add_checkpoint(self, checkpoint_name, state_dict):
+        """
+        添加检查点，保存当前状态
         
-        return state
+        Args:
+            checkpoint_name (str): 检查点名称
+            state_dict (dict): 当前状态
+        """
+        self.checkpoints[checkpoint_name] = {
+            "timestamp": datetime.now().isoformat(),
+            "state": state_dict
+        }
+        logger.info(f"添加检查点: {checkpoint_name}")
+    
+    def _get_node_config(self, node_name):
+        """
+        获取节点配置
         
-    async def _execute_markdown_parser_async(self, state):
-        """异步执行Markdown解析节点"""
-        logger.info(f"执行节点: markdown_parser")
+        Args:
+            node_name (str): 节点名称
+            
+        Returns:
+            dict: 节点配置
+        """
+        for node in self.config.get("workflow", {}).get("nodes", []):
+            if node.get("name") == node_name:
+                return node.get("config", {})
         
-        # 模拟解析逻辑
-        raw_md = state.get("raw_md", "")
-        if not raw_md:
-            logger.warning("Markdown内容为空")
-            return state
-            
-        try:
-            # 解析Markdown内容结构
-            content_structure = {
-                "title": "从Markdown提取的标题",
-                "sections": []
-            }
-            
-            # 简单解析逻辑：识别标题和内容
-            lines = raw_md.split("\n")
-            current_section = None
-            
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-                    
-                # 检测主标题 (# 标题)
-                if line.startswith("# "):
-                    content_structure["title"] = line[2:].strip()
-                
-                # 检测章节标题 (## 标题)
-                elif line.startswith("## "):
-                    current_section = {
-                        "title": line[3:].strip(),
-                        "content": []
-                    }
-                    content_structure["sections"].append(current_section)
-                
-                # 检测子章节标题 (### 标题)
-                elif line.startswith("### "):
-                    if current_section:
-                        current_section["content"].append({
-                            "type": "subheading",
-                            "text": line[4:].strip()
-                        })
-                
-                # 检测列表项 (- 或 * 项目)
-                elif line.startswith("- ") or line.startswith("* "):
-                    if current_section:
-                        current_section["content"].append({
-                            "type": "bullet",
-                            "text": line[2:].strip()
-                        })
-                
-                # 普通段落
-                else:
-                    if current_section:
-                        current_section["content"].append({
-                            "type": "paragraph",
-                            "text": line
-                        })
-            
-            # 更新状态
-            state["content_structure"] = content_structure
-            
-        except Exception as e:
-            logger.error(f"Markdown解析出错: {str(e)}")
-            state["failures"].append({
-                "node": "markdown_parser",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        return state
-        
-    async def _execute_ppt_analyzer_async(self, state):
-        """异步执行PPT模板分析节点"""
-        logger.info(f"执行节点: ppt_analyzer")
-        
-        # 获取PPT模板路径
-        ppt_template_path = state.get("ppt_template_path")
-        if not ppt_template_path or not os.path.exists(ppt_template_path):
-            logger.warning(f"PPT模板路径无效: {ppt_template_path}")
-            return state
-            
-        try:
-            # 模拟模板分析逻辑
-            template_name = os.path.basename(ppt_template_path).replace(".pptx", "")
-            
-            # 提取模板特征
-            layout_features = {
-                "templateName": template_name,
-                "slideCount": 10,  # 模拟值
-                "layouts": [
-                    {"type": "title", "description": "标题页布局"},
-                    {"type": "content", "description": "内容页布局"},
-                    {"type": "section", "description": "章节页布局"},
-                    {"type": "thank_you", "description": "结束页布局"}
-                ]
-            }
-            
-            # 更新状态
-            state["layout_features"] = layout_features
-            
-        except Exception as e:
-            logger.error(f"PPT模板分析出错: {str(e)}")
-            state["failures"].append({
-                "node": "ppt_analyzer",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        return state
-        
+        logger.warning(f"未找到节点配置: {node_name}")
+        return {}
+    
     async def _execute_layout_decider_async(self, state):
-        """异步执行布局决策节点"""
-        logger.info(f"执行节点: layout_decider")
+        """
+        执行布局决策节点
         
-        # 检查所需状态是否存在
-        content_structure = state.get("content_structure")
-        layout_features = state.get("layout_features")
+        Args:
+            state (AgentState): 工作流状态
+            
+        Returns:
+            AgentState: 更新后的工作流状态
+        """
+        logger.info("执行节点: layout_decider")
         
-        if not content_structure:
-            logger.warning("内容结构未定义，无法进行布局决策")
+        # 确保state是AgentState对象
+        if isinstance(state, dict):
+            state = AgentState.from_dict(state)
+        
+        # 检查必要的状态信息
+        if not hasattr(state, 'content_structure') or not state.content_structure:
+            logger.warning("缺少内容结构信息，无法进行布局决策")
+            state.record_failure("布局决策失败：缺少内容结构信息")
             return state
-            
-        if not layout_features:
-            logger.warning("布局特征未定义，无法进行布局决策")
-            return state
-            
-        try:
-            # 模拟布局决策逻辑
-            sections = content_structure.get("sections", [])
-            title = content_structure.get("title", "演示文稿")
-            
-            # 创建决策结果
-            decision_result = {
-                "title_slide": {
-                    "layout": "title",
-                    "title": title,
-                    "subtitle": "自动生成的演示文稿"
-                },
-                "content_slides": []
-            }
-            
-            # 为每个章节创建内容幻灯片
-            for section in sections:
-                section_title = section.get("title", "")
-                section_content = section.get("content", [])
-                
-                # 创建章节标题幻灯片
-                decision_result["content_slides"].append({
-                    "layout": "section",
-                    "title": section_title
-                })
-                
-                # 创建内容幻灯片
-                content_slide = {
-                    "layout": "content",
-                    "title": section_title,
-                    "bullets": []
-                }
-                
-                # 提取要点
-                for item in section_content:
-                    if item.get("type") in ["bullet", "subheading"]:
-                        content_slide["bullets"].append(item.get("text"))
-                
-                decision_result["content_slides"].append(content_slide)
-            
-            # 添加结束幻灯片
-            decision_result["content_slides"].append({
-                "layout": "thank_you",
-                "title": "谢谢观看"
-            })
-            
-            # 更新状态
-            state["decision_result"] = decision_result
-            
-        except Exception as e:
-            logger.error(f"布局决策出错: {str(e)}")
-            state["failures"].append({
-                "node": "layout_decider",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
         
-        return state
+        if not hasattr(state, 'layout_features') or not state.layout_features:
+            logger.warning("缺少布局特征信息，无法进行完整决策")
+            # 这里可以继续执行，因为可以基于内容结构进行基本决策
         
-    async def _execute_ppt_generator_async(self, state):
-        """异步执行PPT生成节点"""
-        logger.info(f"执行节点: ppt_generator")
+        # 使用模拟实现替代真实Agent
+        logger.info("使用模拟实现替代真实的布局决策Agent")
+        self._mock_layout_decider(state)
         
-        # 检查所需状态
-        decision_result = state.get("decision_result")
-        ppt_template_path = state.get("ppt_template_path")
-        output_dir = state.get("output_dir", "workspace/output")
-        
-        if not decision_result:
-            logger.warning("布局决策结果未定义，无法生成PPT")
-            return state
-            
-        if not ppt_template_path or not os.path.exists(ppt_template_path):
-            logger.warning(f"PPT模板路径无效: {ppt_template_path}")
-            return state
-            
-        try:
-            # 确保输出目录存在
-            os.makedirs(output_dir, exist_ok=True)
-            
-            # 生成输出文件名
-            session_id = state.get("session_id", str(uuid.uuid4()))
-            output_filename = f"generated_ppt_{session_id[:8]}.pptx"
-            output_path = os.path.join(output_dir, output_filename)
-            
-            # 模拟PPT生成逻辑
-            logger.info(f"正在生成PPT: {output_path}")
-            
-            # 在实际应用中，这里会使用python-pptx等库生成实际的PPT文件
-            # 为了演示，我们这里创建一个空文件
-            with open(output_path, "w") as f:
-                f.write("# This is a placeholder for the generated PPT")
-            
-            # 更新状态
-            state["output_ppt_path"] = output_path
-            
-        except Exception as e:
-            logger.error(f"PPT生成出错: {str(e)}")
-            state["failures"].append({
-                "node": "ppt_generator",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        return state
-        
-    async def _execute_validator_async(self, state):
-        """异步执行验证节点"""
-        logger.info(f"执行节点: validator")
-        
-        # 检查输出PPT路径
-        output_path = state.get("output_ppt_path")
-        
-        if not output_path or not os.path.exists(output_path):
-            logger.warning(f"生成的PPT文件不存在: {output_path}")
-            return state
-            
-        try:
-            # 模拟验证逻辑
-            logger.info(f"验证生成的PPT: {output_path}")
-            
-            # 更新状态
-            state["validation_result"] = {
-                "is_valid": True,
-                "message": "PPT文件已成功生成并验证",
-                "timestamp": datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error(f"PPT验证出错: {str(e)}")
-            state["failures"].append({
-                "node": "validator",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
-            
-            # 即使验证失败，也添加验证结果
-            state["validation_result"] = {
-                "is_valid": False,
-                "message": f"验证失败: {str(e)}",
-                "timestamp": datetime.now().isoformat()
-            }
-        
-        return state
-
-    def _save_state(self, state):
-        """保存状态到数据库或文件"""
-        # 实现保存状态的逻辑
-        pass
-
-    async def _execute_markdown_parser_async(self, state):
-        """异步执行Markdown解析节点"""
-        logger.info(f"执行节点: markdown_parser")
-        
-        # 模拟解析逻辑
-        raw_md = state.get("raw_md", "")
-        if not raw_md:
-            logger.warning("Markdown内容为空")
-            return state
-            
-        try:
-            # 解析Markdown内容结构
-            content_structure = {
-                "title": "从Markdown提取的标题",
-                "sections": []
-            }
-            
-            # 简单解析逻辑：识别标题和内容
-            lines = raw_md.split("\n")
-            current_section = None
-            
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-                    
-                # 检测主标题 (# 标题)
-                if line.startswith("# "):
-                    content_structure["title"] = line[2:].strip()
-                
-                # 检测章节标题 (## 标题)
-                elif line.startswith("## "):
-                    current_section = {
-                        "title": line[3:].strip(),
-                        "content": []
-                    }
-                    content_structure["sections"].append(current_section)
-                
-                # 检测子章节标题 (### 标题)
-                elif line.startswith("### "):
-                    if current_section:
-                        current_section["content"].append({
-                            "type": "subheading",
-                            "text": line[4:].strip()
-                        })
-                
-                # 检测列表项 (- 或 * 项目)
-                elif line.startswith("- ") or line.startswith("* "):
-                    if current_section:
-                        current_section["content"].append({
-                            "type": "bullet",
-                            "text": line[2:].strip()
-                        })
-                
-                # 普通段落
-                else:
-                    if current_section:
-                        current_section["content"].append({
-                            "type": "paragraph",
-                            "text": line
-                        })
-            
-            # 更新状态
-            state["content_structure"] = content_structure
-            
-        except Exception as e:
-            logger.error(f"Markdown解析出错: {str(e)}")
-            state["failures"].append({
-                "node": "markdown_parser",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        return state
-
-    async def _execute_ppt_analyzer_async(self, state):
-        """异步执行PPT模板分析节点"""
-        logger.info(f"执行节点: ppt_analyzer")
-        
-        # 获取PPT模板路径
-        ppt_template_path = state.get("ppt_template_path")
-        if not ppt_template_path or not os.path.exists(ppt_template_path):
-            logger.warning(f"PPT模板路径无效: {ppt_template_path}")
-            return state
-            
-        try:
-            # 模拟模板分析逻辑
-            template_name = os.path.basename(ppt_template_path).replace(".pptx", "")
-            
-            # 提取模板特征
-            layout_features = {
-                "templateName": template_name,
-                "slideCount": 10,  # 模拟值
-                "layouts": [
-                    {"type": "title", "description": "标题页布局"},
-                    {"type": "content", "description": "内容页布局"},
-                    {"type": "section", "description": "章节页布局"},
-                    {"type": "thank_you", "description": "结束页布局"}
-                ]
-            }
-            
-            # 更新状态
-            state["layout_features"] = layout_features
-            
-        except Exception as e:
-            logger.error(f"PPT模板分析出错: {str(e)}")
-            state["failures"].append({
-                "node": "ppt_analyzer",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        return state
-
-    async def _execute_layout_decider_async(self, state):
-        """异步执行布局决策节点"""
-        logger.info(f"执行节点: layout_decider")
-        
-        # 检查所需状态是否存在
-        content_structure = state.get("content_structure")
-        layout_features = state.get("layout_features")
-        
-        if not content_structure:
-            logger.warning("内容结构未定义，无法进行布局决策")
-            return state
-            
-        if not layout_features:
-            logger.warning("布局特征未定义，无法进行布局决策")
-            return state
-            
-        try:
-            # 模拟布局决策逻辑
-            sections = content_structure.get("sections", [])
-            title = content_structure.get("title", "演示文稿")
-            
-            # 创建决策结果
-            decision_result = {
-                "title_slide": {
-                    "layout": "title",
-                    "title": title,
-                    "subtitle": "自动生成的演示文稿"
-                },
-                "content_slides": []
-            }
-            
-            # 为每个章节创建内容幻灯片
-            for section in sections:
-                section_title = section.get("title", "")
-                section_content = section.get("content", [])
-                
-                # 创建章节标题幻灯片
-                decision_result["content_slides"].append({
-                    "layout": "section",
-                    "title": section_title
-                })
-                
-                # 创建内容幻灯片
-                content_slide = {
-                    "layout": "content",
-                    "title": section_title,
-                    "bullets": []
-                }
-                
-                # 提取要点
-                for item in section_content:
-                    if item.get("type") in ["bullet", "subheading"]:
-                        content_slide["bullets"].append(item.get("text"))
-                
-                decision_result["content_slides"].append(content_slide)
-            
-            # 添加结束幻灯片
-            decision_result["content_slides"].append({
-                "layout": "thank_you",
-                "title": "谢谢观看"
-            })
-            
-            # 更新状态
-            state["decision_result"] = decision_result
-            
-        except Exception as e:
-            logger.error(f"布局决策出错: {str(e)}")
-            state["failures"].append({
-                "node": "layout_decider",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        return state
-
-    async def _execute_ppt_generator_async(self, state):
-        """异步执行PPT生成节点"""
-        logger.info(f"执行节点: ppt_generator")
-        
-        # 检查所需状态
-        decision_result = state.get("decision_result")
-        ppt_template_path = state.get("ppt_template_path")
-        output_dir = state.get("output_dir", "workspace/output")
-        
-        if not decision_result:
-            logger.warning("布局决策结果未定义，无法生成PPT")
-            return state
-            
-        if not ppt_template_path or not os.path.exists(ppt_template_path):
-            logger.warning(f"PPT模板路径无效: {ppt_template_path}")
-            return state
-            
-        try:
-            # 确保输出目录存在
-            os.makedirs(output_dir, exist_ok=True)
-            
-            # 生成输出文件名
-            session_id = state.get("session_id", str(uuid.uuid4()))
-            output_filename = f"generated_ppt_{session_id[:8]}.pptx"
-            output_path = os.path.join(output_dir, output_filename)
-            
-            # 模拟PPT生成逻辑
-            logger.info(f"正在生成PPT: {output_path}")
-            
-            # 在实际应用中，这里会使用python-pptx等库生成实际的PPT文件
-            # 为了演示，我们这里创建一个空文件
-            with open(output_path, "w") as f:
-                f.write("# This is a placeholder for the generated PPT")
-            
-            # 更新状态
-            state["output_ppt_path"] = output_path
-            
-        except Exception as e:
-            logger.error(f"PPT生成出错: {str(e)}")
-            state["failures"].append({
-                "node": "ppt_generator",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        return state
-
-    async def _execute_validator_async(self, state):
-        """异步执行验证节点"""
-        logger.info(f"执行节点: validator")
-        
-        # 检查输出PPT路径
-        output_path = state.get("output_ppt_path")
-        
-        if not output_path or not os.path.exists(output_path):
-            logger.warning(f"生成的PPT文件不存在: {output_path}")
-            return state
-            
-        try:
-            # 模拟验证逻辑
-            logger.info(f"验证生成的PPT: {output_path}")
-            
-            # 更新状态
-            state["validation_result"] = {
-                "is_valid": True,
-                "message": "PPT文件已成功生成并验证",
-                "timestamp": datetime.now().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error(f"PPT验证出错: {str(e)}")
-            state["failures"].append({
-                "node": "validator",
-                "error": str(e),
-                "timestamp": datetime.now().isoformat()
-            })
-            
-            # 即使验证失败，也添加验证结果
-            state["validation_result"] = {
-                "is_valid": False,
-                "message": f"验证失败: {str(e)}",
-                "timestamp": datetime.now().isoformat()
-            }
-        
+        logger.info("布局决策完成")
         return state 

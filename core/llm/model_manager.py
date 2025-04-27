@@ -2,9 +2,9 @@
 # -*- coding: utf-8 -*-
 
 """
-大模型管理器模块
+大模型管理器模块 - 简化版
 
-提供对各种大模型的统一访问接口，支持文本生成、嵌入和多模态能力。
+提供对OpenAI API的简洁封装，支持文本生成、嵌入和多模态能力。
 """
 
 import os
@@ -13,104 +13,120 @@ import json
 import asyncio
 import base64
 from typing import Dict, Any, List, Optional, Union
-import httpx
 
 # 引入OpenAI官方库
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
-from openai.types.chat import ChatCompletionUserMessageParam
-
-from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
 class ModelManager:
-    """大模型统一管理器"""
+    """OpenAI API简化封装"""
     
     def __init__(self):
         """初始化模型管理器"""
-        # 加载model_config配置
-        import yaml
-        with open(settings.MODEL_CONFIG_PATH, 'r', encoding='utf-8') as f:
-            self.model_config = yaml.safe_load(f)
-        
-        # 获取各类模型的API配置
+        # 全局默认配置
         self.default_api_key = os.environ.get("OPENAI_API_KEY", "")
-        self.default_base_url = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
-        self.default_organization = os.environ.get("OPENAI_ORGANIZATION", "")
+        self.default_api_base = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
+        self.organization = os.environ.get("OPENAI_ORGANIZATION", "")
         
-        # 各类模型专用配置
-        openai_config = self.model_config.get("openai", {})
+        # 文本模型配置
+        self.text_model = os.environ.get("LLM_MODEL", "gpt-4")
+        self.text_api_key = os.environ.get("LLM_API_KEY", self.default_api_key)
+        self.text_api_base = os.environ.get("LLM_API_BASE", self.default_api_base)
         
-        # LLM配置
-        llm_config = openai_config.get("text", {})
-        self.llm_api_key = os.environ.get("LLM_API_KEY", self.default_api_key)
-        self.llm_base_url = os.environ.get("LLM_API_BASE", self.default_base_url)
-        
-        # Embedding配置
-        embedding_config = openai_config.get("embedding", {})
-        self.embedding_api_key = os.environ.get("EMBEDDING_API_KEY", self.default_api_key)
-        self.embedding_base_url = os.environ.get("EMBEDDING_API_BASE", self.default_base_url)
-        
-        # Vision配置
-        vision_config = openai_config.get("vision", {})
+        # 视觉模型配置
+        self.vision_model = os.environ.get("VISION_MODEL", "gpt-4-vision")
         self.vision_api_key = os.environ.get("VISION_API_KEY", self.default_api_key)
-        self.vision_base_url = os.environ.get("VISION_API_BASE", self.default_base_url)
+        self.vision_api_base = os.environ.get("VISION_API_BASE", self.default_api_base)
         
-        # 缓存客户端
+        # 嵌入模型配置
+        self.embedding_model = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-large")
+        self.embedding_api_key = os.environ.get("EMBEDDING_API_KEY", self.default_api_key)
+        self.embedding_api_base = os.environ.get("EMBEDDING_API_BASE", self.default_api_base)
+        
+        # 客户端缓存
         self._clients = {}
         
         logger.info("初始化大模型管理器")
     
-    def _get_client(self, client_type: str) -> AsyncOpenAI:
+    def _get_client(self, model_type: str) -> AsyncOpenAI:
         """
-        获取或创建指定类型的OpenAI客户端
+        获取指定类型的OpenAI客户端
         
         Args:
-            client_type: 客户端类型，支持'llm', 'embedding', 'vision'
+            model_type: 模型类型 (text, vision, embedding)
             
         Returns:
-            对应类型的客户端
+            OpenAI客户端实例
         """
-        if client_type in self._clients:
-            return self._clients[client_type]
-        
-        # 根据类型选择API密钥和基础URL
-        if client_type == "llm":
-            api_key = self.llm_api_key
-            base_url = self.llm_base_url
-        elif client_type == "embedding":
-            api_key = self.embedding_api_key
-            base_url = self.embedding_base_url
-        elif client_type == "vision":
+        if model_type in self._clients:
+            return self._clients[model_type]
+            
+        # 根据模型类型选择API配置
+        if model_type == "text":
+            api_key = self.text_api_key
+            api_base = self.text_api_base
+        elif model_type == "vision":
             api_key = self.vision_api_key
-            base_url = self.vision_base_url
+            api_base = self.vision_api_base
+        elif model_type == "embedding":
+            api_key = self.embedding_api_key
+            api_base = self.embedding_api_base
         else:
-            # 默认使用全局配置
+            # 使用默认配置
             api_key = self.default_api_key
-            base_url = self.default_base_url
-        
+            api_base = self.default_api_base
+            
         # 创建客户端
         client = AsyncOpenAI(
             api_key=api_key,
-            base_url=base_url,
-            organization=self.default_organization
+            base_url=api_base,
+            organization=self.organization
         )
         
         # 缓存客户端
-        self._clients[client_type] = client
+        self._clients[model_type] = client
         
         return client
+    
+    def get_model_config(self, model_type):
+        """获取指定类型的模型配置"""
+        # 根据模型类型返回对应的模型名称和默认参数
+        if model_type == "text":
+            return {
+                "model": self.text_model,
+                "temperature": 0.7,
+                "max_tokens": 4000
+            }
+        elif model_type == "vision":
+            return {
+                "model": self.vision_model,
+                "temperature": 0.7,
+                "max_tokens": 4000
+            }
+        elif model_type == "embedding":
+            return {
+                "model": self.embedding_model,
+                "dimensions": 1536
+            }
+        else:
+            logger.warning(f"未知模型类型: {model_type}，使用text类型")
+            return {
+                "model": self.text_model,
+                "temperature": 0.7,
+                "max_tokens": 4000
+            }
     
     async def generate_text(self, 
                            model: str, 
                            prompt: str, 
                            temperature: float = 0.7, 
-                           max_tokens: int = 1000,
+                           max_tokens: int = 4000,
                            top_p: float = 1.0,
                            stop: Optional[List[str]] = None) -> str:
         """
-        调用大模型生成文本
+        调用OpenAI生成文本
         
         Args:
             model: 模型名称
@@ -123,29 +139,38 @@ class ModelManager:
         Returns:
             生成的文本
         """
-        logger.info(f"调用大模型生成文本: {model}")
+        logger.info(f"调用OpenAI生成文本: {model}")
         
-        # 根据模型名称判断使用哪个提供商的API
-        if model.startswith("gpt-"):
-            return await self._call_openai_completion(
-                model=model, 
-                prompt=prompt, 
+        # 开发环境模拟调用
+        if os.environ.get("DEV_ENV") == "true":
+            logger.info(f"[DEV] 模拟OpenAI API请求: {model}")
+            await asyncio.sleep(1)
+            return "这是一个模拟的OpenAI API响应"
+        
+        try:
+            # 获取文本模型客户端
+            client = self._get_client("text")
+            
+            # 创建消息
+            messages = [{"role": "user", "content": prompt}]
+            
+            # 调用OpenAI API
+            response = await client.chat.completions.create(
+                model=model,
+                messages=messages,
                 temperature=temperature,
                 max_tokens=max_tokens,
                 top_p=top_p,
                 stop=stop
             )
-        else:
-            # 默认使用OpenAI
-            logger.warning(f"未知模型类型: {model}，使用OpenAI API")
-            return await self._call_openai_completion(
-                model="gpt-3.5-turbo", 
-                prompt=prompt, 
-                temperature=temperature,
-                max_tokens=max_tokens,
-                top_p=top_p,
-                stop=stop
-            )
+            
+            # 提取结果
+            result = response.choices[0].message.content
+            return result or ""
+                
+        except Exception as e:
+            logger.error(f"调用OpenAI API失败: {str(e)}")
+            raise
     
     async def generate_embedding(self, model: str, text: str) -> List[float]:
         """
@@ -160,12 +185,29 @@ class ModelManager:
         """
         logger.info(f"生成文本嵌入: {model}")
         
-        if model.startswith("text-embedding"):
-            return await self._call_openai_embedding(model=model, text=text)
-        else:
-            # 默认使用OpenAI
-            logger.warning(f"未知嵌入模型: {model}，使用OpenAI嵌入模型")
-            return await self._call_openai_embedding(model="text-embedding-3-large", text=text)
+        # 开发环境模拟调用
+        if os.environ.get("DEV_ENV") == "true":
+            logger.info(f"[DEV] 模拟OpenAI嵌入API请求: {model}")
+            await asyncio.sleep(0.5)
+            return [0.1] * 10
+        
+        try:
+            # 获取嵌入模型客户端
+            client = self._get_client("embedding")
+            
+            # 调用OpenAI API
+            response = await client.embeddings.create(
+                model=model,
+                input=text
+            )
+            
+            # 提取嵌入向量
+            embedding = response.data[0].embedding
+            return embedding
+                
+        except Exception as e:
+            logger.error(f"调用OpenAI嵌入API失败: {str(e)}")
+            raise
     
     async def analyze_image(self, model: str, image_path: str, prompt: str) -> str:
         """
@@ -181,143 +223,18 @@ class ModelManager:
         """
         logger.info(f"分析图像: {model}, {image_path}")
         
-        if model.startswith("gpt-4-vision"):
-            return await self._call_openai_vision(model=model, image_path=image_path, prompt=prompt)
-        else:
-            # 默认使用OpenAI的vision模型
-            logger.warning(f"未知视觉模型: {model}，使用OpenAI视觉模型")
-            return await self._call_openai_vision(model="gpt-4-vision", image_path=image_path, prompt=prompt)
-    
-    async def _call_openai_completion(self, 
-                                     model: str, 
-                                     prompt: str, 
-                                     temperature: float,
-                                     max_tokens: int,
-                                     top_p: float,
-                                     stop: Optional[List[str]]) -> str:
-        """
-        调用OpenAI文本生成API
-        
-        Args:
-            model: 模型名称
-            prompt: 提示词
-            temperature: 温度参数
-            max_tokens: 最大生成token数
-            top_p: Top-p采样参数
-            stop: 停止生成的标记
-            
-        Returns:
-            生成的文本
-        """
-        # 检查API密钥
-        if not self.llm_api_key:
-            raise ValueError("LLM API密钥未设置")
-        
-        # 模拟API调用（开发环境）
-        if os.environ.get("DEV_ENV") == "true":
-            logger.info(f"[DEV] 模拟OpenAI API请求: {model}")
-            await asyncio.sleep(1)  # 模拟网络延迟
-            return "这是一个模拟的OpenAI API响应"
-        
-        try:
-            # 获取LLM客户端
-            client = self._get_client("llm")
-            
-            # 创建消息
-            messages: List[ChatCompletionMessageParam] = [
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ]
-            
-            # 调用OpenAI API
-            response = await client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                top_p=top_p,
-                stop=stop
-            )
-            
-            # 提取结果
-            result = response.choices[0].message.content
-            
-            return result or ""
-                
-        except Exception as e:
-            logger.error(f"调用OpenAI API失败: {str(e)}")
-            raise
-    
-    async def _call_openai_embedding(self, model: str, text: str) -> List[float]:
-        """
-        调用OpenAI嵌入API
-        
-        Args:
-            model: 模型名称
-            text: 输入文本
-            
-        Returns:
-            嵌入向量
-        """
-        # 检查API密钥
-        if not self.embedding_api_key:
-            raise ValueError("Embedding API密钥未设置")
-        
-        # 模拟API调用（开发环境）
-        if os.environ.get("DEV_ENV") == "true":
-            logger.info(f"[DEV] 模拟OpenAI嵌入API请求: {model}")
-            await asyncio.sleep(0.5)  # 模拟网络延迟
-            return [0.1] * 10  # 返回模拟的嵌入向量
-        
-        try:
-            # 获取Embedding客户端
-            client = self._get_client("embedding")
-            
-            # 调用OpenAI API
-            response = await client.embeddings.create(
-                model=model,
-                input=text
-            )
-            
-            # 提取嵌入向量
-            embedding = response.data[0].embedding
-            
-            return embedding
-                
-        except Exception as e:
-            logger.error(f"调用OpenAI嵌入API失败: {str(e)}")
-            raise
-    
-    async def _call_openai_vision(self, model: str, image_path: str, prompt: str) -> str:
-        """
-        调用OpenAI视觉API
-        
-        Args:
-            model: 模型名称
-            image_path: 图像文件路径
-            prompt: 分析提示词
-            
-        Returns:
-            分析结果
-        """
-        # 检查API密钥
-        if not self.vision_api_key:
-            raise ValueError("Vision API密钥未设置")
-            
         # 检查图像文件是否存在
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"图像文件不存在: {image_path}")
         
-        # 模拟API调用（开发环境）
+        # 开发环境模拟调用
         if os.environ.get("DEV_ENV") == "true":
             logger.info(f"[DEV] 模拟OpenAI视觉API请求: {model}")
-            await asyncio.sleep(1.5)  # 模拟网络延迟
+            await asyncio.sleep(1.5)
             return "这是一个模拟的OpenAI视觉API响应，分析了图像内容"
         
         try:
-            # 获取Vision客户端
+            # 获取视觉模型客户端
             client = self._get_client("vision")
             
             # 读取图像文件并进行base64编码
@@ -344,12 +261,11 @@ class ModelManager:
                         "content": content
                     }
                 ],
-                max_tokens=1000
+                max_tokens=4000
             )
             
             # 提取结果
             result = response.choices[0].message.content
-            
             return result or ""
                 
         except Exception as e:

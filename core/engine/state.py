@@ -20,33 +20,44 @@ logger = logging.getLogger(__name__)
 class AgentState:
     """工作流状态类"""
     
-    def __init__(self, session_id: Optional[str] = None):
+    def __init__(self, session_id=None, raw_md=None, ppt_template_path=None, output_dir=None):
         """
-        初始化状态
+        初始化代理状态
         
         Args:
-            session_id: 会话ID，如果不提供则自动生成
+            session_id (str, optional): 会话ID，默认自动生成
+            raw_md (str, optional): 原始Markdown内容
+            ppt_template_path (str, optional): PPT模板路径
+            output_dir (str, optional): 输出目录路径
         """
-        self.session_id = session_id or str(uuid.uuid4())
+        # 如果没有提供会话ID，自动生成一个
+        if not session_id:
+            self.session_id = str(uuid.uuid4())
+        else:
+            self.session_id = session_id
+        
+        # 基本属性
+        self.raw_md = raw_md  # 原始Markdown内容
+        self.ppt_template_path = ppt_template_path  # PPT模板路径
+        self.output_dir = output_dir  # 输出目录
+        
+        # 处理结果
+        self.content_structure = None  # 解析后的内容结构
+        self.layout_features = None  # 模板布局特征
+        self.decision_result = None  # 布局决策结果
+        self.ppt_file_path = None  # 生成的PPT文件路径
+        self.output_ppt_path = None  # 输出的PPT文件路径
+        
+        # 验证信息
+        self.validation_attempts = 0  # 验证尝试次数
+        self.validation_result = None  # 验证结果
+
+        # 状态跟踪
+        self.checkpoints = []  # 检查点列表
+        self.failures = []  # 失败记录
+        self.current_node = None  # 当前执行节点
+        
         self.created_at = datetime.now().isoformat()
-        self.current_node = None
-        self.checkpoints = []
-        self.failures = []
-        
-        # Markdown解析结果
-        self.raw_md = None
-        self.content_structure = None
-        
-        # PPT模板分析结果
-        self.ppt_template_path = None
-        self.layout_features = None
-        
-        # 布局决策结果
-        self.decision_result = None
-        
-        # PPT生成结果
-        self.ppt_file_path = None
-        self.validation_attempts = 0
         
         logger.debug(f"创建状态: {self.session_id}")
     
@@ -157,4 +168,41 @@ class AgentState:
         state.validation_attempts = data.get("validation_attempts", 0)
         
         logger.info(f"加载状态: {session_id}")
+        return state 
+
+    @staticmethod
+    def from_dict(data: Dict[str, Any]) -> 'AgentState':
+        """
+        从字典创建状态实例
+        
+        Args:
+            data: 状态字典
+            
+        Returns:
+            AgentState实例
+        """
+        if not data:
+            logger.warning("传入的状态字典为空")
+            return AgentState()
+        
+        # 提取基本信息
+        session_id = data.get('session_id')
+        raw_md = data.get('raw_md')
+        ppt_template_path = data.get('ppt_template_path')
+        output_dir = data.get('output_dir')
+        
+        # 创建新实例
+        state = AgentState(
+            session_id=session_id,
+            raw_md=raw_md,
+            ppt_template_path=ppt_template_path,
+            output_dir=output_dir
+        )
+        
+        # 复制其他属性
+        for key, value in data.items():
+            if key not in ['session_id', 'raw_md', 'ppt_template_path', 'output_dir']:
+                if hasattr(state, key):
+                    setattr(state, key, value)
+        
         return state 

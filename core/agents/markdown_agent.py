@@ -17,6 +17,7 @@ from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
 from config.prompts.markdown_agent_prompts import ANALYSIS_PROMPT, SECTION_EXTRACTION_PROMPT
+from core.utils.markdown_parser import MarkdownParser
 
 logger = logging.getLogger(__name__)
 
@@ -31,11 +32,21 @@ class MarkdownAgent(BaseAgent):
             config: Agent配置
         """
         super().__init__(config)
-        # 配置LLM模型
-        self.llm_model = config.get("llm_model", "gpt-4")
+        # 初始化模型管理器，让它从环境变量加载配置
         self.model_manager = ModelManager()
-        self.temperature = config.get("temperature", 0.2)  # 低温度以获得更确定性的输出
-        self.max_tokens = config.get("max_tokens", 4000)   # 足够长的输出以容纳完整结构
+        
+        # 从配置获取模型类型和名称
+        self.model_type = config.get("model_type", "text")        
+        self.max_retries = config.get("max_retries", 3)
+        
+        # 初始化模型属性
+        model_config = self.model_manager.get_model_config(self.model_type)
+        self.llm_model = model_config.get("model")
+        self.temperature = model_config.get("temperature", 0.7)
+        self.max_tokens = model_config.get("max_tokens", 4000)
+        
+        # 创建解析器实例
+        self.markdown_parser = MarkdownParser()
         logger.info(f"初始化MarkdownAgent，使用模型: {self.llm_model}")
     
     async def run(self, state: AgentState) -> AgentState:
@@ -57,8 +68,22 @@ class MarkdownAgent(BaseAgent):
             return state
         
         try:
-            # 首先使用基础解析获取基本结构
-            basic_structure = self._parse_markdown(state.raw_md)
+
+
+            # 使用MarkdownParser进行基础解析
+            basic_structure = self.markdown_parser.parse(state.raw_md)
+            
+            # 提取额外信息
+            keywords = self.markdown_parser.extract_keywords(state.raw_md)
+            math_formulas = self.markdown_parser.parse_math_formulas(state.raw_md)
+            images = self.markdown_parser.parse_images(state.raw_md)
+            
+            # 将提取的信息添加到结构中
+            basic_structure["keywords"] = keywords
+            if math_formulas:
+                basic_structure["math_formulas"] = math_formulas
+            if images:
+                basic_structure["images"] = images
             
             # 使用大模型对内容进行深度理解
             enhanced_structure = await self._enhance_with_llm(state.raw_md, basic_structure)
@@ -78,7 +103,7 @@ class MarkdownAgent(BaseAgent):
     
     def _parse_markdown(self, markdown_text: str) -> Dict[str, Any]:
         """
-        基础解析Markdown文本，提取基本结构
+        基础解析Markdown文本，提取基本结构（保留兼容性）
         
         Args:
             markdown_text: Markdown文本
@@ -86,61 +111,8 @@ class MarkdownAgent(BaseAgent):
         Returns:
             解析后的基本结构化内容
         """
-        # 初始化结构
-        structure = {
-            "title": "",
-            "sections": []
-        }
-        
-        # 按行分割
-        lines = markdown_text.split("\n")
-        
-        # 存储当前处理的章节索引
-        current_section_index = -1
-        
-        # 处理每一行
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-                
-            # 处理一级标题（文档标题）
-            if line.startswith("# "):
-                structure["title"] = line[2:].strip()
-                
-            # 处理二级标题（章节标题）
-            elif line.startswith("## "):
-                structure["sections"].append({
-                    "title": line[3:].strip(),
-                    "content": [],
-                    "items": [],
-                    "code_blocks": []
-                })
-                current_section_index = len(structure["sections"]) - 1
-                
-            # 处理三级标题（子章节）
-            elif line.startswith("### ") and current_section_index >= 0:
-                if "subsections" not in structure["sections"][current_section_index]:
-                    structure["sections"][current_section_index]["subsections"] = []
-                
-                structure["sections"][current_section_index]["subsections"].append({
-                    "title": line[4:].strip(),
-                    "content": [],
-                    "items": []
-                })
-                
-            # 处理列表项
-            elif line.startswith("- ") and current_section_index >= 0:
-                # 将列表项添加到当前章节
-                structure["sections"][current_section_index]["items"].append(line[2:].strip())
-                
-            # 处理普通段落
-            elif current_section_index >= 0:
-                # 将段落添加到当前章节
-                structure["sections"][current_section_index]["content"].append(line)
-        
-        logger.debug(f"基础解析结果: 标题={structure['title']}, 章节数={len(structure['sections'])}")
-        return structure
+        # 直接使用新的MarkdownParser
+        return self.markdown_parser.parse(markdown_text)
     
     async def _enhance_with_llm(self, markdown_text: str, basic_structure: Dict[str, Any]) -> Dict[str, Any]:
         """

@@ -3,23 +3,23 @@ workflow:
   name: ppt_generation
   description: "PPT自动生成工作流"
   
-  # 节点配置
+  # 节点配置 - 只引用模型类型，具体模型名称从环境变量获取
   nodes:
-    - name: markdown_parser
+    - name: markdown_agent
       agent: MarkdownAgent
       config:
-        llm_model: gpt-4
+        model_type: text  # 对应环境变量LLM_MODEL
         max_retries: 3
         
     - name: ppt_analyzer
       agent: PPTAnalysisAgent  
       config:
-        vision_model: gpt-4-vision
+        model_type: vision  # 对应环境变量VISION_MODEL
         
     - name: layout_decider
       agent: LayoutDecisionAgent
       config:
-        embedding_model: text-embedding-3-large
+        model_type: embedding  # 对应环境变量EMBEDDING_MODEL
         
     - name: ppt_generator
       agent: PPTGeneratorAgent
@@ -29,13 +29,13 @@ workflow:
     - name: validator
       agent: ValidationAgent
       config:
-        vision_model: gpt-4-vision
+        model_type: vision  # 对应环境变量VISION_MODEL
         
   # 边配置
   edges:
     - from: start
-      to: markdown_parser
-    - from: markdown_parser
+      to: markdown_agent
+    - from: markdown_agent
       to: ppt_analyzer
     - from: ppt_analyzer
       to: layout_decider
