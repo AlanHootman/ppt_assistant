@@ -37,7 +37,7 @@ TEMPLATE_ANALYSIS_PROMPT = """
 4. 分析每种布局适合展示的内容类型和信息量
 5. 提供使用建议，包括如何最佳利用每种布局
 6. 对文本内容进行细致分析：
-   - 对于项目符号列表(bulletPoints)，请精确统计并描述有多少个项目点
+   - 对于项目符号列表(bulletPoints)，请通过识别每个项目点前面的符号(如圆点、方块、数字、三角形等)精确计数，不要依赖换行判断。即使一个项目点因内容较长而换行，也应视为一个项目点
    - 对于文本块(textBlock)，请分析有几个段落及其结构特点
 7. 对于图片元素，请添加图片内容描述(caption)，详细说明图片中展示的内容
 8. 提供幻灯片布局分组和汇总，说明哪几页使用类似布局，哪页是开篇/结束页
@@ -100,8 +100,9 @@ TEMPLATE_ANALYSIS_PROMPT = """
           "type": "bulletPoints",
           "position": "右侧主区域",
           "size": "占右侧80%空间",
-          "bulletCount": 5,
-          "bulletDescription": "每个要点平均2-3行文本，使用绿色圆点作为项目符号"
+          "bulletCount": 4,
+          "bulletSymbol": "绿色圆点",
+          "bulletDescription": "每个要点前有明显的绿色圆点符号标识，部分要点内容较长需要换行显示"
         },
         {
           "type": "textBlock",
@@ -118,7 +119,7 @@ TEMPLATE_ANALYSIS_PROMPT = """
         }
       ],
       "suitableContent": ["关键要点", "产品特性", "服务说明"],
-      "bestPractices": "每页限制5-7个要点，保持简洁"
+      "bestPractices": "每页限制4-6个要点，保持简洁"
     }
   ],
   "layoutGroups": [
@@ -160,7 +161,7 @@ TEMPLATE_ANALYSIS_PROMPT = """
 请确保为每个幻灯片布局的分析都提供以下详细信息：
 1. 幻灯片在原始PPT中的索引(slideIndex)
 2. 详细的结构和元素布局描述
-3. 项目符号列表的具体数量和特点
+3. 项目符号列表的具体数量、使用的符号类型及特点
 4. 文本块的段落数量和结构
 5. 图片的内容描述(caption)
 6. 幻灯片布局分组和汇总信息
