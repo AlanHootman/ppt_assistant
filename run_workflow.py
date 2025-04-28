@@ -51,9 +51,6 @@ async def main():
     parser.add_argument('--ppt_template', type=str, required=True, help='PPT模板文件路径')
     parser.add_argument('--output_dir', type=str, default='workspace/output', help='输出目录')
     parser.add_argument('--trace', action='store_true', help='启用MLflow跟踪')
-    parser.add_argument('--ui', action='store_true', help='启动MLflow服务器')
-    parser.add_argument('--host', type=str, default="127.0.0.1", help='MLflow服务器主机地址')
-    parser.add_argument('--port', type=int, default=5000, help='MLflow服务器端口号')
     
     args = parser.parse_args()
     
@@ -96,10 +93,6 @@ async def main():
             logger.info(f"PPT生成成功: {output_path}")
             print(f"\nPPT文件已生成: {output_path}")
             
-            # 启动MLflow服务器（如果请求）
-            if args.ui and has_mlflow:
-                start_mlflow_server(port=args.port, host=args.host)
-                print(f"\nMLflow服务器已启动，请访问: http://{args.host}:{args.port}")
         else:
             logger.error("PPT生成失败，未找到输出文件")
             return 1
