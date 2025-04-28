@@ -5,23 +5,39 @@
 幻灯片生成Agent模块
 
 负责根据内容规划生成具体的幻灯片内容，包括标题、文本、图片等元素。
+使用PPTManager在已有PPTX模板上进行操作，不直接生成幻灯片内容。
 """
 
 import logging
 import json
 import os
-from pathlib import Path
+import re
 from typing import Dict, Any, List, Optional
+import enum
 
 from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
-from config.prompts.slide_generator_prompts import SLIDE_GENERATION_PROMPT
+from config.prompts.slide_generator_prompts import LLM_PPT_ELEMENT_MATCHING_PROMPT
+
+# 导入PPT管理器
+try:
+    from interfaces.ppt_api import PPTManager
+except ImportError:
+    logger = logging.getLogger(__name__)
+    logger.error("无法导入PPTManager，请确保ppt_manager库已正确安装")
+    PPTManager = None
 
 logger = logging.getLogger(__name__)
 
+class EnumEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, enum.Enum):
+            return obj.value if hasattr(obj, 'value') else str(obj)
+        return super().default(obj)
+
 class SlideGeneratorAgent(BaseAgent):
-    """幻灯片生成Agent，负责生成具体的幻灯片内容"""
+    """幻灯片生成Agent，负责基于PPT模板生成具体的幻灯片内容"""
     
     def __init__(self, config: Dict[str, Any]):
         """
@@ -35,7 +51,7 @@ class SlideGeneratorAgent(BaseAgent):
         self.model_manager = ModelManager()
         
         # 从配置获取模型类型和名称
-        self.model_type = config.get("model_type", "vision")
+        self.model_type = config.get("model_type", "text")
         
         # 初始化模型属性
         model_config = self.model_manager.get_model_config(self.model_type)
@@ -43,229 +59,366 @@ class SlideGeneratorAgent(BaseAgent):
         self.temperature = model_config.get("temperature", 0.7)
         self.max_tokens = model_config.get("max_tokens", 4000)
         
+        # 初始化PPTManager
+        try:
+            # 尝试导入PPTManager
+            from interfaces.ppt_api import PPTManager
+            self.ppt_manager = PPTManager()
+            logger.info("成功初始化PPT管理器")
+        except ImportError as e:
+            logger.error(f"无法导入PPTManager: {str(e)}")
+            self.ppt_manager = None
+        
         logger.info(f"初始化SlideGeneratorAgent，使用模型: {self.llm_model}")
     
     async def run(self, state: AgentState) -> AgentState:
         """
-        执行幻灯片生成
-        
+        执行幻灯片生成逻辑
+
         Args:
-            state: 当前工作流状态
-            
+            state: 工作流引擎状态
+
         Returns:
-            更新后的状态
+            更新后的工作流引擎状态
         """
         logger.info("开始生成幻灯片")
         
-        # 检查必要的输入
-        if not state.decision_result or "slides" not in state.decision_result:
-            error_msg = "缺少幻灯片决策结果"
-            self.record_failure(state, error_msg)
-            return state
-        
         try:
-            # 获取幻灯片计划
-            slides = state.decision_result.get("slides", [])
+            # 检查PPTManager是否已初始化
+            if not hasattr(self, 'ppt_manager') or self.ppt_manager is None:
+                raise ValueError("PPTManager未初始化")
             
-            # 检查当前章节索引
-            if state.current_section_index is None:
-                state.current_section_index = 0
+            # 检查内容规划是否存在
+            if not state.content_plan:
+                raise ValueError("缺少内容规划，无法生成幻灯片")
             
-            # 确保章节索引在有效范围内
-            if not 0 <= state.current_section_index < len(slides):
-                error_msg = f"无效的章节索引: {state.current_section_index}"
-                self.record_failure(state, error_msg)
-                return state
+            # 统一模板路径参数，优先使用template_path，兼容ppt_template_path
+            template_path = state.template_path if hasattr(state, 'template_path') and state.template_path else state.ppt_template_path if hasattr(state, 'ppt_template_path') else None
+            if not template_path or not os.path.exists(template_path):
+                raise ValueError(f"无效的PPT模板路径: {template_path}")
             
-            # 获取当前章节的幻灯片计划
-            current_slide_plan = slides[state.current_section_index]
-            section = current_slide_plan.get("section", {})
-            template = current_slide_plan.get("template", {})
+            # 获取当前章节索引
+            current_index = state.current_section_index
+            if current_index is None:
+                raise ValueError("当前章节索引未定义")
+                
+            # 检查索引是否在有效范围内
+            if current_index < 0 or current_index >= len(state.content_plan):
+                raise ValueError(f"无效的章节索引: {current_index}，内容规划共有{len(state.content_plan)}个章节")
             
-            # 使用LLM生成幻灯片内容
-            slide_content = await self._generate_slide_content(section, template)
+            # 获取当前要处理的章节
+            current_section = state.content_plan[current_index]
+            logger.info(f"处理章节 {current_index + 1}/{len(state.content_plan)}: {current_section.get('slide_type', '未知类型')}")
             
-            # 生成幻灯片图像（在实际应用中，这里会调用渲染服务）
-            slide_image_path = self._generate_slide_image(state.session_id, state.current_section_index)
+            # 加载PPT模板
+            presentation = self.ppt_manager.load_presentation(template_path)
+            logger.info(f"已加载PPT模板: {template_path}")
             
-            # 更新当前幻灯片
-            state.current_slide = {
-                "slide_id": f"slide_{state.current_section_index}",
-                "content": slide_content,
-                "template": template,
-                "image_path": slide_image_path,
-                "section_index": state.current_section_index
+            # 获取PPT的JSON结构，用于获取模板幻灯片ID
+            ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
+            logger.info(f"已获取PPT JSON结构，包含 {len(ppt_json.get('slides', []))} 张幻灯片")
+            
+            # 获取模板幻灯片ID
+            template_info = current_section.get("template", {})
+            slide_id = self._get_template_slide_id(template_info, ppt_json)
+            logger.info(f"已选择模板幻灯片ID: {slide_id}")
+            
+            # 复制模板幻灯片
+            duplicate_result = self.ppt_manager.duplicate_slide_by_id(
+                presentation=presentation,
+                slide_id=slide_id
+            )
+            
+            if not duplicate_result["success"]:
+                raise ValueError(f"复制模板幻灯片失败: {duplicate_result.get('message', '未知错误')}")
+                
+            new_slide_id = duplicate_result["slide_id"]
+            # 更新presentation对象，确保包含新创建的幻灯片
+            presentation = duplicate_result["presentation"]
+            
+            logger.info(f"已复制模板幻灯片, 新幻灯片ID: {new_slide_id}")
+            
+            # 直接获取新幻灯片的详细信息
+            slide_result = self.ppt_manager.get_slide_json_by_id(
+                presentation=presentation,
+                slide_id=new_slide_id            
+            )
+                    
+            # 使用LLM进行内容-元素智能匹配
+            logger.info("调用LLM进行内容-元素智能匹配")
+            llm_matches = await self._llm_match_content_to_elements(
+                slide_type=current_section.get("slide_type", "content"),
+                slide_elements=slide_result,
+                current_section=current_section
+            )
+            
+            if not llm_matches:
+                raise ValueError("LLM未能正确匹配内容和元素")
+            
+            # 应用LLM匹配结果到幻灯片
+            logger.info(f"开始应用LLM匹配结果，共 {len(llm_matches)} 项")
+            success = await self._apply_llm_matches(presentation, new_slide_id, llm_matches)
+            
+            if not success:
+                raise ValueError("应用LLM匹配结果失败")
+            
+            # # 生成幻灯片预览
+            # preview_dir = os.path.join(state.output_dir, "previews")
+            # os.makedirs(preview_dir, exist_ok=True)
+            # preview_path = os.path.join(preview_dir, f"slide_{current_index}.png")
+            
+            # slide_index = self._get_slide_index_by_id(presentation, new_slide_id)
+            # render_result = self.ppt_manager.render_presentation(
+            #     presentation=presentation,
+            #     output_dir=preview_dir,
+            #     slide_index=slide_index,
+            #     format="png"
+            # )
+            
+            # if render_result and len(render_result) > 0:
+            #     preview_path = render_result[0]
+            #     logger.info(f"已生成幻灯片预览: {preview_path}")
+            # else:
+            #     logger.warning("生成幻灯片预览失败")
+            
+            # # 保存修改后的演示文稿
+            # output_path = os.path.join(state.output_dir, f"generated_slide_{current_index}.pptx")
+            # self.ppt_manager.save_presentation(presentation, output_path)
+            # logger.info(f"已保存修改后的演示文稿: {output_path}")
+            
+            # 更新状态
+            if not hasattr(state, 'generated_slides') or state.generated_slides is None:
+                state.generated_slides = []
+            
+            # 添加已生成的幻灯片信息
+            slide_info = {
+                "section_index": current_index,
+                "slide_id": new_slide_id,
+                # "preview_path": preview_path,
+                # "pptx_path": output_path
             }
+            state.generated_slides.append(slide_info)
+            logger.info(f"已更新状态，添加生成的幻灯片信息")
             
-            logger.info(f"幻灯片生成完成: {state.current_slide.get('slide_id')}")
-            
-            # 记录检查点
-            self.add_checkpoint(state)
+            return state
             
         except Exception as e:
             error_msg = f"幻灯片生成失败: {str(e)}"
-            self.record_failure(state, error_msg)
-        
-        return state
+            logger.error(error_msg)
+            logger.exception(e)
+            raise RuntimeError(error_msg)
     
-    async def _generate_slide_content(self, section: Dict[str, Any], template: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_template_slide_id(self, template_info: Dict[str, Any], ppt_json: Dict[str, Any]) -> str:
         """
-        使用LLM生成幻灯片内容
+        从模板信息中获取幻灯片ID
         
         Args:
-            section: 章节内容
-            template: 布局模板
+            template_info: 模板信息
+            ppt_json: PPT的JSON结构
             
         Returns:
-            格式化的幻灯片内容
+            幻灯片ID
         """
-        # 构建提示词
-        prompt = self._build_slide_prompt(section, template)
+        if "slideIndex" in template_info:
+            slide_index = template_info["slideIndex"]
+            slides = ppt_json.get("slides", [])
+            
+            # 根据slideIndex(实际是real_index)查找对应的slide_id
+            for slide in slides:
+                # 检查slide是否包含real_index信息
+                if "real_index" in slide and slide["real_index"] == slide_index:
+                    return slide.get("slide_id")
+            
+            # 如果找不到匹配的real_index或index，直接抛出异常
+            raise ValueError(f"无法找到real_index或index为{slide_index}的幻灯片，请检查模板配置")
         
+        # 如果template_info中没有slide_id和slideIndex，直接抛出异常
+        raise ValueError("template_info中缺少slide_id或slideIndex，无法确定要使用的模板幻灯片")
+    
+    def _get_slide_index_by_id(self, presentation: Any, slide_id: str) -> Optional[int]:
+        """
+        根据幻灯片ID获取索引
+        
+        Args:
+            presentation: PPT演示文稿对象
+            slide_id: 幻灯片ID
+            
+        Returns:
+            幻灯片索引，未找到时返回None
+        """
+        # 获取所有幻灯片
+        result = self.ppt_manager.get_slides(presentation)
+        if not result["success"]:
+            logger.error("获取幻灯片列表失败")
+            return None
+        
+        # 遍历查找匹配ID的幻灯片
+        slides = result["slides"]
+        for i, slide in enumerate(slides):
+            if slide.get("id") == slide_id:
+                return i
+        
+        logger.warning(f"未找到ID为 {slide_id} 的幻灯片")
+        return None
+    
+    async def _llm_match_content_to_elements(self, slide_type: str, slide_elements: List[Dict[str, Any]], current_section: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        使用LLM将章节内容与幻灯片元素进行智能匹配
+        
+        Args:
+            slide_type: 幻灯片类型（opening, content, closing）
+            slide_elements: 幻灯片元素列表
+            current_section: 当前处理的章节信息
+            
+        Returns:
+            匹配结果列表
+        """
         try:
-            # 调用LLM生成内容
+            # 将slide_type转换为中文描述，更适合中文大模型理解
+            slide_type_map = {
+                "opening": "开篇页",
+                "content": "内容页",
+                "closing": "结束页"
+            }
+            slide_type_zh = slide_type_map.get(slide_type, slide_type)
+            
+            # 构建提示词上下文
+            context = {
+                "slide_elements_json": json.dumps(slide_elements, ensure_ascii=False, indent=2, cls=EnumEncoder),
+                "content_json": json.dumps(current_section, ensure_ascii=False, indent=2, cls=EnumEncoder), 
+                "slide_type": slide_type_zh
+            }
+            
+            # 渲染提示词
+            prompt = self.model_manager.render_template(LLM_PPT_ELEMENT_MATCHING_PROMPT, context)
+            
+            # 调用LLM获取匹配结果
             response = await self.model_manager.generate_text(
                 model=self.llm_model,
                 prompt=prompt,
-                temperature=self.temperature,
+                temperature=0.2,  # 使用较低的温度以获得更确定的结果
                 max_tokens=self.max_tokens
             )
             
             # 解析LLM响应
-            slide_content = self._parse_llm_response(response, section, template)
-            logger.info("LLM幻灯片内容生成成功")
+            matches = self._parse_llm_matching_response(response)
             
-            return slide_content
-            
+            if matches:
+                logger.info(f"LLM成功返回 {len(matches)} 个内容-元素匹配")
+                return matches
+            else:
+                logger.warning("无法从LLM响应中解析出有效的匹配结果")
+                return []
+                
         except Exception as e:
-            logger.error(f"LLM生成幻灯片内容失败: {str(e)}")
-            # 如果LLM生成失败，使用简单的内容生成
-            return self._fallback_content_generation(section, template)
+            logger.exception(f"LLM内容-元素匹配过程出错: {str(e)}")
+            return []
     
-    def _build_slide_prompt(self, section: Dict[str, Any], template: Dict[str, Any]) -> str:
+    def _parse_llm_matching_response(self, response: str) -> List[Dict[str, Any]]:
         """
-        构建用于幻灯片生成的提示词
-        
-        Args:
-            section: 章节内容
-            template: 布局模板
-            
-        Returns:
-            提示词
-        """
-        # 将section和template转换为格式化的JSON字符串
-        section_json = json.dumps(section, ensure_ascii=False, indent=2)
-        template_json = json.dumps(template, ensure_ascii=False, indent=2)
-        
-        # 使用导入的prompt模板并格式化
-        return SLIDE_GENERATION_PROMPT.format(
-            section_json=section_json,
-            template_json=template_json
-        )
-    
-    def _parse_llm_response(self, response: str, section: Dict[str, Any], 
-                           template: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        解析LLM响应，提取幻灯片内容
+        解析LLM返回的匹配响应
         
         Args:
             response: LLM响应文本
-            section: 原始章节（用于回退）
-            template: 布局模板（用于回退）
             
         Returns:
-            格式化的幻灯片内容
+            解析后的匹配结果列表
         """
         try:
-            # 清理响应中的markdown格式代码块
+            # 提取JSON部分
             json_text = response
-            if "```json" in response or "```" in response:
+            if "```json" in response:
                 # 提取JSON代码块
-                import re
                 pattern = r"```(?:json)?\s*([\s\S]*?)```"
                 matches = re.findall(pattern, response)
                 if matches:
                     json_text = matches[0]
             
             # 解析JSON
-            slide_content = json.loads(json_text)
+            result = json.loads(json_text)
             
-            # 验证必要的字段
-            if "title" not in slide_content:
-                logger.warning("LLM响应解析失败，缺少标题")
-                return self._fallback_content_generation(section, template)
+            # 提取匹配列表
+            if isinstance(result, dict) and "matches" in result:
+                matches = result["matches"]
+                if isinstance(matches, list):
+                    return matches
             
-            return slide_content
+            # 如果直接是列表，尝试直接使用
+            if isinstance(result, list):
+                return result
+                
+            logger.warning(f"LLM响应格式不符合预期: {json_text[:100]}...")
+            return []
             
         except Exception as e:
-            logger.error(f"解析LLM响应失败: {str(e)}")
-            return self._fallback_content_generation(section, template)
+            logger.exception(f"解析LLM匹配响应时出错: {str(e)}")
+            return []
     
-    def _fallback_content_generation(self, section: Dict[str, Any], 
-                                    template: Dict[str, Any]) -> Dict[str, Any]:
+    async def _apply_llm_matches(self, presentation: Any, slide_id: str, matches: List[Dict[str, Any]]) -> bool:
         """
-        当LLM生成失败时使用的回退内容生成逻辑
+        应用LLM推荐的内容-元素匹配
         
         Args:
-            section: 章节内容
-            template: 布局模板
+            presentation: PPT演示文稿对象
+            slide_id: 幻灯片ID
+            matches: LLM推荐的匹配列表
             
         Returns:
-            简单的幻灯片内容
+            是否成功应用所有匹配
         """
-        logger.info("使用回退内容生成策略")
+        if not matches:
+            return False
         
-        # 提取章节标题和内容
-        title = section.get("title", "未命名幻灯片")
-        content = section.get("content", [])
-        items = section.get("items", [])
+        success_count = 0
+        total_count = len(matches)
         
-        # 创建基本内容
-        slide_content = {
-            "title": title,
-            "bullets": items[:6] if items else [],  # 限制6个项目符号
-            "paragraphs": content[:2] if content else []  # 限制2个段落
-        }
-        
-        # 根据模板类型添加特定内容
-        template_name = template.get("name", "").lower()
-        
-        if "title" in template_name:
-            # 标题页
-            slide_content["subtitle"] = section.get("subtitle", "")
-        elif "two" in template_name or "column" in template_name:
-            # 双栏布局
-            if items:
-                midpoint = len(items) // 2
-                slide_content["leftContent"] = items[:midpoint]
-                slide_content["rightContent"] = items[midpoint:midpoint*2]
-        elif "image" in template_name:
-            # 图片布局
-            slide_content["imagePath"] = "placeholder_image.jpg"
-            slide_content["imageCaption"] = "图片说明"
-        
-        # 添加演讲者注释
-        slide_content["notes"] = "这张幻灯片介绍" + title
-        
-        return slide_content
-    
-    def _generate_slide_image(self, session_id: str, slide_index: int) -> str:
-        """
-        生成幻灯片预览图像（模拟实现）
-        
-        Args:
-            session_id: 会话ID
-            slide_index: 幻灯片索引
+        for match in matches:
+            element_id = match.get("element_id")
+            content = match.get("content")
             
-        Returns:
-            幻灯片图像路径
-        """
-        # 在实际项目中，这里会调用渲染服务来生成幻灯片图像
-        # 现在仅返回一个预期的路径
+            if not element_id or content is None:
+                logger.warning(f"跳过无效匹配: {match}")
+                continue
+            
+            try:
+                # 针对不同类型的内容进行处理
+                if isinstance(content, list):
+                    # 列表内容（如项目符号）
+                    formatted_content = ""
+                    for item in content:
+                        if item and item.strip():
+                            formatted_content += f"• {item.strip()}\n"
+                    
+                    if formatted_content:
+                        result = self.ppt_manager.edit_text_element_by_id(
+                            presentation=presentation,
+                            slide_id=slide_id,
+                            element_id=element_id,
+                            new_text=formatted_content.strip()
+                        )
+                        
+                        if result.get("success"):
+                            success_count += 1
+                            logger.info(f"成功应用列表内容到元素 {element_id}")
+                else:
+                    # 字符串内容
+                    result = self.ppt_manager.edit_text_element_by_id(
+                        presentation=presentation,
+                        slide_id=slide_id,
+                        element_id=element_id,
+                        new_text=str(content).strip()
+                    )
+                    
+                    if result.get("success"):
+                        success_count += 1
+                        logger.info(f"成功应用文本内容到元素 {element_id}")
+            
+            except Exception as e:
+                logger.warning(f"应用匹配 {element_id} 时出错: {str(e)}")
         
-        # 确保会话目录存在
-        session_dir = Path(f"workspace/sessions/{session_id}")
-        session_dir.mkdir(parents=True, exist_ok=True)
+        # 计算成功率
+        success_rate = success_count / total_count if total_count > 0 else 0
+        logger.info(f"应用LLM匹配完成，成功率: {success_rate:.2%} ({success_count}/{total_count})")
         
-        # 返回预期的图像路径
-        return str(session_dir / f"slide_{slide_index}.png") 
+        # 如果有任何匹配成功应用，就认为整体成功
+        return success_count > 0 

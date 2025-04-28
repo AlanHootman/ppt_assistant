@@ -320,6 +320,130 @@ class WorkflowEngine:
         # 使用WorkflowMocks中的验证逻辑
         return WorkflowMocks.validate_condition(state)
     
+    async def _execute_slide_generator(self, state: AgentState) -> None:
+        """
+        使用真实的SlideGeneratorAgent生成幻灯片
+        
+        Args:
+            state: 代理状态
+        """
+        try:
+            logger.info("执行真实的SlideGeneratorAgent处理")
+            
+            # 从配置中获取slide_generator节点的配置
+            node_config = None
+            for node in self.config.get("workflow", {}).get("nodes", []):
+                if node.get("name") == "slide_generator":
+                    node_config = node.get("config", {})
+                    break
+            
+            if not node_config:
+                node_config = {"model_type": "vision", "max_retries": "3"}
+                logger.warning("未找到slide_generator节点配置，使用默认配置")
+            
+            # 创建SlideGeneratorAgent实例
+            from core.agents.slide_generator_agent import SlideGeneratorAgent
+            slide_generator_agent = SlideGeneratorAgent(node_config)
+            
+            # 执行幻灯片生成
+            try:
+                updated_state = await slide_generator_agent.run(state)
+                
+                # 更新状态
+                state.current_slide = updated_state.current_slide
+                
+                logger.info(f"SlideGeneratorAgent执行完成，生成了幻灯片: {state.current_slide.get('slide_id') if state.current_slide else 'None'}")
+                
+            except Exception as agent_error:
+                logger.error(f"SlideGeneratorAgent执行出错: {str(agent_error)}")
+                # 记录详细的错误堆栈
+                import traceback
+                logger.error(f"错误详情: {traceback.format_exc()}")
+                state.record_failure(f"执行SlideGeneratorAgent失败: {str(agent_error)}")
+                
+                # 如果实际执行失败，尝试使用模拟实现作为备份
+                logger.warning("尝试使用模拟SlideGenerator实现作为备份...")
+                self._mock_slide_generator(state)
+            
+        except Exception as e:
+            logger.error(f"初始化或执行SlideGeneratorAgent失败: {str(e)}")
+            # 记录详细的错误堆栈
+            import traceback
+            logger.error(f"错误详情: {traceback.format_exc()}")
+            state.record_failure(f"执行SlideGeneratorAgent失败: {str(e)}")
+            
+            # 尝试使用模拟实现
+            logger.warning("尝试使用模拟SlideGenerator实现...")
+            self._mock_slide_generator(state)
+
+    async def _execute_next_slide_or_end(self, state: AgentState) -> None:
+        """
+        检查是否还有更多内容需要处理，更新状态
+        
+        Args:
+            state: 代理状态
+        """
+        try:
+            logger.info("执行幻灯片进度检查")
+            
+            # 确保状态中有必要的属性
+            if not hasattr(state, 'content_plan') or not state.content_plan:
+                if not hasattr(state, 'decision_result') or not state.decision_result:
+                    error_msg = "无法检查进度：缺少内容规划结果"
+                    logger.error(error_msg)
+                    state.record_failure(error_msg)
+                    state.has_more_content = False
+                    return
+                
+                # 使用旧版兼容模式
+                slides = state.decision_result.get('slides', [])
+                total_slides = len(slides)
+            else:
+                # 使用新版content_plan
+                total_slides = len(state.content_plan)
+            
+            # 当前幻灯片已验证通过，将其添加到已生成列表中
+            if state.current_slide and state.validation_result:
+                if not state.generated_slides:
+                    state.generated_slides = []
+                
+                # 检查是否已存在相同ID的幻灯片，如果是则替换
+                slide_id = state.current_slide.get('slide_id')
+                existing_index = None
+                for i, slide in enumerate(state.generated_slides):
+                    if slide.get('slide_id') == slide_id:
+                        existing_index = i
+                        break
+                
+                if existing_index is not None:
+                    state.generated_slides[existing_index] = state.current_slide
+                else:
+                    state.generated_slides.append(state.current_slide)
+                
+                logger.info(f"添加已验证的幻灯片到生成列表: {slide_id}")
+            
+            # 更新章节索引
+            if state.current_section_index is None:
+                state.current_section_index = 0
+            else:
+                state.current_section_index += 1
+            
+            # 检查是否还有更多内容
+            state.has_more_content = (state.current_section_index < total_slides)
+            
+            logger.info(f"当前章节索引: {state.current_section_index}, 总幻灯片数: {total_slides}, 还有更多内容: {state.has_more_content}")
+            
+        except Exception as e:
+            logger.error(f"幻灯片进度检查失败: {str(e)}")
+            # 记录详细的错误堆栈
+            import traceback
+            logger.error(f"错误详情: {traceback.format_exc()}")
+            state.record_failure(f"幻灯片进度检查失败: {str(e)}")
+            
+            # 尝试使用模拟实现
+            logger.warning("尝试使用模拟next_slide_or_end实现...")
+            self._mock_next_slide_or_end(state)
+
     async def run_async(self, session_id=None, raw_md=None, ppt_template_path=None, output_dir=None):
         """
         异步执行工作流
@@ -404,24 +528,28 @@ class WorkflowEngine:
                     "timestamp": datetime.now().isoformat()
                 }
             
-            # 4. 执行幻灯片生成
-            # (此处暂时使用模拟实现)
-            self._execute_node_directly("slide_generator", state)
+            # 初始化章节索引和内容标记
+            if state.current_section_index is None:
+                state.current_section_index = 0
+            state.has_more_content = True
+            state.generated_slides = []
             
-            # 5. 执行验证节点
-            # (此处暂时使用模拟实现)
-            self._execute_node_directly("slide_validator", state)
-            
-            # 6. 检查是否还有更多内容
-            # (此处暂时使用模拟实现)
-            self._execute_node_directly("next_slide_or_end", state)
-            
-            # 7. 如果需要，继续生成幻灯片
-            if state.has_more_content:
+            # 循环生成幻灯片，直到所有内容处理完毕
+            while state.has_more_content:
+                # 4. 执行幻灯片生成
+                await self._execute_slide_generator(state)
+                
+                # 5. 执行验证节点
                 # (此处暂时使用模拟实现)
-                self._execute_node_directly("slide_generator", state)
                 self._execute_node_directly("slide_validator", state)
-                self._execute_node_directly("next_slide_or_end", state)
+                
+                # 6. 检查验证结果，如果不通过则重新生成
+                # if not state.validation_result:
+                #     logger.info(f"幻灯片验证不通过，重新生成...")
+                #     continue
+                
+                # 7. 检查是否还有更多内容
+                await self._execute_next_slide_or_end(state)
             
             # 8. 完成PPT生成
             # (此处暂时使用模拟实现)
