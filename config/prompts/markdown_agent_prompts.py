@@ -14,15 +14,19 @@ ANALYSIS_PROMPT = """
 4. "key_points": 提取的关键点列表，以便在PPT中突出显示
 5. "summary": 总结性描述，简明扼要表达该部分主旨
 
+{% if markdown_text %}
 Markdown文本:
 ```
-{markdown_text}
+{{ markdown_text }}
 ```
+{% endif %}
 
+{% if basic_structure %}
 基础解析结果:
 ```
-{basic_structure}
+{{ basic_structure | tojson(indent=2) }}
 ```
+{% endif %}
 
 请输出完整的增强JSON结构，确保输出是有效的JSON格式。
 只返回JSON数据，不要有其他回复。
@@ -34,10 +38,12 @@ SECTION_EXTRACTION_PROMPT = """
 2. 章节标题（二级标题）
 3. 每个章节下的内容（包括段落、列表项等）
 
+{% if markdown_text %}
 Markdown文本:
 ```
-{markdown_text}
+{{ markdown_text }}
 ```
+{% endif %}
 
 请将结果以JSON格式返回，格式参考：
 {

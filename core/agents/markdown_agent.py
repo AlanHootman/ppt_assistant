@@ -127,11 +127,14 @@ class MarkdownAgent(BaseAgent):
         """
         logger.info(f"使用大模型({self.llm_model})进行内容增强分析")
         
-        # 构建提示词
-        prompt = ANALYSIS_PROMPT.format(
-            markdown_text=markdown_text,
-            basic_structure=json.dumps(basic_structure, ensure_ascii=False, indent=2)
-        )
+        # 构建提示词 - 使用Jinja2模板
+        context = {
+            "markdown_text": markdown_text,
+            "basic_structure": basic_structure
+        }
+        
+        # 使用模型管理器的模板渲染方法
+        prompt = self.model_manager.render_template(ANALYSIS_PROMPT, context)
         
         try:
             # 调用大模型
@@ -215,6 +218,14 @@ class MarkdownAgent(BaseAgent):
         """
         # 此为示例实现，实际项目中会调用OpenAI等LLM
         logger.info(f"使用LLM({self.llm_model})解析Markdown")
+        
+        # 构建上下文
+        context = {
+            "markdown_text": markdown_text
+        }
+        
+        # 使用Jinja2模板
+        prompt = self.model_manager.render_template(SECTION_EXTRACTION_PROMPT, context)
         
         # 模拟LLM解析结果
         return {
