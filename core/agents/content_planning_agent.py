@@ -14,6 +14,7 @@ from typing import Dict, Any, List, Optional
 from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
+from config.prompts.content_planning_prompts import CONTENT_PLANNING_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -176,34 +177,11 @@ class ContentPlanningAgent(BaseAgent):
         sections_json = json.dumps(sections, ensure_ascii=False, indent=2)
         layouts_json = json.dumps(layouts, ensure_ascii=False, indent=2)
         
-        # 构建提示词
-        prompt = f"""你是一位专业的PPT设计师，需要为以下内容章节选择最合适的幻灯片布局。
-
-可用的布局模板有：
-{layouts_json}
-
-需要规划的内容章节有：
-{sections_json}
-
-请为每个章节选择最合适的布局模板，考虑以下因素：
-1. 章节内容的类型（文字、列表、图片等）
-2. 内容的复杂度和长度
-3. 布局的适用性
-4. 整体PPT的一致性和节奏变化
-
-请以JSON格式返回你的规划，格式如下：
-[
-  {{
-    "section": {{章节原始内容}},
-    "template": {{选择的布局模板}},
-    "reasoning": "选择这个布局的理由"
-  }},
-  ...
-]
-
-只返回JSON，不要包含其他解释。"""
-
-        return prompt
+        # 使用导入的prompt模板并格式化
+        return CONTENT_PLANNING_PROMPT.format(
+            sections_json=sections_json,
+            layouts_json=layouts_json
+        )
     
     def _parse_llm_response(self, response: str, sections: List[Dict[str, Any]], 
                            layouts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
