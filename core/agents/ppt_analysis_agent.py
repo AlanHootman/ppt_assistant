@@ -163,8 +163,9 @@ class PPTAnalysisAgent(BaseAgent):
                 "fonts": font_families
             },
             "visualFeatures": visual_analysis.get("visualFeatures", {}),
+            "slideLayouts": visual_analysis.get("slideLayouts", []),  # 使用更新后的字段名
+            "recommendations": visual_analysis.get("recommendations", {}),
             "slideImages": image_paths,  # 保存图片路径，以便后续处理
-            "recommendations": visual_analysis.get("recommendations", {})
         }
         
         return layout_features
@@ -234,8 +235,34 @@ class PPTAnalysisAgent(BaseAgent):
         logger.info(f"使用视觉模型分析 {len(image_paths)} 张幻灯片图像")
         
         # 为了避免向模型传递太多图像，我们选择最有代表性的几张幻灯片进行分析
-        # 如果图像超过5张，只选择前5张
+        # 如果图像超过30张，只选择前30张
         representative_images = image_paths[:min(30, len(image_paths))]
+        
+        # 准备图像索引信息，帮助模型识别每张图片对应原始PPT中的哪一页
+        image_indices = []
+        for i, image_path in enumerate(representative_images):
+            # 从图像路径中提取文件名
+            filename = os.path.basename(image_path)
+            # 文件命名通常为 "slide-1.png", "slide-2.png" 等
+            # 尝试提取真实的幻灯片索引
+            real_index = i  # 默认索引
+            
+            # 尝试从文件名中提取索引
+            import re
+            match = re.search(r'slide-(\d+)', filename)
+            if match:
+                try:
+                    # 提取的索引通常从1开始，转换为从0开始
+                    extracted_index = int(match.group(1)) - 1
+                    real_index = extracted_index
+                except ValueError:
+                    pass
+            
+            image_indices.append({
+                "filename": filename,
+                "position": i,  # 在当前分析中的位置
+                "slideIndex": real_index  # 在原始PPT中的索引
+            })
         
         # 对于每张图像，使用视觉模型进行分析
         # 使用Jinja2模板构建提示词
@@ -248,7 +275,8 @@ class PPTAnalysisAgent(BaseAgent):
         # 准备模板上下文
         context = {
             "template_info": template_info,
-            "has_images": len(representative_images) > 0
+            "has_images": len(representative_images) > 0,
+            "image_indices": image_indices
         }
         
         # 使用模型管理器的模板渲染方法
@@ -260,9 +288,14 @@ class PPTAnalysisAgent(BaseAgent):
         try:
             # 构建图片列表，实际项目中这些图片应该被编码并传给视觉模型
             images = []
-            for image_path in representative_images:
+            for i, image_path in enumerate(representative_images):
                 if os.path.exists(image_path):
-                    images.append({"url": f"file://{image_path}", "detail": "high"})
+                    # 将索引信息添加到图片描述中，帮助模型理解图片对应关系
+                    slide_index = image_indices[i]["slideIndex"]
+                    images.append({
+                        "url": f"file://{image_path}", 
+                        "detail": "high"
+                    })
             
             # 调用视觉模型API
             if hasattr(self.model_manager, 'generate_vision_response'):
@@ -291,27 +324,83 @@ class PPTAnalysisAgent(BaseAgent):
                 except Exception as e:
                     logger.error(f"解析视觉模型响应失败: {str(e)}")
                     # 返回一个默认的分析结果
-                    return self._get_default_visual_analysis(template_info)
+                    return self._get_default_visual_analysis(template_info, image_indices)
             else:
                 logger.warning("模型管理器不支持视觉模型调用，使用默认分析结果")
-                return self._get_default_visual_analysis(template_info)
+                return self._get_default_visual_analysis(template_info, image_indices)
                 
         except Exception as e:
             logger.error(f"视觉模型分析失败: {str(e)}")
             # 如果分析失败，返回一个默认的分析结果
-            return self._get_default_visual_analysis(template_info)
+            return self._get_default_visual_analysis(template_info, image_indices)
     
-    def _get_default_visual_analysis(self, template_info: Dict[str, Any]) -> Dict[str, Any]:
+    def _get_default_visual_analysis(self, template_info: Dict[str, Any], image_indices: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         获取默认的视觉分析结果
         
         Args:
             template_info: 模板基本信息
+            image_indices: 图像索引信息
             
         Returns:
             默认的视觉分析结果
         """
         template_name = template_info.get("template_name", "未知模板")
+        
+        # 创建默认的幻灯片布局分析
+        default_slide_layouts = []
+        if image_indices:
+            for idx_info in image_indices[:2]:  # 只处理前两个作为示例
+                slide_index = idx_info.get("slideIndex", 0)
+                
+                # 为第一页创建封面页布局
+                if slide_index == 0:
+                    default_slide_layouts.append({
+                        "slideIndex": slide_index,
+                        "type": "封面页/标题页",
+                        "purpose": "演示开始页面",
+                        "structure": {
+                            "titleLocation": "页面顶部居中",
+                            "subtitleLocation": "页面中部",
+                            "logoPosition": "右下角"
+                        },
+                        "elements": [
+                            {
+                                "type": "titleText",
+                                "position": "上部居中",
+                                "size": "大"
+                            },
+                            {
+                                "type": "subtitleText",
+                                "position": "中部居中",
+                                "size": "中"
+                            }
+                        ],
+                        "suitableContent": ["演示标题", "副标题", "公司名称"],
+                        "bestPractices": "标题简洁明了，副标题可提供更多上下文"
+                    })
+                else:
+                    # 为其他页创建内容页布局
+                    default_slide_layouts.append({
+                        "slideIndex": slide_index,
+                        "type": "内容页",
+                        "purpose": "展示具体内容",
+                        "structure": "左侧标题，右侧内容区块",
+                        "elements": [
+                            {
+                                "type": "titleText",
+                                "position": "左侧栏",
+                                "size": "中"
+                            },
+                            {
+                                "type": "bulletPoints",
+                                "position": "右侧主区域",
+                                "size": "占右侧80%空间"
+                            }
+                        ],
+                        "suitableContent": ["关键要点", "产品特性", "服务说明"],
+                        "bestPractices": "每页限制5-7个要点，保持简洁"
+                    })
         
         return {
             "templateName": template_name,
@@ -322,10 +411,11 @@ class PPTAnalysisAgent(BaseAgent):
                 "layoutComplexity": "medium",
                 "textDensity": "moderate"
             },
+            "slideLayouts": default_slide_layouts,
             "recommendations": {
-                "textContent": "适合文字内容较多的演示",
-                "dataVisualization": "提供了良好的图表支持",
-                "imageContent": "图片展示效果良好",
-                "presentationFlow": "结构清晰，适合逻辑性强的内容"
+                "textContent": "适合文字内容较多的演示，每页建议控制在200字以内",
+                "dataVisualization": "提供了良好的图表支持，适合柱状图、饼图和简单表格",
+                "imageContent": "图片展示效果良好，建议使用高质量图片",
+                "presentationFlow": "结构清晰，适合逻辑性强的内容，建议按'介绍-问题-解决方案-结果'顺序组织"
             }
         } 
