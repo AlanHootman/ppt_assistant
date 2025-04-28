@@ -57,6 +57,7 @@ class AgentState:
         self.has_more_content = False  # 是否还有更多内容需要处理
         self.current_slide = None  # 当前生成的幻灯片
         self.generated_slides = []  # 已生成的幻灯片列表
+        self.presentation = None  # PPTX对象
         
         # 验证信息
         self.validation_result = None  # 验证结果

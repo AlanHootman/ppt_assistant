@@ -97,6 +97,15 @@ class SlideGeneratorAgent(BaseAgent):
             if not template_path or not os.path.exists(template_path):
                 raise ValueError(f"无效的PPT模板路径: {template_path}")
             
+            # 检查state中的presentation是否存在：如果存在则使用state中的presentation，否则通过ppt_manager加载
+            if hasattr(state, 'presentation') and state.presentation:
+                presentation = state.presentation
+            else:
+                # 加载PPT模板
+                presentation = self.ppt_manager.load_presentation(template_path)
+                logger.info(f"已加载PPT模板: {template_path}")
+
+
             # 获取当前章节索引
             current_index = state.current_section_index
             if current_index is None:
@@ -110,10 +119,7 @@ class SlideGeneratorAgent(BaseAgent):
             current_section = state.content_plan[current_index]
             logger.info(f"处理章节 {current_index + 1}/{len(state.content_plan)}: {current_section.get('slide_type', '未知类型')}")
             
-            # 加载PPT模板
-            presentation = self.ppt_manager.load_presentation(template_path)
-            logger.info(f"已加载PPT模板: {template_path}")
-            
+
             # 获取PPT的JSON结构，用于获取模板幻灯片ID
             ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
             logger.info(f"已获取PPT JSON结构，包含 {len(ppt_json.get('slides', []))} 张幻灯片")
@@ -162,29 +168,9 @@ class SlideGeneratorAgent(BaseAgent):
             if not success:
                 raise ValueError("应用LLM匹配结果失败")
             
-            # # 生成幻灯片预览
-            # preview_dir = os.path.join(state.output_dir, "previews")
-            # os.makedirs(preview_dir, exist_ok=True)
-            # preview_path = os.path.join(preview_dir, f"slide_{current_index}.png")
-            
-            # slide_index = self._get_slide_index_by_id(presentation, new_slide_id)
-            # render_result = self.ppt_manager.render_presentation(
-            #     presentation=presentation,
-            #     output_dir=preview_dir,
-            #     slide_index=slide_index,
-            #     format="png"
-            # )
-            
-            # if render_result and len(render_result) > 0:
-            #     preview_path = render_result[0]
-            #     logger.info(f"已生成幻灯片预览: {preview_path}")
-            # else:
-            #     logger.warning("生成幻灯片预览失败")
-            
-            # # 保存修改后的演示文稿
-            # output_path = os.path.join(state.output_dir, f"generated_slide_{current_index}.pptx")
-            # self.ppt_manager.save_presentation(presentation, output_path)
-            # logger.info(f"已保存修改后的演示文稿: {output_path}")
+
+            # 将presentation保存到state中
+            state.presentation = presentation
             
             # 更新状态
             if not hasattr(state, 'generated_slides') or state.generated_slides is None:
