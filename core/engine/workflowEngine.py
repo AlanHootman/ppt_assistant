@@ -21,6 +21,8 @@ from core.engine.configLoader import ConfigLoader
 from core.agents.markdown_agent import MarkdownAgent
 # 引入PPTAnalysisAgent
 from core.agents.ppt_analysis_agent import PPTAnalysisAgent
+# 引入ContentPlanningAgent
+from core.agents.content_planning_agent import ContentPlanningAgent
 # 导入模拟模块
 from core.engine.mocks import WorkflowMocks
 # 引入监控功能（可选）
@@ -320,99 +322,138 @@ class WorkflowEngine:
     
     async def run_async(self, session_id=None, raw_md=None, ppt_template_path=None, output_dir=None):
         """
-        异步运行工作流
+        异步执行工作流
         
         Args:
-            session_id: 会话ID
-            raw_md: 原始Markdown内容
+            session_id: 会话ID，如果不提供则自动生成
+            raw_md: 原始Markdown文本
             ppt_template_path: PPT模板路径
             output_dir: 输出目录
             
         Returns:
             执行结果
         """
-        # 准备初始状态
-        state = AgentState(
-            session_id=session_id,
-            raw_md=raw_md,
-            ppt_template_path=ppt_template_path,
-            output_dir=output_dir
-        )
-        
-        logger.info(f"异步运行工作流，会话: {state.session_id}")
-        
-        # 启动MLflow跟踪
-        if self.enable_tracking and self.tracker:
-            self.tracker.start_workflow_run(state.session_id, self.workflow_name)
-        
         try:
-            # 清除之前的执行日志
-            self.execution_logs = []
+            # 创建状态对象
+            state = AgentState(
+                session_id=session_id,
+                raw_md=raw_md,
+                ppt_template_path=ppt_template_path,
+                output_dir=output_dir
+            )
+            logger.info(f"开始异步执行工作流，会话ID: {state.session_id}")
             
-            # 直接模拟按序执行工作流节点
-            if state.raw_md and state.ppt_template_path:
-                logger.info(f"直接模拟执行工作流节点...")
+            # 启动MLflow跟踪
+            if self.enable_tracking and self.tracker:
+                self.tracker.start_workflow_run(state.session_id, self.workflow_name)
+            
+            # 1. 执行Markdown解析节点
+            await self._execute_markdown_parser(state)
+            
+            # 检查是否有内容结构
+            if not state.content_structure:
+                error_msg = "Markdown解析失败，无法获取内容结构"
+                logger.error(error_msg)
+                state.record_failure(error_msg)
                 
-                # 1. 执行Markdown解析节点
-                await self._execute_markdown_parser(state)
-                
-                # 2. 执行PPT分析节点
-                if state.content_structure:
-                    # 直接使用异步方法调用真实的PPT分析Agent
-                    await self._execute_ppt_analyzer(state)
-                
-                # 3. 执行内容规划节点
-                if state.content_structure and state.layout_features:
-                    self._execute_node_directly("content_planner", state)
-                
-                # 初始化幻灯片生成状态
-                if state.decision_result:
-                    # 初始化当前章节索引和内容标记
-                    state.current_section_index = 0
-                    state.has_more_content = True
-                    state.generated_slides = []
-                    
-                    # 循环生成幻灯片，直到所有内容处理完毕
-                    while state.has_more_content:
-                        # 幻灯片生成
-                        self._execute_node_directly("slide_generator", state)
-                        
-                        # 幻灯片验证
-                        self._execute_node_directly("slide_validator", state)
-                        
-                        # 检查验证结果，如果不通过则重新生成
-                        if not state.validation_result:
-                            logger.info(f"幻灯片验证不通过，重新生成...")
-                            continue
-                        
-                        # 验证通过，处理下一章节
-                        state.current_section_index += 1
-                        
-                        # 检查是否还有更多内容
-                        state.has_more_content = (state.current_section_index < 
-                                                len(state.decision_result.get("slides", [])))
-                    
-                    # 所有内容处理完毕，执行PPT清理和保存
-                    self._execute_node_directly("ppt_finalizer", state)
-                
-                # 保存最终状态
-                state.save()
-                
-                logger.info(f"工作流直接执行完成，节点执行次数: {len(self.execution_logs)}")
-                
-                # 结束MLflow跟踪
+                # 结束MLflow跟踪，标记为失败
                 if self.enable_tracking and self.tracker:
-                    self.tracker.end_workflow_run("FINISHED")
+                    self.tracker.end_workflow_run("FAILED")
                     
-                return state.to_dict()
+                return {
+                    "error": error_msg,
+                    "session_id": state.session_id,
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            # 2. 执行PPT分析节点
+            await self._execute_ppt_analyzer(state)
+            
+            # 检查是否有布局特征
+            if not state.layout_features:
+                error_msg = "PPT模板分析失败，无法获取布局特征"
+                logger.error(error_msg)
+                state.record_failure(error_msg)
                 
-            # 如果无法直接模拟，尝试使用LangGraph执行
-            logger.warning("无法直接模拟执行，将尝试使用LangGraph执行")
-            return {"error": "直接模拟执行失败，LangGraph执行尚未实现"}
+                # 结束MLflow跟踪，标记为失败
+                if self.enable_tracking and self.tracker:
+                    self.tracker.end_workflow_run("FAILED")
+                    
+                return {
+                    "error": error_msg,
+                    "session_id": state.session_id,
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            # 3. 执行内容规划节点
+            await self._execute_content_planner(state)
+            
+            # 检查是否有内容规划
+            if not state.content_plan and not state.decision_result:
+                error_msg = "内容规划失败，无法获取内容规划结果"
+                logger.error(error_msg)
+                state.record_failure(error_msg)
+                
+                # 结束MLflow跟踪，标记为失败
+                if self.enable_tracking and self.tracker:
+                    self.tracker.end_workflow_run("FAILED")
+                    
+                return {
+                    "error": error_msg,
+                    "session_id": state.session_id,
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            # 4. 执行幻灯片生成
+            # (此处暂时使用模拟实现)
+            self._execute_node_directly("slide_generator", state)
+            
+            # 5. 执行验证节点
+            # (此处暂时使用模拟实现)
+            self._execute_node_directly("slide_validator", state)
+            
+            # 6. 检查是否还有更多内容
+            # (此处暂时使用模拟实现)
+            self._execute_node_directly("next_slide_or_end", state)
+            
+            # 7. 如果需要，继续生成幻灯片
+            if state.has_more_content:
+                # (此处暂时使用模拟实现)
+                self._execute_node_directly("slide_generator", state)
+                self._execute_node_directly("slide_validator", state)
+                self._execute_node_directly("next_slide_or_end", state)
+            
+            # 8. 完成PPT生成
+            # (此处暂时使用模拟实现)
+            self._execute_node_directly("ppt_finalizer", state)
+            
+            # 保存最终状态
+            state.save()
+            
+            logger.info(f"工作流执行完成，会话ID: {state.session_id}")
+            
+            # 结束MLflow跟踪，标记为成功
+            if self.enable_tracking and self.tracker:
+                self.tracker.end_workflow_run("FINISHED")
+            
+            # 返回结果
+            return {
+                "status": "success",
+                "session_id": state.session_id,
+                "output_ppt_path": state.output_ppt_path,
+                "timestamp": datetime.now().isoformat()
+            }
             
         except Exception as e:
-            logger.error(f"工作流执行失败: {str(e)}")
+            logger.error(f"工作流执行异常: {str(e)}")
             traceback.print_exc()
+            
+            # 创建状态对象（如果尚未创建）
+            if not state:
+                state = AgentState(session_id=session_id)
+            
+            # 记录失败
+            state.record_failure(str(e))
             
             # 结束MLflow跟踪，标记为失败
             if self.enable_tracking and self.tracker:
@@ -448,6 +489,8 @@ class WorkflowEngine:
             # 注意：真实的PPTAnalysisAgent是在run_async中通过await调用的
             self._mock_ppt_analyzer(state)
         elif node_name == "content_planner":
+            # 注意：真实的ContentPlanningAgent需要异步执行，此处使用模拟实现
+            logger.warning("content_planner节点需要异步执行，应由调用者处理")
             self._mock_content_planner(state)
         elif node_name == "slide_generator":
             self._mock_slide_generator(state)
@@ -617,8 +660,62 @@ class WorkflowEngine:
             
         except Exception as e:
             logger.error(f"执行PPTAnalysisAgent失败: {str(e)}")
-            state.record_failure(f"PPT模板分析错误: {str(e)}")
+            state.record_failure(f"执行PPTAnalysisAgent失败: {str(e)}")
+            raise
+    
+    async def _execute_content_planner(self, state: AgentState) -> None:
+        """
+        使用真实的ContentPlanningAgent执行内容规划
+        
+        Args:
+            state: 代理状态
+        """
+        try:
+            logger.info("执行真实的ContentPlanningAgent处理")
             
-            # 如果真实实现失败，尝试使用模拟实现作为备份
-            logger.warning("尝试使用模拟PPT分析实现作为备份...")
-            self._mock_ppt_analyzer(state) 
+            # 从配置中获取content_planner节点的配置
+            node_config = None
+            for node in self.config.get("workflow", {}).get("nodes", []):
+                if node.get("name") == "content_planner":
+                    node_config = node.get("config", {})
+                    break
+            
+            if not node_config:
+                node_config = {"model_type": "text", "max_retries": "3"}
+                logger.warning("未找到content_planner节点配置，使用默认配置")
+            
+            # 创建ContentPlanningAgent实例
+            content_planning_agent = ContentPlanningAgent(node_config)
+            
+            # 执行内容规划
+            try:
+                updated_state = await content_planning_agent.run(state)
+                
+                # 更新状态
+                state.content_plan = updated_state.content_plan
+                state.decision_result = updated_state.decision_result
+                state.current_section_index = updated_state.current_section_index
+                
+                logger.info(f"ContentPlanningAgent执行完成，计划了 {len(state.content_plan) if state.content_plan else 0} 张幻灯片")
+                
+            except Exception as agent_error:
+                logger.error(f"ContentPlanningAgent执行出错: {str(agent_error)}")
+                # 记录详细的错误堆栈
+                import traceback
+                logger.error(f"错误详情: {traceback.format_exc()}")
+                state.record_failure(f"执行ContentPlanningAgent失败: {str(agent_error)}")
+                
+                # 如果实际执行失败，尝试使用模拟实现作为备份
+                logger.warning("尝试使用模拟ContentPlanner实现作为备份...")
+                self._mock_content_planner(state)
+            
+        except Exception as e:
+            logger.error(f"初始化或执行ContentPlanningAgent失败: {str(e)}")
+            # 记录详细的错误堆栈
+            import traceback
+            logger.error(f"错误详情: {traceback.format_exc()}")
+            state.record_failure(f"执行ContentPlanningAgent失败: {str(e)}")
+            
+            # 尝试使用模拟实现
+            logger.warning("尝试使用模拟ContentPlanner实现...")
+            self._mock_content_planner(state) 

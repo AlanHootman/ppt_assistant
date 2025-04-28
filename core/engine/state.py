@@ -49,7 +49,8 @@ class AgentState:
         self.layout_features = None  # 模板布局特征
         
         # 内容规划结果
-        self.decision_result = None  # 内容-布局匹配结果
+        self.content_plan = None  # 完整的内容规划（包括开篇页、内容页和结束页）
+        self.decision_result = None  # 内容-布局匹配结果（向后兼容）
         
         # 幻灯片生成状态
         self.current_section_index = None  # 当前处理的章节索引
@@ -148,6 +149,7 @@ class AgentState:
             "layout_features": self.layout_features,
             
             # 内容规划结果
+            "content_plan": self.content_plan,
             "decision_result": self.decision_result,
             
             # 幻灯片生成状态
@@ -199,92 +201,59 @@ class AgentState:
         if not state_file.exists():
             raise FileNotFoundError(f"状态文件不存在: {state_file}")
         
+        # 读取状态文件
         with open(state_file, 'r', encoding='utf-8') as f:
-            data = json.load(f)
+            state_dict = json.load(f)
         
-        # 创建状态实例
-        state = cls(session_id=session_id)
-        
-        # 复制基本属性
-        state.raw_md = data.get("raw_md")
-        state.ppt_template_path = data.get("ppt_template_path")
-        state.output_dir = data.get("output_dir")
-        
-        # 复制解析结果
-        state.content_structure = data.get("content_structure")
-        state.layout_features = data.get("layout_features")
-        state.decision_result = data.get("decision_result")
-        
-        # 复制幻灯片生成状态
-        state.current_section_index = data.get("current_section_index")
-        state.has_more_content = data.get("has_more_content", False)
-        state.current_slide = data.get("current_slide")
-        state.generated_slides = data.get("generated_slides", [])
-        
-        # 复制验证信息
-        state.validation_result = data.get("validation_result")
-        state.validation_attempts = data.get("validation_attempts", 0)
-        state.validation_issues = data.get("validation_issues", [])
-        state.validation_suggestions = data.get("validation_suggestions", [])
-        
-        # 复制最终输出
-        state.output_ppt_path = data.get("output_ppt_path")
-        
-        # 复制跟踪信息
-        state.created_at = data.get("created_at", state.created_at)
-        state.current_node = data.get("current_node")
-        state.checkpoints = data.get("checkpoints", [])
-        state.failures = data.get("failures", [])
-        
-        logger.info(f"加载状态: {session_id}")
-        return state 
-
+        # 恢复状态
+        return cls.from_dict(state_dict)
+    
     @staticmethod
     def from_dict(data: Dict[str, Any]) -> 'AgentState':
         """
-        从字典创建状态实例
+        从字典恢复状态
         
         Args:
             data: 状态字典
             
         Returns:
-            AgentState实例
+            恢复的状态对象
         """
-        if not data:
-            logger.warning("传入的状态字典为空")
-            return AgentState()
-        
-        # 提取基本信息
-        session_id = data.get('session_id')
-        raw_md = data.get('raw_md')
-        ppt_template_path = data.get('ppt_template_path')
-        output_dir = data.get('output_dir')
-        content_structure = data.get('content_structure')
-        
-        # 创建新实例
+        # 创建基本状态对象
         state = AgentState(
-            session_id=session_id,
-            raw_md=raw_md,
-            ppt_template_path=ppt_template_path,
-            output_dir=output_dir,
-            content_structure=content_structure
+            session_id=data.get("session_id"),
+            raw_md=data.get("raw_md"),
+            ppt_template_path=data.get("ppt_template_path"),
+            output_dir=data.get("output_dir"),
+            content_structure=data.get("content_structure")
         )
         
-        # 复制其他属性
-        state.layout_features = data.get('layout_features')
-        state.decision_result = data.get('decision_result')
-        state.current_section_index = data.get('current_section_index')
-        state.has_more_content = data.get('has_more_content', False)
-        state.current_slide = data.get('current_slide')
-        state.generated_slides = data.get('generated_slides', [])
-        state.validation_result = data.get('validation_result')
-        state.validation_attempts = data.get('validation_attempts', 0)
-        state.validation_issues = data.get('validation_issues', [])
-        state.validation_suggestions = data.get('validation_suggestions', [])
-        state.output_ppt_path = data.get('output_ppt_path')
-        state.created_at = data.get('created_at', state.created_at)
-        state.current_node = data.get('current_node')
-        state.checkpoints = data.get('checkpoints', [])
-        state.failures = data.get('failures', [])
+        # 恢复其他属性
+        state.created_at = data.get("created_at", datetime.now().isoformat())
+        state.current_node = data.get("current_node")
+        state.checkpoints = data.get("checkpoints", [])
+        state.failures = data.get("failures", [])
+        
+        # 内容规划结果
+        state.content_plan = data.get("content_plan")
+        state.decision_result = data.get("decision_result")
+        
+        # 分析结果
+        state.layout_features = data.get("layout_features")
+        
+        # 幻灯片生成状态
+        state.current_section_index = data.get("current_section_index")
+        state.has_more_content = data.get("has_more_content", False)
+        state.current_slide = data.get("current_slide")
+        state.generated_slides = data.get("generated_slides", [])
+        
+        # 验证信息
+        state.validation_result = data.get("validation_result")
+        state.validation_attempts = data.get("validation_attempts", 0)
+        state.validation_issues = data.get("validation_issues", [])
+        state.validation_suggestions = data.get("validation_suggestions", [])
+        
+        # 最终输出
+        state.output_ppt_path = data.get("output_ppt_path")
         
         return state 
