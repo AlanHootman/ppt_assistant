@@ -17,6 +17,8 @@ from typing import Dict, Any, List, Optional, Union
 # 引入OpenAI官方库
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
+# 添加Jinja2模板支持
+from jinja2 import Template
 
 logger = logging.getLogger(__name__)
 
@@ -270,4 +272,141 @@ class ModelManager:
                 
         except Exception as e:
             logger.error(f"调用OpenAI视觉API失败: {str(e)}")
+            raise
+    
+    async def generate_vision_response(self, 
+                                     model: str, 
+                                     prompt: str, 
+                                     images: List[Dict[str, Any]], 
+                                     temperature: float = 0.7, 
+                                     max_tokens: int = 4000) -> str:
+        """
+        使用视觉模型分析多个图像并生成响应
+        
+        Args:
+            model: 模型名称
+            prompt: 提示词
+            images: 图像列表，每个图像为包含url和detail键的字典
+                   例如：[{"url": "file:///path/to/image.jpg", "detail": "high"}]
+            temperature: 温度参数
+            max_tokens: 最大生成token数
+            
+        Returns:
+            分析结果文本
+        """
+        logger.info(f"使用视觉模型分析多图像: {model}, 图像数量: {len(images)}")
+        
+        # 开发环境模拟调用
+        if os.environ.get("DEV_ENV") == "true":
+            logger.info(f"[DEV] 模拟OpenAI视觉API多图像请求: {model}")
+            await asyncio.sleep(2)
+            return json.dumps({
+                "templateName": "模拟模板",
+                "style": "现代简约",
+                "visualFeatures": {
+                    "colorScheme": "蓝色主题",
+                    "designStyle": "商务风格",
+                    "layoutComplexity": "中等",
+                    "textDensity": "适中"
+                },
+                "recommendations": {
+                    "textContent": "适合包含中等文字内容",
+                    "dataVisualization": "支持各类图表",
+                    "imageContent": "图片展示效果良好",
+                    "presentationFlow": "结构清晰"
+                }
+            }, ensure_ascii=False)
+        
+        try:
+            # 获取视觉模型客户端
+            client = self._get_client("vision")
+            
+            # 准备消息内容
+            content: List[Dict[str, Any]] = [{"type": "text", "text": prompt}]
+            
+            # 添加所有图像到内容中
+            for img in images:
+                image_url = img.get("url", "")
+                detail = img.get("detail", "auto")
+                
+                # 处理本地文件路径
+                if image_url.startswith("file://"):
+                    file_path = image_url.replace("file://", "")
+                    
+                    # 检查文件是否存在
+                    if not os.path.exists(file_path):
+                        logger.warning(f"图像文件不存在: {file_path}，跳过此图像")
+                        continue
+                    
+                    # 读取图像文件并进行base64编码
+                    with open(file_path, "rb") as image_file:
+                        base64_image = base64.b64encode(image_file.read()).decode('utf-8')
+                    
+                    # 根据文件扩展名确定MIME类型
+                    ext = os.path.splitext(file_path)[1].lower()
+                    mime_type = "image/jpeg"  # 默认MIME类型
+                    if ext == ".png":
+                        mime_type = "image/png"
+                    elif ext == ".gif":
+                        mime_type = "image/gif"
+                    elif ext == ".webp":
+                        mime_type = "image/webp"
+                    
+                    image_content = {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{mime_type};base64,{base64_image}",
+                            "detail": detail
+                        }
+                    }
+                    content.append(image_content)
+                else:
+                    # 处理网络URL
+                    image_content = {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": image_url,
+                            "detail": detail
+                        }
+                    }
+                    content.append(image_content)
+            
+            # 调用OpenAI API
+            response = await client.chat.completions.create(
+                model=model,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": content
+                    }
+                ],
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            
+            # 提取结果
+            result = response.choices[0].message.content
+            return result or ""
+                
+        except Exception as e:
+            logger.error(f"调用OpenAI视觉API失败: {str(e)}")
             raise 
+            
+    def render_template(self, template_str: str, context: Dict[str, Any]) -> str:
+        """
+        使用Jinja2渲染模板字符串
+        
+        Args:
+            template_str: Jinja2模板字符串
+            context: 模板上下文变量
+            
+        Returns:
+            渲染后的字符串
+        """
+        try:
+            template = Template(template_str)
+            return template.render(**context)
+        except Exception as e:
+            logger.error(f"渲染Jinja2模板失败: {str(e)}")
+            # 发生错误时返回原始模板
+            return template_str 

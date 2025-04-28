@@ -19,6 +19,8 @@ from core.engine.state import AgentState
 from core.engine.configLoader import ConfigLoader
 # 引入MarkdownAgent
 from core.agents.markdown_agent import MarkdownAgent
+# 引入PPTAnalysisAgent
+from core.agents.ppt_analysis_agent import PPTAnalysisAgent
 # 导入模拟模块
 from core.engine.mocks import WorkflowMocks
 # 引入监控功能（可选）
@@ -285,7 +287,7 @@ class WorkflowEngine:
                     break
             
             if not node_config:
-                node_config = {"model_type": "text", "model_name": "gpt-4"}
+                node_config = {"model_type": "text", "max_retries": "3"}
                 logger.warning("未找到markdown_parser节点配置，使用默认配置")
             
             # 创建MarkdownAgent实例
@@ -356,7 +358,8 @@ class WorkflowEngine:
                 
                 # 2. 执行PPT分析节点
                 if state.content_structure:
-                    self._execute_node_directly("ppt_analyzer", state)
+                    # 直接使用异步方法调用真实的PPT分析Agent
+                    await self._execute_ppt_analyzer(state)
                 
                 # 3. 执行内容规划节点
                 if state.content_structure and state.layout_features:
@@ -441,6 +444,8 @@ class WorkflowEngine:
             # Markdown解析节点需要异步执行，由调用者处理
             logger.warning("markdown_parser节点需要异步执行，应由调用者处理")
         elif node_name == "ppt_analyzer":
+            # 在直接执行时，使用模拟实现
+            # 注意：真实的PPTAnalysisAgent是在run_async中通过await调用的
             self._mock_ppt_analyzer(state)
         elif node_name == "content_planner":
             self._mock_content_planner(state)
@@ -576,4 +581,44 @@ class WorkflowEngine:
         Args:
             state: 代理状态
         """
-        WorkflowMocks.mock_validator(state) 
+        WorkflowMocks.mock_validator(state)
+
+    async def _execute_ppt_analyzer(self, state: AgentState) -> None:
+        """
+        使用真实的PPTAnalysisAgent分析PPT模板
+        
+        Args:
+            state: 代理状态
+        """
+        try:
+            logger.info("执行真实的PPTAnalysisAgent处理")
+            
+            # 从配置中获取ppt_analyzer节点的配置
+            node_config = None
+            for node in self.config.get("workflow", {}).get("nodes", []):
+                if node.get("name") == "ppt_analyzer":
+                    node_config = node.get("config", {})
+                    break
+            
+            if not node_config:
+                node_config = {"model_type": "vision", "max_retries": "3"}
+                logger.warning("未找到ppt_analyzer节点配置，使用默认配置")
+            
+            # 创建PPTAnalysisAgent实例
+            ppt_analysis_agent = PPTAnalysisAgent(node_config)
+            
+            # 执行PPT模板分析
+            updated_state = await ppt_analysis_agent.run(state)
+            
+            # 更新状态（虽然run方法已经更新了状态，但为了清晰起见，再次赋值）
+            state.layout_features = updated_state.layout_features
+            
+            logger.info(f"PPTAnalysisAgent执行完成，布局特征: {state.layout_features is not None}")
+            
+        except Exception as e:
+            logger.error(f"执行PPTAnalysisAgent失败: {str(e)}")
+            state.record_failure(f"PPT模板分析错误: {str(e)}")
+            
+            # 如果真实实现失败，尝试使用模拟实现作为备份
+            logger.warning("尝试使用模拟PPT分析实现作为备份...")
+            self._mock_ppt_analyzer(state) 

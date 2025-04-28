@@ -9,3 +9,6 @@ pytest-asyncio>=0.21.0
 # 模型服务
 openai>=1.0.0
 python-pptx>=0.6.21
+# 其他依赖
+pdf2image
+jinja2
