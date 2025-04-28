@@ -57,7 +57,7 @@ class Settings:
         self.MODEL_CONFIG_PATH = self.CONFIG_DIR / "model_config.yaml"
         
         # 工作流配置
-        self.WORKFLOW_CONFIG_DIR = self.CONFIG_DIR / "workflow_config"
+        self.WORKFLOW_CONFIG_DIR = self.CONFIG_DIR / "workflow"
         
         logger.info(f"加载系统配置，项目根目录: {self.BASE_DIR}")
     
