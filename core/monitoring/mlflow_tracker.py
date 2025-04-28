@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class MLflowTracker:
     """MLflow跟踪器用于记录工作流执行数据"""
     
-    def __init__(self, tracking_uri="http://127.0.0.1:5001", experiment_name="workflow_executions"):
+    def __init__(self, tracking_uri="http://127.0.0.1:5000", experiment_name="workflow_executions"):
         """初始化MLflow跟踪器
         
         Args:
