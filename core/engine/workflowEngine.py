@@ -23,6 +23,10 @@ from core.agents.markdown_agent import MarkdownAgent
 from core.agents.ppt_analysis_agent import PPTAnalysisAgent
 # 引入ContentPlanningAgent
 from core.agents.content_planning_agent import ContentPlanningAgent
+# 引入SlideGeneratorAgent (提前引入以避免动态导入)
+from core.agents.slide_generator_agent import SlideGeneratorAgent
+# 引入PPTFinalizerAgent (提前引入以避免动态导入)
+from core.agents.ppt_finalizer_agent import PPTFinalizerAgent
 # 导入模拟模块
 from core.engine.mocks import WorkflowMocks
 # 引入监控功能（可选）
@@ -224,6 +228,66 @@ class WorkflowEngine:
         }
         self.execution_logs.append(record)
         logger.debug(f"执行节点: {node_name}, 会话: {session_id}")
+
+    def _convert_result_to_state(self, original_state: AgentState, result_dict: Optional[Dict[str, Any]]) -> AgentState:
+        """
+        将LangGraph返回的结果字典转换为AgentState对象
+        
+        Args:
+            original_state: 原始状态
+            result_dict: 结果字典，可能为None
+            
+        Returns:
+            AgentState对象
+        """
+        # 创建新的AgentState，保留会话ID
+        result_state = AgentState(session_id=original_state.session_id)
+        
+        # 复制原始状态中的检查点等
+        result_state.checkpoints = original_state.checkpoints.copy() if original_state.checkpoints else []
+        result_state.failures = original_state.failures.copy() if original_state.failures else []
+        
+        # 复制原始状态的所有属性作为基础
+        for attr in dir(original_state):
+            if not attr.startswith('_') and not callable(getattr(original_state, attr)):
+                try:
+                    setattr(result_state, attr, getattr(original_state, attr))
+                except Exception as e:
+                    logger.debug(f"无法复制属性 {attr}: {str(e)}")
+        
+        # 如果结果字典不为None，则更新状态
+        if result_dict is not None:
+            # 复制结果中的值到新状态
+            for key, value in result_dict.items():
+                if hasattr(result_state, key):
+                    setattr(result_state, key, value)
+            logger.debug(f"从结果字典更新了状态: {result_state.session_id}")
+        else:
+            logger.warning("结果字典为None，使用原始状态")
+        
+        return result_state
+    
+    def get_execution_logs(self) -> List[Dict[str, Any]]:
+        """
+        获取执行日志
+        
+        Returns:
+            执行日志列表
+        """
+        return self.execution_logs
+
+    def _validate_condition(self, state: Dict[str, Any]) -> str:
+        """
+        验证条件函数
+        
+        Args:
+            state: 当前状态字典
+            
+        Returns:
+            下一步分支名称
+        """
+        # 使用WorkflowMocks中的验证逻辑
+        return WorkflowMocks.validate_condition(state)
     
     def _placeholder_node(self, node_name: str) -> Callable:
         """
@@ -270,179 +334,124 @@ class WorkflowEngine:
         # 这个方法已移至WorkflowMocks，此处只保留接口兼容性
         # 并转发到新的模拟实现
         WorkflowMocks.execute_mock_node_logic(node_name, state)
-    
-    async def _execute_markdown_parser(self, state: AgentState) -> None:
-        """
-        使用真实的MarkdownAgent解析Markdown内容
-        
-        Args:
-            state: 代理状态
-        """
-        try:
-            logger.info("执行真实的MarkdownAgent处理")
-            
-            # 从配置中获取markdown_parser节点的配置
-            node_config = None
-            for node in self.config.get("workflow", {}).get("nodes", []):
-                if node.get("name") == "markdown_parser":
-                    node_config = node.get("config", {})
-                    break
-            
-            if not node_config:
-                node_config = {"model_type": "text", "max_retries": "3"}
-                logger.warning("未找到markdown_parser节点配置，使用默认配置")
-            
-            # 创建MarkdownAgent实例
-            markdown_agent = MarkdownAgent(node_config)
-            
-            # 执行Markdown解析
-            updated_state = await markdown_agent.run(state)
-            
-            # 更新状态（虽然run方法已经更新了状态，但为了清晰起见，再次赋值）
-            state.content_structure = updated_state.content_structure
-            
-            logger.info(f"MarkdownAgent执行完成，内容结构: {state.content_structure is not None}")
-            
-        except Exception as e:
-            logger.error(f"执行MarkdownAgent失败: {str(e)}")
-            state.record_failure(f"Markdown解析错误: {str(e)}")
-    
-    def _validate_condition(self, state: Dict[str, Any]) -> str:
-        """
-        验证条件函数
-        
-        Args:
-            state: 当前状态字典
-            
-        Returns:
-            下一步分支名称
-        """
-        # 使用WorkflowMocks中的验证逻辑
-        return WorkflowMocks.validate_condition(state)
-    
-    async def _execute_slide_generator(self, state: AgentState) -> None:
-        """
-        使用真实的SlideGeneratorAgent生成幻灯片
-        
-        Args:
-            state: 代理状态
-        """
-        try:
-            logger.info("执行真实的SlideGeneratorAgent处理")
-            
-            # 从配置中获取slide_generator节点的配置
-            node_config = None
-            for node in self.config.get("workflow", {}).get("nodes", []):
-                if node.get("name") == "slide_generator":
-                    node_config = node.get("config", {})
-                    break
-            
-            if not node_config:
-                node_config = {"model_type": "vision", "max_retries": "3"}
-                logger.warning("未找到slide_generator节点配置，使用默认配置")
-            
-            # 创建SlideGeneratorAgent实例
-            from core.agents.slide_generator_agent import SlideGeneratorAgent
-            slide_generator_agent = SlideGeneratorAgent(node_config)
-            
-            # 执行幻灯片生成
-            try:
-                updated_state = await slide_generator_agent.run(state)
-                
-                # 更新状态
-                state.current_slide = updated_state.current_slide
-                
-                logger.info(f"SlideGeneratorAgent执行完成，生成了幻灯片: {state.current_slide.get('slide_id') if state.current_slide else 'None'}")
-                
-            except Exception as agent_error:
-                logger.error(f"SlideGeneratorAgent执行出错: {str(agent_error)}")
-                # 记录详细的错误堆栈
-                import traceback
-                logger.error(f"错误详情: {traceback.format_exc()}")
-                state.record_failure(f"执行SlideGeneratorAgent失败: {str(agent_error)}")
-                
-                # 如果实际执行失败，尝试使用模拟实现作为备份
-                logger.warning("尝试使用模拟SlideGenerator实现作为备份...")
-                self._mock_slide_generator(state)
-            
-        except Exception as e:
-            logger.error(f"初始化或执行SlideGeneratorAgent失败: {str(e)}")
-            # 记录详细的错误堆栈
-            import traceback
-            logger.error(f"错误详情: {traceback.format_exc()}")
-            state.record_failure(f"执行SlideGeneratorAgent失败: {str(e)}")
-            
-            # 尝试使用模拟实现
-            logger.warning("尝试使用模拟SlideGenerator实现...")
-            self._mock_slide_generator(state)
 
-    async def _execute_next_slide_or_end(self, state: AgentState) -> None:
+    def _mock_ppt_analyzer(self, state: AgentState) -> None:
         """
-        检查是否还有更多内容需要处理，更新状态
+        模拟PPT分析节点实现
         
         Args:
             state: 代理状态
         """
-        try:
-            logger.info("执行幻灯片进度检查")
-            
-            # 确保状态中有必要的属性
-            if not hasattr(state, 'content_plan') or not state.content_plan:
-                if not hasattr(state, 'decision_result') or not state.decision_result:
-                    error_msg = "无法检查进度：缺少内容规划结果"
-                    logger.error(error_msg)
-                    state.record_failure(error_msg)
-                    state.has_more_content = False
-                    return
-                
-                # 使用旧版兼容模式
-                slides = state.decision_result.get('slides', [])
-                total_slides = len(slides)
-            else:
-                # 使用新版content_plan
-                total_slides = len(state.content_plan)
-            
-            # 当前幻灯片已验证通过，将其添加到已生成列表中
-            if state.current_slide and state.validation_result:
-                if not state.generated_slides:
-                    state.generated_slides = []
-                
-                # 检查是否已存在相同ID的幻灯片，如果是则替换
-                slide_id = state.current_slide.get('slide_id')
-                existing_index = None
-                for i, slide in enumerate(state.generated_slides):
-                    if slide.get('slide_id') == slide_id:
-                        existing_index = i
-                        break
-                
-                if existing_index is not None:
-                    state.generated_slides[existing_index] = state.current_slide
-                else:
-                    state.generated_slides.append(state.current_slide)
-                
-                logger.info(f"添加已验证的幻灯片到生成列表: {slide_id}")
-            
-            # 更新章节索引
-            if state.current_section_index is None:
-                state.current_section_index = 0
-            else:
-                state.current_section_index += 1
-            
-            # 检查是否还有更多内容
-            state.has_more_content = (state.current_section_index < total_slides)
-            
-            logger.info(f"当前章节索引: {state.current_section_index}, 总幻灯片数: {total_slides}, 还有更多内容: {state.has_more_content}")
-            
-        except Exception as e:
-            logger.error(f"幻灯片进度检查失败: {str(e)}")
-            # 记录详细的错误堆栈
-            import traceback
-            logger.error(f"错误详情: {traceback.format_exc()}")
-            state.record_failure(f"幻灯片进度检查失败: {str(e)}")
-            
-            # 尝试使用模拟实现
-            logger.warning("尝试使用模拟next_slide_or_end实现...")
+        WorkflowMocks.mock_ppt_analyzer(state)
+
+    def _mock_content_planner(self, state: AgentState) -> None:
+        """
+        模拟内容规划节点实现
+        
+        Args:
+            state: 代理状态
+        """
+        WorkflowMocks.mock_content_planner(state)
+
+    def _mock_slide_generator(self, state: AgentState) -> None:
+        """
+        模拟幻灯片生成节点实现
+        
+        Args:
+            state: 代理状态
+        """
+        WorkflowMocks.mock_slide_generator(state)
+
+    def _mock_slide_validator(self, state: AgentState) -> None:
+        """
+        模拟幻灯片验证节点实现
+        
+        Args:
+            state: 代理状态
+        """
+        WorkflowMocks.mock_slide_validator(state)
+
+    def _mock_next_slide_or_end(self, state: AgentState) -> None:
+        """
+        模拟检查是否还有更多内容节点实现
+        
+        Args:
+            state: 代理状态
+        """
+        WorkflowMocks.mock_next_slide_or_end(state)
+
+    def _mock_ppt_finalizer(self, state: AgentState) -> None:
+        """
+        模拟PPT清理与保存节点实现
+        
+        Args:
+            state: 代理状态
+        """
+        WorkflowMocks.mock_ppt_finalizer(state)
+
+    def _mock_ppt_generator(self, state: AgentState) -> None:
+        """
+        模拟PPT生成节点实现
+        
+        Args:
+            state: 代理状态
+        """
+        WorkflowMocks.mock_ppt_generator(state)
+
+    def _mock_validator(self, state: AgentState) -> None:
+        """
+        模拟验证节点实现
+        
+        Args:
+            state: 代理状态
+        """
+        WorkflowMocks.mock_validator(state)
+
+    def _execute_node_directly(self, node_name: str, state: AgentState) -> None:
+        """
+        直接执行指定的节点
+        
+        Args:
+            node_name: 节点名称
+            state: 代理状态
+        """
+        logger.info(f"直接执行节点: {node_name}")
+        
+        # 记录执行开始的检查点
+        state.add_checkpoint(f"{node_name}_started")
+        
+        # 更新执行记录
+        if state.session_id:
+            self._record_execution(node_name, state.session_id)
+        
+        # 根据节点类型执行不同的处理逻辑
+        if node_name == "markdown_parser":
+            # Markdown解析节点需要异步执行，由调用者处理
+            logger.warning("markdown_parser节点需要异步执行，应由调用者处理")
+        elif node_name == "ppt_analyzer":
+            # 在直接执行时，使用模拟实现
+            # 注意：真实的PPTAnalysisAgent是在run_async中通过await调用的
+            self._mock_ppt_analyzer(state)
+        elif node_name == "content_planner":
+            # 注意：真实的ContentPlanningAgent需要异步执行，此处使用模拟实现
+            logger.warning("content_planner节点需要异步执行，应由调用者处理")
+            self._mock_content_planner(state)
+        elif node_name == "slide_generator":
+            self._mock_slide_generator(state)
+        elif node_name == "slide_validator":
+            self._mock_slide_validator(state)
+        elif node_name == "ppt_finalizer":
+            # 在直接执行时，仍使用模拟实现，因为无法在同步方法中直接调用异步方法
+            logger.warning("在同步方法中无法直接调用异步的PPTFinalizerAgent，使用模拟实现")
+            self._mock_ppt_finalizer(state)
+        elif node_name == "next_slide_or_end":
             self._mock_next_slide_or_end(state)
+        else:
+            # 未知节点，使用通用模拟逻辑
+            WorkflowMocks.execute_mock_node_logic(node_name, state)
+        
+        # 记录执行完成的检查点
+        state.add_checkpoint(f"{node_name}_completed")
 
     async def run_async(self, session_id=None, raw_md=None, ppt_template_path=None, output_dir=None):
         """
@@ -552,8 +561,8 @@ class WorkflowEngine:
                 await self._execute_next_slide_or_end(state)
             
             # 8. 完成PPT生成
-            # (此处暂时使用模拟实现)
-            self._execute_node_directly("ppt_finalizer", state)
+            # 使用真实的PPTFinalizerAgent而不是模拟实现
+            await self._execute_ppt_finalizer(state)
             
             # 保存最终状态
             state.save()
@@ -593,166 +602,165 @@ class WorkflowEngine:
                 "session_id": state.session_id,
                 "timestamp": datetime.now().isoformat()
             }
-    
-    def _execute_node_directly(self, node_name: str, state: AgentState) -> None:
+
+    async def _execute_markdown_parser(self, state: AgentState) -> None:
         """
-        直接执行节点，跳过LangGraph框架
+        使用真实的MarkdownAgent解析Markdown内容
         
         Args:
-            node_name: 节点名称
-            state: 状态对象
+            state: 代理状态
         """
-        logger.info(f"直接执行节点: {node_name}, 会话: {state.session_id}")
-        state.current_node = node_name
-        
-        # 记录执行信息
-        self._record_execution(node_name, state.session_id)
-        
-        # 根据节点类型执行不同的处理逻辑
-        if node_name == "markdown_parser":
-            # Markdown解析节点需要异步执行，由调用者处理
-            logger.warning("markdown_parser节点需要异步执行，应由调用者处理")
-        elif node_name == "ppt_analyzer":
-            # 在直接执行时，使用模拟实现
-            # 注意：真实的PPTAnalysisAgent是在run_async中通过await调用的
-            self._mock_ppt_analyzer(state)
-        elif node_name == "content_planner":
-            # 注意：真实的ContentPlanningAgent需要异步执行，此处使用模拟实现
-            logger.warning("content_planner节点需要异步执行，应由调用者处理")
-            self._mock_content_planner(state)
-        elif node_name == "slide_generator":
-            self._mock_slide_generator(state)
-        elif node_name == "slide_validator":
-            self._mock_slide_validator(state)
-        elif node_name == "ppt_finalizer":
-            self._mock_ppt_finalizer(state)
-        elif node_name == "next_slide_or_end":
-            self._mock_next_slide_or_end(state)
-        else:
-            # 未知节点，使用通用模拟逻辑
-            WorkflowMocks.execute_mock_node_logic(node_name, state)
-        
-        # 记录执行完成的检查点
-        state.add_checkpoint(f"{node_name}_completed")
-    
-    def _convert_result_to_state(self, original_state: AgentState, result_dict: Optional[Dict[str, Any]]) -> AgentState:
-        """
-        将LangGraph返回的结果字典转换为AgentState对象
-        
-        Args:
-            original_state: 原始状态
-            result_dict: 结果字典，可能为None
+        try:
+            logger.info("执行真实的MarkdownAgent处理")
             
-        Returns:
-            AgentState对象
-        """
-        # 创建新的AgentState，保留会话ID
-        result_state = AgentState(session_id=original_state.session_id)
-        
-        # 复制原始状态中的检查点等
-        result_state.checkpoints = original_state.checkpoints.copy() if original_state.checkpoints else []
-        result_state.failures = original_state.failures.copy() if original_state.failures else []
-        
-        # 复制原始状态的所有属性作为基础
-        for attr in dir(original_state):
-            if not attr.startswith('_') and not callable(getattr(original_state, attr)):
-                try:
-                    setattr(result_state, attr, getattr(original_state, attr))
-                except Exception as e:
-                    logger.debug(f"无法复制属性 {attr}: {str(e)}")
-        
-        # 如果结果字典不为None，则更新状态
-        if result_dict is not None:
-            # 复制结果中的值到新状态
-            for key, value in result_dict.items():
-                if hasattr(result_state, key):
-                    setattr(result_state, key, value)
-            logger.debug(f"从结果字典更新了状态: {result_state.session_id}")
-        else:
-            logger.warning("结果字典为None，使用原始状态")
-        
-        return result_state
+            # 从配置中获取markdown_parser节点的配置
+            node_config = None
+            for node in self.config.get("workflow", {}).get("nodes", []):
+                if node.get("name") == "markdown_parser":
+                    node_config = node.get("config", {})
+                    break
+            
+            if not node_config:
+                node_config = {"model_type": "text", "max_retries": "3"}
+                logger.warning("未找到markdown_parser节点配置，使用默认配置")
+            
+            # 创建MarkdownAgent实例
+            markdown_agent = MarkdownAgent(node_config)
+            
+            # 执行Markdown解析
+            updated_state = await markdown_agent.run(state)
+            
+            # 更新状态（虽然run方法已经更新了状态，但为了清晰起见，再次赋值）
+            state.content_structure = updated_state.content_structure
+            
+            logger.info(f"MarkdownAgent执行完成，内容结构: {state.content_structure is not None}")
+            
+        except Exception as e:
+            logger.error(f"执行MarkdownAgent失败: {str(e)}")
+            state.record_failure(f"Markdown解析错误: {str(e)}")
     
-    def get_execution_logs(self) -> List[Dict[str, Any]]:
+    async def _execute_slide_generator(self, state: AgentState) -> None:
         """
-        获取执行日志
-        
-        Returns:
-            执行日志列表
-        """
-        return self.execution_logs
-
-    def _mock_ppt_analyzer(self, state: AgentState) -> None:
-        """
-        模拟PPT分析节点实现
+        使用真实的SlideGeneratorAgent生成幻灯片
         
         Args:
             state: 代理状态
         """
-        WorkflowMocks.mock_ppt_analyzer(state)
+        try:
+            logger.info("执行真实的SlideGeneratorAgent处理")
+            
+            # 从配置中获取slide_generator节点的配置
+            node_config = None
+            for node in self.config.get("workflow", {}).get("nodes", []):
+                if node.get("name") == "slide_generator":
+                    node_config = node.get("config", {})
+                    break
+            
+            if not node_config:
+                node_config = {"model_type": "vision", "max_retries": "3"}
+                logger.warning("未找到slide_generator节点配置，使用默认配置")
+            
+            # 创建SlideGeneratorAgent实例
+            slide_generator_agent = SlideGeneratorAgent(node_config)
+            
+            # 执行幻灯片生成
+            try:
+                updated_state = await slide_generator_agent.run(state)
+                
+                # 更新状态
+                state.current_slide = updated_state.current_slide
+                
+                logger.info(f"SlideGeneratorAgent执行完成，生成了幻灯片: {state.current_slide.get('slide_id') if state.current_slide else 'None'}")
+                
+            except Exception as agent_error:
+                logger.error(f"SlideGeneratorAgent执行出错: {str(agent_error)}")
+                # 记录详细的错误堆栈
+                import traceback
+                logger.error(f"错误详情: {traceback.format_exc()}")
+                state.record_failure(f"执行SlideGeneratorAgent失败: {str(agent_error)}")
+                
+                # 如果实际执行失败，尝试使用模拟实现作为备份
+                logger.warning("尝试使用模拟SlideGenerator实现作为备份...")
+                self._mock_slide_generator(state)
+            
+        except Exception as e:
+            logger.error(f"初始化或执行SlideGeneratorAgent失败: {str(e)}")
+            # 记录详细的错误堆栈
+            import traceback
+            logger.error(f"错误详情: {traceback.format_exc()}")
+            state.record_failure(f"执行SlideGeneratorAgent失败: {str(e)}")
+            
+            # 尝试使用模拟实现
+            logger.warning("尝试使用模拟SlideGenerator实现...")
+            self._mock_slide_generator(state)
 
-    def _mock_content_planner(self, state: AgentState) -> None:
+    async def _execute_next_slide_or_end(self, state: AgentState) -> None:
         """
-        模拟内容规划节点实现
+        检查是否还有更多内容需要处理，更新状态
         
         Args:
             state: 代理状态
         """
-        WorkflowMocks.mock_content_planner(state)
-
-    def _mock_slide_generator(self, state: AgentState) -> None:
-        """
-        模拟幻灯片生成节点实现
-        
-        Args:
-            state: 代理状态
-        """
-        WorkflowMocks.mock_slide_generator(state)
-
-    def _mock_slide_validator(self, state: AgentState) -> None:
-        """
-        模拟幻灯片验证节点实现
-        
-        Args:
-            state: 代理状态
-        """
-        WorkflowMocks.mock_slide_validator(state)
-
-    def _mock_next_slide_or_end(self, state: AgentState) -> None:
-        """
-        模拟检查是否还有更多内容节点实现
-        
-        Args:
-            state: 代理状态
-        """
-        WorkflowMocks.mock_next_slide_or_end(state)
-
-    def _mock_ppt_finalizer(self, state: AgentState) -> None:
-        """
-        模拟PPT清理与保存节点实现
-        
-        Args:
-            state: 代理状态
-        """
-        WorkflowMocks.mock_ppt_finalizer(state)
-
-    def _mock_ppt_generator(self, state: AgentState) -> None:
-        """
-        模拟PPT生成节点实现
-        
-        Args:
-            state: 代理状态
-        """
-        WorkflowMocks.mock_ppt_generator(state)
-
-    def _mock_validator(self, state: AgentState) -> None:
-        """
-        模拟验证节点实现
-        
-        Args:
-            state: 代理状态
-        """
-        WorkflowMocks.mock_validator(state)
+        try:
+            logger.info("执行幻灯片进度检查")
+            
+            # 确保状态中有必要的属性
+            if not hasattr(state, 'content_plan') or not state.content_plan:
+                if not hasattr(state, 'decision_result') or not state.decision_result:
+                    error_msg = "无法检查进度：缺少内容规划结果"
+                    logger.error(error_msg)
+                    state.record_failure(error_msg)
+                    state.has_more_content = False
+                    return
+                
+                # 使用旧版兼容模式
+                slides = state.decision_result.get('slides', [])
+                total_slides = len(slides)
+            else:
+                # 使用新版content_plan
+                total_slides = len(state.content_plan)
+            
+            # 当前幻灯片已验证通过，将其添加到已生成列表中
+            if state.current_slide and state.validation_result:
+                if not state.generated_slides:
+                    state.generated_slides = []
+                
+                # 检查是否已存在相同ID的幻灯片，如果是则替换
+                slide_id = state.current_slide.get('slide_id')
+                existing_index = None
+                for i, slide in enumerate(state.generated_slides):
+                    if slide.get('slide_id') == slide_id:
+                        existing_index = i
+                        break
+                
+                if existing_index is not None:
+                    state.generated_slides[existing_index] = state.current_slide
+                else:
+                    state.generated_slides.append(state.current_slide)
+                
+                logger.info(f"添加已验证的幻灯片到生成列表: {slide_id}")
+            
+            # 更新章节索引
+            if state.current_section_index is None:
+                state.current_section_index = 0
+            else:
+                state.current_section_index += 1
+            
+            # 检查是否还有更多内容
+            state.has_more_content = (state.current_section_index < total_slides)
+            
+            logger.info(f"当前章节索引: {state.current_section_index}, 总幻灯片数: {total_slides}, 还有更多内容: {state.has_more_content}")
+            
+        except Exception as e:
+            logger.error(f"幻灯片进度检查失败: {str(e)}")
+            # 记录详细的错误堆栈
+            import traceback
+            logger.error(f"错误详情: {traceback.format_exc()}")
+            state.record_failure(f"幻灯片进度检查失败: {str(e)}")
+            
+            # 尝试使用模拟实现
+            logger.warning("尝试使用模拟next_slide_or_end实现...")
+            self._mock_next_slide_or_end(state)
 
     async def _execute_ppt_analyzer(self, state: AgentState) -> None:
         """
@@ -846,4 +854,39 @@ class WorkflowEngine:
             
             # 尝试使用模拟实现
             logger.warning("尝试使用模拟ContentPlanner实现...")
-            self._mock_content_planner(state) 
+            self._mock_content_planner(state)
+
+    async def _execute_ppt_finalizer(self, state: AgentState) -> None:
+        """
+        执行PPT清理与保存
+        
+        Args:
+            state: 代理状态
+        """
+        try:
+            logger.info("执行真实的PPTFinalizerAgent处理")
+            
+            # 从配置中获取ppt_finalizer节点的配置
+            node_config = None
+            for node in self.config.get("workflow", {}).get("nodes", []):
+                if node.get("name") == "ppt_finalizer":
+                    node_config = node.get("config", {})
+                    break
+            
+            if not node_config:
+                node_config = {}
+                logger.warning("未找到ppt_finalizer节点配置，使用默认配置")
+            
+            # 创建PPTFinalizerAgent实例
+            ppt_finalizer_agent = PPTFinalizerAgent(node_config)
+            
+            # 执行PPT清理与保存
+            state = await ppt_finalizer_agent.run(state)
+            
+            logger.info("PPT清理与保存完成")
+            
+        except Exception as e:
+            error_msg = f"PPT清理与保存失败: {str(e)}"
+            logger.error(error_msg)
+            state.record_failure(error_msg)
+            raise 
