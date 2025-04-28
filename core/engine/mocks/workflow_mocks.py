@@ -244,4 +244,149 @@ class WorkflowMocks:
             elif node_name == "layout_decider":
                 logger.warning(f"[模拟] layout_decider 需要 content_structure 和 layout_features，当前值: {state.content_structure is not None}, {state.layout_features is not None}")
             elif node_name == "ppt_generator":
-                logger.warning(f"[模拟] ppt_generator 需要 decision_result，当前值: {state.decision_result is not None}") 
+                logger.warning(f"[模拟] ppt_generator 需要 decision_result，当前值: {state.decision_result is not None}")
+
+    @staticmethod
+    def mock_content_planner(state: AgentState) -> None:
+        """模拟内容规划节点实现"""
+        logger.info("模拟执行内容规划节点")
+        # 基于内容结构和布局特征，规划内容与幻灯片匹配
+        content_plan = []
+        
+        if state.content_structure and state.layout_features:
+            # 获取章节和模板
+            sections = state.content_structure.get("sections", [])
+            templates = state.layout_features.get("layouts", [])
+            
+            # 为每个章节选择合适的模板
+            for i, section in enumerate(sections):
+                template_index = i % len(templates) if templates else 0
+                template = templates[template_index] if templates else {"name": "default"}
+                
+                content_plan.append({
+                    "section": section,
+                    "template": template,
+                    "slide_index": i + 1
+                })
+            
+            # 创建决策结果
+            state.decision_result = {
+                "slides": content_plan,
+                "total_slides": len(content_plan),
+                "theme": state.layout_features.get("theme", {})
+            }
+            
+            logger.info(f"内容规划完成，计划生成 {len(content_plan)} 张幻灯片")
+        else:
+            logger.warning("无法执行内容规划，缺少内容结构或布局特征")
+            state.record_failure("内容规划失败：缺少必要数据")
+
+    @staticmethod
+    def mock_slide_generator(state: AgentState) -> None:
+        """模拟幻灯片生成节点实现"""
+        logger.info(f"模拟执行幻灯片生成节点，章节索引: {state.current_section_index}")
+        
+        if state.decision_result and "slides" in state.decision_result:
+            slides = state.decision_result.get("slides", [])
+            
+            if state.current_section_index is None:
+                state.current_section_index = 0
+            
+            if 0 <= state.current_section_index < len(slides):
+                current_slide_plan = slides[state.current_section_index]
+                
+                # 模拟生成幻灯片
+                state.current_slide = {
+                    "slide_id": f"slide_{state.current_section_index}",
+                    "content": current_slide_plan.get("section", {}),
+                    "template": current_slide_plan.get("template", {}),
+                    "image_path": f"workspace/sessions/{state.session_id}/slide_{state.current_section_index}.png"
+                }
+                
+                logger.info(f"幻灯片生成完成: {state.current_slide.get('slide_id')}")
+            else:
+                logger.warning(f"无效的章节索引: {state.current_section_index}")
+                state.record_failure(f"幻灯片生成失败：无效的章节索引 {state.current_section_index}")
+        else:
+            logger.warning("无法生成幻灯片，缺少决策结果")
+            state.record_failure("幻灯片生成失败：缺少决策结果")
+
+    @staticmethod
+    def mock_slide_validator(state: AgentState) -> None:
+        """模拟幻灯片验证节点实现"""
+        logger.info("模拟执行幻灯片验证节点")
+        
+        if state.current_slide:
+            # 模拟验证结果（通常应该有更复杂的验证逻辑）
+            # 这里简单地验证为通过，但可以根据需要添加随机失败或其他条件
+            state.validation_result = True
+            
+            if not hasattr(state, "validation_attempts") or state.validation_attempts is None:
+                state.validation_attempts = 0
+            state.validation_attempts += 1
+            
+            # 验证通过时，将当前幻灯片添加到已生成列表
+            if state.validation_result:
+                if not hasattr(state, "generated_slides") or state.generated_slides is None:
+                    state.generated_slides = []
+                state.generated_slides.append(state.current_slide)
+                logger.info(f"幻灯片验证通过: {state.current_slide.get('slide_id')}")
+            else:
+                logger.warning(f"幻灯片验证不通过: {state.current_slide.get('slide_id')}")
+        else:
+            logger.warning("无法验证幻灯片，缺少当前幻灯片数据")
+            state.record_failure("幻灯片验证失败：缺少当前幻灯片数据")
+            state.validation_result = False
+
+    @staticmethod
+    def mock_next_slide_or_end(state: AgentState) -> None:
+        """模拟检查是否还有更多内容节点实现"""
+        logger.info("模拟执行下一张幻灯片或结束节点")
+        
+        # 更新索引到下一章节
+        if state.current_section_index is None:
+            state.current_section_index = 0
+        else:
+            state.current_section_index += 1
+        
+        # 检查是否还有更多内容需要处理
+        if state.decision_result and "slides" in state.decision_result:
+            state.has_more_content = (state.current_section_index < 
+                                     len(state.decision_result.get("slides", [])))
+            
+            if state.has_more_content:
+                logger.info(f"继续处理下一章节: {state.current_section_index}")
+            else:
+                logger.info("所有章节处理完毕")
+        else:
+            logger.warning("无法确定是否有更多内容，缺少决策结果")
+            state.has_more_content = False
+
+    @staticmethod
+    def mock_ppt_finalizer(state: AgentState) -> None:
+        """模拟PPT清理与保存节点实现"""
+        logger.info("模拟执行PPT清理与保存节点")
+        
+        if hasattr(state, "generated_slides") and state.generated_slides:
+            # 创建输出目录
+            if state.output_dir:
+                os.makedirs(state.output_dir, exist_ok=True)
+                
+                # 模拟保存PPT文件
+                output_file = os.path.join(state.output_dir, f"{state.session_id}.pptx")
+                state.output_ppt_path = output_file
+                state.ppt_file_path = output_file  # 同时设置ppt_file_path以保持一致性
+                
+                # 实际情况下，这里应该调用PPT管理器保存文件
+                # 仅记录一个假的保存操作
+                with open(f"{output_file}.log", "w") as f:
+                    f.write(f"PPT文件模拟保存于 {datetime.now()}\n")
+                    f.write(f"包含 {len(state.generated_slides)} 张幻灯片\n")
+                
+                logger.info(f"PPT文件已保存: {output_file}")
+            else:
+                logger.warning("无法保存PPT，未指定输出目录")
+                state.record_failure("PPT保存失败：未指定输出目录")
+        else:
+            logger.warning("无法完成PPT，没有已生成的幻灯片")
+            state.record_failure("PPT清理与保存失败：没有已生成的幻灯片") 

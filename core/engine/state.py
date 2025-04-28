@@ -42,17 +42,30 @@ class AgentState:
         self.ppt_template_path = ppt_template_path  # PPT模板路径
         self.output_dir = output_dir  # 输出目录
         
-        # 处理结果
+        # Markdown解析结果
         self.content_structure = content_structure  # 解析后的内容结构
+        
+        # PPT分析结果
         self.layout_features = None  # 模板布局特征
-        self.decision_result = None  # 布局决策结果
-        self.ppt_file_path = None  # 生成的PPT文件路径
-        self.output_ppt_path = None  # 输出的PPT文件路径
+        
+        # 内容规划结果
+        self.decision_result = None  # 内容-布局匹配结果
+        
+        # 幻灯片生成状态
+        self.current_section_index = None  # 当前处理的章节索引
+        self.has_more_content = False  # 是否还有更多内容需要处理
+        self.current_slide = None  # 当前生成的幻灯片
+        self.generated_slides = []  # 已生成的幻灯片列表
         
         # 验证信息
-        self.validation_attempts = 0  # 验证尝试次数
         self.validation_result = None  # 验证结果
-
+        self.validation_attempts = 0  # 验证尝试次数
+        self.validation_issues = []  # 验证发现的问题
+        self.validation_suggestions = []  # 改进建议
+        
+        # 最终输出
+        self.output_ppt_path = None  # 最终PPT文件路径
+        
         # 状态跟踪
         self.checkpoints = []  # 检查点列表
         self.failures = []  # 失败记录
@@ -61,6 +74,17 @@ class AgentState:
         self.created_at = datetime.now().isoformat()
         
         logger.debug(f"创建状态: {self.session_id}")
+    
+    # 添加ppt_file_path属性，兼容旧代码
+    @property
+    def ppt_file_path(self):
+        """兼容性属性，返回output_ppt_path的值"""
+        return self.output_ppt_path
+    
+    @ppt_file_path.setter
+    def ppt_file_path(self, value):
+        """设置ppt_file_path时同时设置output_ppt_path"""
+        self.output_ppt_path = value
     
     def add_checkpoint(self, checkpoint: str) -> None:
         """
@@ -111,14 +135,34 @@ class AgentState:
             "current_node": self.current_node,
             "checkpoints": self.checkpoints,
             "failures": self.failures,
-            "content_structure": self.content_structure,
-            "layout_features": self.layout_features,
-            "decision_result": self.decision_result,
-            "ppt_file_path": self.ppt_file_path,
-            "validation_attempts": self.validation_attempts,
+            
+            # 基本属性
             "raw_md": self.raw_md,
             "ppt_template_path": self.ppt_template_path,
             "output_dir": self.output_dir,
+            
+            # Markdown解析结果
+            "content_structure": self.content_structure,
+            
+            # PPT分析结果
+            "layout_features": self.layout_features,
+            
+            # 内容规划结果
+            "decision_result": self.decision_result,
+            
+            # 幻灯片生成状态
+            "current_section_index": self.current_section_index,
+            "has_more_content": self.has_more_content,
+            "current_slide": self.current_slide,
+            "generated_slides": self.generated_slides,
+            
+            # 验证信息
+            "validation_result": self.validation_result,
+            "validation_attempts": self.validation_attempts,
+            "validation_issues": self.validation_issues,
+            "validation_suggestions": self.validation_suggestions,
+            
+            # 最终输出
             "output_ppt_path": self.output_ppt_path
         }
     
@@ -161,20 +205,36 @@ class AgentState:
         # 创建状态实例
         state = cls(session_id=session_id)
         
-        # 复制属性
+        # 复制基本属性
+        state.raw_md = data.get("raw_md")
+        state.ppt_template_path = data.get("ppt_template_path")
+        state.output_dir = data.get("output_dir")
+        
+        # 复制解析结果
+        state.content_structure = data.get("content_structure")
+        state.layout_features = data.get("layout_features")
+        state.decision_result = data.get("decision_result")
+        
+        # 复制幻灯片生成状态
+        state.current_section_index = data.get("current_section_index")
+        state.has_more_content = data.get("has_more_content", False)
+        state.current_slide = data.get("current_slide")
+        state.generated_slides = data.get("generated_slides", [])
+        
+        # 复制验证信息
+        state.validation_result = data.get("validation_result")
+        state.validation_attempts = data.get("validation_attempts", 0)
+        state.validation_issues = data.get("validation_issues", [])
+        state.validation_suggestions = data.get("validation_suggestions", [])
+        
+        # 复制最终输出
+        state.output_ppt_path = data.get("output_ppt_path")
+        
+        # 复制跟踪信息
         state.created_at = data.get("created_at", state.created_at)
         state.current_node = data.get("current_node")
         state.checkpoints = data.get("checkpoints", [])
         state.failures = data.get("failures", [])
-        state.content_structure = data.get("content_structure")
-        state.layout_features = data.get("layout_features")
-        state.decision_result = data.get("decision_result")
-        state.ppt_file_path = data.get("ppt_file_path")
-        state.validation_attempts = data.get("validation_attempts", 0)
-        state.raw_md = data.get("raw_md")
-        state.ppt_template_path = data.get("ppt_template_path")
-        state.output_dir = data.get("output_dir")
-        state.output_ppt_path = data.get("output_ppt_path")
         
         logger.info(f"加载状态: {session_id}")
         return state 
@@ -199,19 +259,32 @@ class AgentState:
         raw_md = data.get('raw_md')
         ppt_template_path = data.get('ppt_template_path')
         output_dir = data.get('output_dir')
+        content_structure = data.get('content_structure')
         
         # 创建新实例
         state = AgentState(
             session_id=session_id,
             raw_md=raw_md,
             ppt_template_path=ppt_template_path,
-            output_dir=output_dir
+            output_dir=output_dir,
+            content_structure=content_structure
         )
         
         # 复制其他属性
-        for key, value in data.items():
-            if key not in ['session_id', 'raw_md', 'ppt_template_path', 'output_dir']:
-                if hasattr(state, key):
-                    setattr(state, key, value)
+        state.layout_features = data.get('layout_features')
+        state.decision_result = data.get('decision_result')
+        state.current_section_index = data.get('current_section_index')
+        state.has_more_content = data.get('has_more_content', False)
+        state.current_slide = data.get('current_slide')
+        state.generated_slides = data.get('generated_slides', [])
+        state.validation_result = data.get('validation_result')
+        state.validation_attempts = data.get('validation_attempts', 0)
+        state.validation_issues = data.get('validation_issues', [])
+        state.validation_suggestions = data.get('validation_suggestions', [])
+        state.output_ppt_path = data.get('output_ppt_path')
+        state.created_at = data.get('created_at', state.created_at)
+        state.current_node = data.get('current_node')
+        state.checkpoints = data.get('checkpoints', [])
+        state.failures = data.get('failures', [])
         
         return state 

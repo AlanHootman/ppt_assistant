@@ -81,8 +81,8 @@ async def test_ppt_analysis_agent(state=None):
     if state is None:
         state = AgentState()
     
-    # 设置测试PPT模板路径
-    template_path = project_root / "libs" / "ppt_manager" / "test" / "testfiles" / "Iphone16Pro.pptx"
+    # 设置测试PPT模板路径 - 修正路径问题
+    template_path = Path(__file__).parent.parent.parent / "libs" / "ppt_manager" / "test" / "testfiles" / "Iphone16Pro.pptx"
     if not template_path.exists():
         logger.error(f"测试模板文件不存在: {template_path}")
         return state
@@ -149,16 +149,16 @@ async def test_ppt_generator_agent(state=None):
     # 执行Agent
     result_state = await agent.run(state)
     
-    # 检查结果
-    if result_state.ppt_file_path:
-        logger.info(f"PPT生成成功，文件保存至: {result_state.ppt_file_path}")
+    # 检查结果 - 使用output_ppt_path而不是ppt_file_path
+    if hasattr(result_state, 'output_ppt_path') and result_state.output_ppt_path:
+        logger.info(f"PPT生成成功，文件保存至: {result_state.output_ppt_path}")
         
         # 检查文件是否存在
-        if os.path.exists(result_state.ppt_file_path):
-            file_size = os.path.getsize(result_state.ppt_file_path)
+        if os.path.exists(result_state.output_ppt_path):
+            file_size = os.path.getsize(result_state.output_ppt_path)
             logger.info(f"文件大小: {file_size} 字节")
         else:
-            logger.error(f"文件不存在: {result_state.ppt_file_path}")
+            logger.error(f"文件不存在: {result_state.output_ppt_path}")
     else:
         logger.error("PPT生成失败!")
     
@@ -169,7 +169,7 @@ async def test_validator_agent(state=None):
     logger.info("===== 测试验证Agent =====")
     
     # 如果没有提供状态，尝试运行前面的Agent
-    if state is None or not state.ppt_file_path:
+    if state is None or not hasattr(state, 'output_ppt_path') or not state.output_ppt_path:
         logger.info("需要先运行PPT生成")
         state = await test_ppt_generator_agent()
     

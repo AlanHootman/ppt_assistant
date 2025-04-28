@@ -54,8 +54,8 @@ class PPTGeneratorAgent(BaseAgent):
             # 生成PPT文件
             output_path = self._generate_ppt(state.decision_result, state.session_id)
             
-            # 更新状态
-            state.ppt_file_path = str(output_path)
+            # 更新状态 - 使用output_ppt_path而不是ppt_file_path
+            state.output_ppt_path = str(output_path)
             logger.info(f"PPT生成完成，文件保存至: {output_path}")
             
             # 记录检查点
