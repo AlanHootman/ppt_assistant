@@ -180,8 +180,6 @@ class SlideGeneratorAgent(BaseAgent):
             slide_info = {
                 "section_index": current_index,
                 "slide_id": new_slide_id,
-                # "preview_path": preview_path,
-                # "pptx_path": output_path
             }
             state.generated_slides.append(slide_info)
             logger.info(f"已更新状态，添加生成的幻灯片信息")

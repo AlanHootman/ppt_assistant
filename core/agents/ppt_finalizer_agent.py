@@ -80,6 +80,9 @@ class PPTFinalizerAgent(BaseAgent):
             # 获取presentation对象
             presentation = state.presentation
             
+            # 删除未使用的幻灯片（只保留generated_slides中记录的幻灯片）
+            self._delete_unused_slides(presentation, state.generated_slides)
+            
             # 获取输出目录
             output_dir = state.output_dir if hasattr(state, "output_dir") and state.output_dir else "workspace/output"
             
@@ -153,4 +156,47 @@ class PPTFinalizerAgent(BaseAgent):
             metadata: 元数据字典
         """
         # 此方法可以在未来实现，用于更新PPT的元数据
-        pass 
+        pass
+
+    def _delete_unused_slides(self, presentation: Any, generated_slides: List[Dict[str, Any]]) -> None:
+        """
+        删除未使用的幻灯片，只保留generated_slides中记录的幻灯片
+        
+        Args:
+            presentation: PPT演示文稿对象
+            generated_slides: 已生成的幻灯片列表，每个元素包含slide_id
+        """
+        if not self.ppt_manager:
+            logger.warning("PPTManager未初始化，无法删除未使用的幻灯片")
+            return
+        
+        # 提取所有已生成的幻灯片ID
+        generated_slide_ids = [slide["slide_id"] for slide in generated_slides]
+        logger.info(f"已生成的幻灯片ID: {generated_slide_ids}")
+        
+        try:
+            # 获取演示文稿中的所有幻灯片
+            ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
+            all_slides = ppt_json.get("slides", [])
+            
+            # 找出需要删除的幻灯片ID（不在generated_slide_ids中的）
+            slides_to_delete = []
+            for slide in all_slides:
+                slide_id = slide.get("slide_id")
+                if slide_id and slide_id not in generated_slide_ids:
+                    slides_to_delete.append(slide_id)
+            
+            logger.info(f"需要删除的幻灯片ID: {slides_to_delete}")
+            
+            # 删除未使用的幻灯片
+            for slide_id in slides_to_delete:
+                try:
+                    result = self.ppt_manager.delete_slide_by_id(presentation, slide_id)
+                    if result.get("success"):
+                        logger.info(f"已删除未使用的幻灯片: {slide_id}")
+                    else:
+                        logger.warning(f"删除幻灯片失败: {slide_id}, 原因: {result.get('message')}")
+                except Exception as e:
+                    logger.warning(f"删除幻灯片出错: {slide_id}, 原因: {str(e)}")
+        except Exception as e:
+            logger.error(f"删除未使用幻灯片过程中发生错误: {str(e)}") 
