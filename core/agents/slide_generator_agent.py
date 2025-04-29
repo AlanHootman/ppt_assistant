@@ -123,7 +123,6 @@ class SlideGeneratorAgent(BaseAgent):
             # 使用LLM匹配内容到幻灯片元素
             logger.info("调用LLM进行内容-元素智能匹配")
             llm_matches = await self._llm_match_content_to_elements(
-                slide_type=current_section.get("slide_type", "content"),
                 slide_elements=slide_result,
                 current_section=current_section
             )
@@ -206,12 +205,11 @@ class SlideGeneratorAgent(BaseAgent):
         logger.warning(f"未找到ID为 {slide_id} 的幻灯片")
         return None
     
-    async def _llm_match_content_to_elements(self, slide_type: str, slide_elements: List[Dict[str, Any]], current_section: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def _llm_match_content_to_elements(self, slide_elements: List[Dict[str, Any]], current_section: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
         使用LLM将章节内容与幻灯片元素进行智能匹配
         
         Args:
-            slide_type: 幻灯片类型（opening, content, closing）
             slide_elements: 幻灯片元素列表
             current_section: 当前处理的章节信息
             
@@ -219,19 +217,10 @@ class SlideGeneratorAgent(BaseAgent):
             匹配结果列表
         """
         try:
-            # 将slide_type转换为中文描述，更适合中文大模型理解
-            slide_type_map = {
-                "opening": "开篇页",
-                "content": "内容页",
-                "closing": "结束页"
-            }
-            slide_type_zh = slide_type_map.get(slide_type, slide_type)
-            
-            # 构建提示词上下文
+            # 构建提示词上下文，直接提供幻灯片元素和章节内容
             context = {
                 "slide_elements_json": json.dumps(slide_elements, ensure_ascii=False, indent=2, cls=EnumEncoder),
-                "content_json": json.dumps(current_section, ensure_ascii=False, indent=2, cls=EnumEncoder), 
-                "slide_type": slide_type_zh
+                "content_json": json.dumps(current_section, ensure_ascii=False, indent=2, cls=EnumEncoder)
             }
             
             # 渲染提示词
