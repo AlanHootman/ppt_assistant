@@ -1,7 +1,7 @@
 # PPT生成工作流配置
 workflow:
-  name: ppt_generation
-  description: "PPT自动生成工作流"
+  name: ppt_assisstant
+  description: "PPT自动处理工作流"
   
   # 节点配置 - 只引用模型类型，具体模型名称从环境变量获取
   nodes:
