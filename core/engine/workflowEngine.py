@@ -401,6 +401,48 @@ class WorkflowEngine:
         # 记录执行完成的检查点
         state.add_checkpoint(f"{node_name}_completed")
 
+    async def _execute_and_validate_node(self, node_name: str, state: AgentState, 
+                                        check_item: Optional[str] = None, 
+                                        error_message: Optional[str] = None,
+                                        use_mock: bool = False) -> Optional[Dict[str, Any]]:
+        """
+        执行节点并验证结果
+        
+        Args:
+            node_name: 节点名称
+            state: 当前状态
+            check_item: 需要检查的状态属性(如果不需要验证则为None)
+            error_message: 条件不满足时的错误消息
+            use_mock: 是否使用模拟实现
+            
+        Returns:
+            如果条件不满足返回错误响应，否则返回None
+        """
+        # 执行节点
+        await self._execute_node(node_name, state, use_mock)
+        
+        # 如果需要验证结果
+        if check_item and error_message:
+            return self._check_state_condition(state, check_item, error_message)
+        
+        # 特殊情况：内容规划节点需要检查content_plan和decision_result
+        if node_name == "content_planner":
+            if not state.content_plan and not state.decision_result:
+                error_msg = "内容规划失败，无法获取内容规划结果"
+                logger.error(error_msg)
+                state.record_failure(error_msg)
+                
+                if self.enable_tracking and self.tracker:
+                    self.tracker.end_workflow_run("FAILED")
+                    
+                return {
+                    "error": error_msg,
+                    "session_id": state.session_id,
+                    "timestamp": datetime.now().isoformat()
+                }
+        
+        return None
+
     async def run_async(self, session_id=None, raw_md=None, ppt_template_path=None, output_dir=None):
         """
         异步执行工作流
@@ -430,46 +472,27 @@ class WorkflowEngine:
                 self.tracker.start_workflow_run(state.session_id, self.workflow_name)
             
             # 1. 执行Markdown解析节点
-            await self._execute_node("markdown_parser", state)
-            
-            # 检查是否有内容结构
-            error_response = self._check_state_condition(
-                state, 
-                "content_structure", 
-                "Markdown解析失败，无法获取内容结构"
+            error_response = await self._execute_and_validate_node(
+                "markdown_parser", state, 
+                "content_structure", "Markdown解析失败，无法获取内容结构"
             )
             if error_response:
                 return error_response
             
             # 2. 执行PPT分析节点
-            await self._execute_node("ppt_analyzer", state)
-            
-            # 检查是否有布局特征
-            error_response = self._check_state_condition(
-                state, 
-                "layout_features", 
-                "PPT模板分析失败，无法获取布局特征"
+            error_response = await self._execute_and_validate_node(
+                "ppt_analyzer", state,
+                "layout_features", "PPT模板分析失败，无法获取布局特征"
             )
             if error_response:
                 return error_response
             
             # 3. 执行内容规划节点
-            await self._execute_node("content_planner", state)
-            
-            # 检查是否有内容规划
-            if not state.content_plan and not state.decision_result:
-                error_msg = "内容规划失败，无法获取内容规划结果"
-                logger.error(error_msg)
-                state.record_failure(error_msg)
-                
-                if self.enable_tracking and self.tracker:
-                    self.tracker.end_workflow_run("FAILED")
-                    
-                return {
-                    "error": error_msg,
-                    "session_id": state.session_id,
-                    "timestamp": datetime.now().isoformat()
-                }
+            error_response = await self._execute_and_validate_node(
+                "content_planner", state
+            )
+            if error_response:
+                return error_response
             
             # 初始化幻灯片生成状态
             if state.current_section_index is None:
@@ -480,16 +503,16 @@ class WorkflowEngine:
             # 循环生成幻灯片，直到所有内容处理完毕
             while state.has_more_content:
                 # 4. 执行幻灯片生成
-                await self._execute_node("slide_generator", state)
+                await self._execute_and_validate_node("slide_generator", state)
                 
                 # 5. 执行验证节点
-                await self._execute_node("slide_validator", state, use_mock=True)
+                await self._execute_and_validate_node("slide_validator", state, use_mock=True)
                 
                 # 6. 检查是否还有更多内容
-                await self._execute_node("next_slide_or_end", state)
+                await self._execute_and_validate_node("next_slide_or_end", state)
             
             # 7. 完成PPT生成
-            await self._execute_node("ppt_finalizer", state)
+            await self._execute_and_validate_node("ppt_finalizer", state)
             
             # 保存最终状态
             state.save()
