@@ -2,156 +2,224 @@
 # -*- coding: utf-8 -*-
 
 """
-测试MarkdownParser类的功能
+Markdown解析器单元测试
 """
 
-import pytest
+import unittest
+import os
+import sys
+from typing import Dict, Any, List
+
+# 添加项目根目录到路径，以便导入模块
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+
 from core.utils.markdown_parser import MarkdownParser
 
-def test_markdown_parser_initialization():
-    """测试MarkdownParser的初始化"""
-    parser = MarkdownParser()
-    assert parser is not None
-
-def test_parse_empty_markdown():
-    """测试解析空的Markdown文本"""
-    parser = MarkdownParser()
-    result = parser.parse("")
+class TestMarkdownParser(unittest.TestCase):
+    """Markdown解析器单元测试类"""
     
-    assert result is not None
-    assert result["title"] == ""
-    assert len(result["sections"]) == 0
+    def setUp(self):
+        """测试前的准备工作"""
+        self.parser = MarkdownParser()
+        
+    def test_empty_markdown(self):
+        """测试解析空的Markdown文本"""
+        result = self.parser.parse("")
+        self.assertEqual(result, {"title": "", "subtitle": "", "sections": []})
+        
+    def test_document_title_and_subtitle(self):
+        """测试解析文档标题和副标题"""
+        markdown = """# 主标题
+副标题
 
-def test_parse_title_only():
-    """测试只解析标题"""
-    parser = MarkdownParser()
-    markdown_text = "# 测试标题"
-    result = parser.parse(markdown_text)
-    
-    assert result["title"] == "测试标题"
-    assert len(result["sections"]) == 0
-
-def test_parse_sections():
-    """测试解析章节"""
-    parser = MarkdownParser()
-    markdown_text = """# 测试文档
-    
 ## 第一章节
-这是第一章节的内容。
+内容
+"""
+        result = self.parser.parse(markdown)
+        self.assertEqual(result["title"], "主标题")
+        self.assertEqual(result["subtitle"], "副标题")
+        
+    def test_section_parsing(self):
+        """测试章节解析"""
+        markdown = """# 文档标题
+
+## 第一章节
+章节内容
+
+### 子章节1
+子章节内容
+
+#### 子子章节
+子子章节内容
 
 ## 第二章节
-这是第二章节的内容。
-- 列表项1
-- 列表项2
+另一个章节内容
 """
-    result = parser.parse(markdown_text)
-    
-    assert result["title"] == "测试文档"
-    assert len(result["sections"]) == 2
-    assert result["sections"][0]["title"] == "第一章节"
-    assert result["sections"][1]["title"] == "第二章节"
-    assert len(result["sections"][1]["items"]) == 2
+        result = self.parser.parse(markdown)
+        
+        # 验证章节数量
+        self.assertEqual(len(result["sections"]), 2)
+        
+        # 验证第一个章节
+        first_section = result["sections"][0]
+        self.assertEqual(first_section["title"], "第一章节")
+        self.assertEqual(first_section["content"], ["章节内容"])
+        
+        # 验证子章节
+        self.assertTrue("subsections" in first_section)
+        self.assertEqual(len(first_section["subsections"]), 1)
+        self.assertEqual(first_section["subsections"][0]["title"], "子章节1")
+        
+        # 验证子子章节
+        subsection = first_section["subsections"][0]
+        self.assertTrue("subsections" in subsection)
+        self.assertEqual(len(subsection["subsections"]), 1)
+        self.assertEqual(subsection["subsections"][0]["title"], "子子章节")
+        
+        # 验证第二个章节
+        second_section = result["sections"][1]
+        self.assertEqual(second_section["title"], "第二章节")
+        self.assertEqual(second_section["content"], ["另一个章节内容"])
+        
+    def test_list_items(self):
+        """测试列表项解析"""
+        markdown = """## 列表测试
+- 项目1
+- 项目2
+- 项目3
 
-def test_parse_code_blocks():
-    """测试解析代码块"""
-    parser = MarkdownParser()
-    markdown_text = """# 测试文档
-    
-## 代码示例
-以下是一个Python代码示例：
+1. 有序项目1
+2. 有序项目2
+"""
+        result = self.parser.parse(markdown)
+        section = result["sections"][0]
+        
+        # 验证无序列表
+        self.assertEqual(section["items"], ["项目1", "项目2", "项目3"])
+        
+        # 验证有序列表
+        self.assertEqual(section["ordered_items"], ["有序项目1", "有序项目2"])
+        
+    def test_code_blocks(self):
+        """测试代码块解析"""
+        markdown = """## 代码示例
 
 ```python
 def hello_world():
     print("Hello, World!")
 ```
+
+一些文字
+
+```javascript
+console.log("Hello, World!");
+```
 """
-    result = parser.parse(markdown_text)
-    
-    assert result["title"] == "测试文档"
-    assert len(result["sections"]) == 1
-    assert "code_blocks" in result["sections"][0]
-    assert len(result["sections"][0]["code_blocks"]) == 1
-    assert result["sections"][0]["code_blocks"][0]["language"] == "python"
+        result = self.parser.parse(markdown)
+        section = result["sections"][0]
+        
+        # 验证代码块
+        self.assertTrue("code_blocks" in section)
+        self.assertEqual(len(section["code_blocks"]), 2)
+        
+        # 验证第一个代码块
+        first_code_block = section["code_blocks"][0]
+        self.assertEqual(first_code_block["language"], "python")
+        self.assertIn("def hello_world():", first_code_block["code"])
+        
+        # 验证第二个代码块
+        second_code_block = section["code_blocks"][1]
+        self.assertEqual(second_code_block["language"], "javascript")
+        self.assertIn('console.log("Hello, World!");', second_code_block["code"])
+        
+    def test_tables(self):
+        """测试表格解析"""
+        markdown = """## 表格测试
 
-def test_extract_keywords():
-    """测试提取关键词"""
-    parser = MarkdownParser()
-    markdown_text = """# 人工智能与机器学习简介
-    
-## 什么是人工智能
-人工智能是计算机科学的一个分支，旨在开发能够模拟人类智能的机器。
-
-## 机器学习算法
-机器学习是人工智能的一个子领域，专注于让系统能够从数据中学习。
-常见的算法包括：
-- 监督学习
-- 无监督学习
-- 强化学习
+| 标题1 | 标题2 | 标题3 |
+| ----- | ----- | ----- |
+| 单元格1 | 单元格2 | 单元格3 |
+| 单元格4 | 单元格5 | 单元格6 |
 """
-    keywords = parser.extract_keywords(markdown_text)
-    
-    assert len(keywords) > 0
-    # 检查是否包含相关关键词
-    all_keywords = " ".join(keywords).lower()
-    assert "智能" in all_keywords or "机器" in all_keywords or "学习" in all_keywords
+        result = self.parser.parse(markdown)
+        section = result["sections"][0]
+        
+        # 验证表格
+        self.assertTrue("tables" in section)
+        self.assertEqual(len(section["tables"]), 1)  # 一个表格
+        
+        # 验证表格内容
+        table = section["tables"][0]
+        self.assertEqual(len(table), 3)  # 三行（包括标题行和两行数据行）
+        self.assertEqual(table[0], ["标题1", "标题2", "标题3"])
+        self.assertEqual(table[1], ["单元格1", "单元格2", "单元格3"])
+        self.assertEqual(table[2], ["单元格4", "单元格5", "单元格6"])
+        
+    def test_images(self):
+        """测试图片解析"""
+        markdown = """## 图片测试
 
-def test_parse_math_formulas():
-    """测试解析数学公式"""
-    parser = MarkdownParser()
-    markdown_text = """# 数学公式示例
-    
-## 线性代数
-行内公式示例: $y = mx + b$
+![图片描述](https://example.com/image.jpg)
 
-块级公式示例:
-$$
-\\begin{pmatrix}
-a & b \\\\
-c & d
-\\end{pmatrix}
-$$
+一些文字
+
+![另一张图片](https://example.com/another.png)
 """
-    formulas = parser.parse_math_formulas(markdown_text)
-    
-    assert len(formulas) == 2
-    assert formulas[0]["type"] == "inline"
-    assert formulas[0]["content"] == "y = mx + b"
-    assert formulas[1]["type"] == "block"
+        result = self.parser.parse(markdown)
+        section = result["sections"][0]
+        
+        # 验证图片
+        self.assertTrue("images" in section)
+        self.assertEqual(len(section["images"]), 2)
+        
+        # 验证第一张图片
+        first_image = section["images"][0]
+        self.assertEqual(first_image["alt"], "图片描述")
+        self.assertEqual(first_image["url"], "https://example.com/image.jpg")
+        
+        # 验证第二张图片
+        second_image = section["images"][1]
+        self.assertEqual(second_image["alt"], "另一张图片")
+        self.assertEqual(second_image["url"], "https://example.com/another.png")
+        
+    def test_markdown_formatting_cleaning(self):
+        """测试Markdown格式清理"""
+        markdown = """## 格式测试
 
-def test_parse_images():
-    """测试解析图片"""
-    parser = MarkdownParser()
-    markdown_text = """# 图片示例
-    
-## 示例图片
-这是一个图片： ![示例图片](example.jpg)
+**粗体文字** 和 *斜体文字*
 
-另一个图片： ![第二张图片](second.png)
+~~删除线~~ 和 `代码`
+
+**引导词**：内容
 """
-    images = parser.parse_images(markdown_text)
-    
-    assert len(images) == 2
-    assert images[0]["alt"] == "示例图片"
-    assert images[0]["url"] == "example.jpg"
-    assert images[1]["alt"] == "第二张图片"
-    assert images[1]["url"] == "second.png"
+        result = self.parser.parse(markdown)
+        section = result["sections"][0]
+        
+        # 验证内容中格式被清理
+        content = section["content"]
+        self.assertIn("粗体文字 和 斜体文字", content)
+        self.assertIn("删除线 和 代码", content)
+        self.assertIn("引导词: 内容", content)
+        
+    def test_special_section_types(self):
+        """测试特殊章节类型识别"""
+        markdown = """# 文档标题
 
-def test_get_section_by_title():
-    """测试通过标题查找章节"""
-    parser = MarkdownParser()
-    markdown_text = """# 测试文档
-    
-## 第一章节
-这是第一章节的内容。
+## 介绍
+介绍内容
 
-## 第二章节
-这是第二章节的内容。
+## 主要内容
+一些内容
+
+## 结论
+结论内容
 """
-    result = parser.parse(markdown_text)
-    
-    section = parser.get_section_by_title(result, "第二章节")
-    assert section is not None
-    assert section["title"] == "第二章节"
-    
-    section = parser.get_section_by_title(result, "不存在的章节")
-    assert section is None 
+        result = self.parser.parse(markdown)
+        
+        # 验证特殊章节类型
+        self.assertEqual(result["sections"][0]["type"], "opening")  # 介绍识别为开篇
+        self.assertEqual(result["sections"][1]["type"], "content")  # 默认为内容
+        self.assertEqual(result["sections"][2]["type"], "closing")  # 结论识别为结束
+
+if __name__ == "__main__":
+    unittest.main() 

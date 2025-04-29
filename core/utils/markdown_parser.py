@@ -147,6 +147,9 @@ class MarkdownParser:
         text = re.sub(r'\*\*(.*?)\*\*：', r'\1: ', text)
         text = re.sub(r'__(.*?)__：', r'\1: ', text)
         
+        # 确保中文冒号被转换为英文冒号
+        text = text.replace('：', ': ')
+        
         # 处理可能的链接 [文字](链接)
         text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)
         
@@ -171,264 +174,431 @@ class MarkdownParser:
         
         # 按行分割
         lines = markdown_text.split("\n")
-        current_section = None
-        current_subsection = None
-        current_subsubsection = None
-        current_subsubsubsection = None
-        in_code_block = False
-        current_code_block = ""
-        code_block_lang = ""
         
-        # 记录是否找到了文档标题
-        found_title = False
-        found_subtitle = False
-        subtitle_line = None
+        # 初始化解析状态
+        parsing_state = {
+            "current_section": None,
+            "current_subsection": None,
+            "current_subsubsection": None,
+            "current_subsubsubsection": None,
+            "in_code_block": False,
+            "current_code_block": "",
+            "code_block_lang": "",
+            "found_title": False,
+            "found_subtitle": False,
+            "subtitle_line": None,
+        }
         
         # 逐行解析
         for i, line in enumerate(lines):
             line_stripped = line.strip()
             
-            # 处理代码块
-            if line_stripped.startswith("```"):
-                in_code_block = not in_code_block
-                if in_code_block:
-                    # 提取代码块语言
-                    code_block_lang = line_stripped[3:].strip()
-                    current_code_block = ""
-                else:
-                    # 代码块结束，添加到当前所在的最深层级
-                    target_section = self._get_target_section(
-                        current_section, current_subsection, 
-                        current_subsubsection, current_subsubsubsection
-                    )
-                    
-                    if target_section is not None:
-                        if "code_blocks" not in target_section:
-                            target_section["code_blocks"] = []
-                        
-                        target_section["code_blocks"].append({
-                            "language": code_block_lang,
-                            "code": current_code_block
-                        })
-                continue
-            
-            # 在代码块内，收集代码内容
-            if in_code_block:
-                current_code_block += line + "\n"
-                continue
-            
-            # 忽略空行
+            # 跳过空行
             if not line_stripped:
                 continue
                 
-            # 检测文档标题 (# 标题)
-            if line_stripped.startswith("# "):
-                content_structure["title"] = line_stripped[2:].strip()
-                found_title = True
-                logger.debug(f"找到文档标题: '{content_structure['title']}'")
-                
-                # 检查下一行是否可能是副标题（非标题格式但紧跟标题）
-                if i + 1 < len(lines):
-                    next_line = lines[i+1].strip()
-                    # 如果下一行不是标题格式且不为空，可能是副标题
-                    if next_line and not next_line.startswith("#") and not next_line.startswith("```"):
-                        subtitle_line = i + 1
-                    # 如果下一行是空行，检查下下行是否是可能的副标题
-                    elif not next_line and i + 2 < len(lines):
-                        next_next_line = lines[i+2].strip()
-                        if next_next_line and not next_next_line.startswith("#") and not next_next_line.startswith("```"):
-                            subtitle_line = i + 2
+            # 处理代码块
+            if self._handle_code_block(line_stripped, parsing_state, content_structure):
+                continue
             
-            # 检查是否为副标题（紧跟在主标题之后的非空行）
-            elif i == subtitle_line:
+            # 如果在代码块内，继续收集代码内容
+            if parsing_state["in_code_block"]:
+                parsing_state["current_code_block"] += line + "\n"
+                continue
+            
+            # 处理文档标题和副标题
+            if self._handle_document_title(i, line_stripped, lines, parsing_state, content_structure):
+                continue
+                
+            # 处理副标题
+            if i == parsing_state["subtitle_line"]:
                 content_structure["subtitle"] = line_stripped
-                found_subtitle = True
+                parsing_state["found_subtitle"] = True
                 logger.debug(f"找到文档副标题: '{content_structure['subtitle']}'")
+                continue
             
-            # 检测二级标题 (## 标题) - 主要章节
-            elif line_stripped.startswith("## "):
-                section_title = line_stripped[3:].strip()
-                current_section = {
-                    "title": section_title,
-                    "content": [],
-                    "items": [],
-                    "level": 2,
-                    "type": "content"  # 默认为内容页类型
-                }
-                # 重置子章节跟踪
-                current_subsection = None
-                current_subsubsection = None
-                current_subsubsubsection = None
+            # 处理各级标题
+            if self._handle_headings(line_stripped, parsing_state, content_structure):
+                continue
                 
-                # 特殊章节类型识别
-                lower_title = section_title.lower()
-                if any(keyword in lower_title for keyword in ["介绍", "introduction", "概述", "overview"]) and len(content_structure["sections"]) == 0:
-                    current_section["type"] = "opening"
-                elif any(keyword in lower_title for keyword in ["总结", "结论", "conclusion", "未来展望", "future work"]):
-                    current_section["type"] = "closing"
-                
-                content_structure["sections"].append(current_section)
-            
-            # 检测三级标题 (### 标题) - 子章节
-            elif line_stripped.startswith("### "):
-                subheading_title = line_stripped[4:].strip()
-                
-                if current_section is not None:
-                    if "subsections" not in current_section:
-                        current_section["subsections"] = []
-                    
-                    current_subsection = {
-                        "title": subheading_title,
-                        "content": [],
-                        "items": [],
-                        "level": 3
-                    }
-                    
-                    # 重置更深层级的章节跟踪
-                    current_subsubsection = None
-                    current_subsubsubsection = None
-                    
-                    current_section["subsections"].append(current_subsection)
-            
-            # 检测四级标题 (#### 标题) - 子子章节
-            elif line_stripped.startswith("#### "):
-                subsubheading_title = line_stripped[5:].strip()
-                
-                if current_subsection is not None:
-                    if "subsections" not in current_subsection:
-                        current_subsection["subsections"] = []
-                    
-                    current_subsubsection = {
-                        "title": subsubheading_title,
-                        "content": [],
-                        "items": [],
-                        "level": 4
-                    }
-                    
-                    # 重置更深层级的章节跟踪
-                    current_subsubsubsection = None
-                    
-                    current_subsection["subsections"].append(current_subsubsection)
-            
-            # 检测五级标题 (##### 标题) - 最深层级
-            elif line_stripped.startswith("##### "):
-                subsubsubheading_title = line_stripped[6:].strip()
-                
-                if current_subsubsection is not None:
-                    if "subsections" not in current_subsubsection:
-                        current_subsubsection["subsections"] = []
-                    
-                    current_subsubsubsection = {
-                        "title": subsubsubheading_title,
-                        "content": [],
-                        "items": [],
-                        "level": 5
-                    }
-                    
-                    current_subsubsection["subsections"].append(current_subsubsubsection)
-            
-            # 检测列表项 (- 或 * 项目)
-            elif line_stripped.startswith("- ") or line_stripped.startswith("* "):
-                item_text = line_stripped[2:].strip()
-                
-                # 确定要将列表项添加到哪个层级
-                target_section = self._get_target_section(
-                    current_section, current_subsection, 
-                    current_subsubsection, current_subsubsubsection
-                )
-                
-                if target_section is not None:
-                    target_section["items"].append(item_text)
-            
-            # 检测有序列表项 (1. 项目)
-            elif re.match(r"^\d+\.\s", line_stripped):
-                item_text = re.sub(r"^\d+\.\s+", "", line_stripped)
-                
-                # 确定要将有序列表项添加到哪个层级
-                target_section = self._get_target_section(
-                    current_section, current_subsection, 
-                    current_subsubsection, current_subsubsubsection
-                )
-                
-                if target_section is not None:
-                    if "ordered_items" not in target_section:
-                        target_section["ordered_items"] = []
-                    
-                    target_section["ordered_items"].append(item_text)
-            
-            # 检测表格
-            elif "|" in line_stripped:
-                # 确定要将表格添加到哪个层级
-                target_section = self._get_target_section(
-                    current_section, current_subsection, 
-                    current_subsubsection, current_subsubsubsection
-                )
-                
-                if target_section is not None:
-                    if "tables" not in target_section:
-                        target_section["tables"] = []
-                        target_section["tables"].append([])
-                    
-                    # 跳过表格分隔行 (|---|---|)
-                    if not re.search(r"^[\|\s\-:]+$", line_stripped):
-                        target_section["tables"][-1].append(
-                            [cell.strip() for cell in line_stripped.split("|") if cell.strip()]
-                        )
-            
-            # 处理图片链接
-            elif re.search(r"!\[.*?\]\(.*?\)", line_stripped):
-                # 确定要将图片添加到哪个层级
-                target_section = self._get_target_section(
-                    current_section, current_subsection, 
-                    current_subsubsection, current_subsubsubsection
-                )
-                
-                if target_section is not None:
-                    if "images" not in target_section:
-                        target_section["images"] = []
-                    
-                    # 提取图片描述和URL
-                    match = re.search(r"!\[(.*?)\]\((.*?)\)", line_stripped)
-                    if match:
-                        alt_text, url = match.groups()
-                        target_section["images"].append({
-                            "alt": alt_text,
-                            "url": url
-                        })
-            
-            # 处理普通段落
-            else:
-                # 确定要将内容添加到哪个层级
-                target_section = self._get_target_section(
-                    current_section, current_subsection, 
-                    current_subsubsection, current_subsubsubsection
-                )
-                
-                if target_section is not None:
-                    target_section["content"].append(line_stripped)
+            # 处理列表项、表格、图片和普通段落
+            self._handle_content_elements(line_stripped, parsing_state)
         
         # 日志记录解析结果
-        section_count = len(content_structure["sections"])
+        self._log_parsing_results(content_structure)
         
+        return content_structure
+    
+    def _handle_code_block(self, line_stripped: str, parsing_state: Dict[str, Any], content_structure: Dict[str, Any]) -> bool:
+        """
+        处理代码块的开始和结束
+        
+        Args:
+            line_stripped: 当前处理的行（已去除前后空白）
+            parsing_state: 当前解析状态
+            content_structure: 内容结构
+            
+        Returns:
+            是否处理了代码块标记
+        """
+        if not line_stripped.startswith("```"):
+            return False
+            
+        parsing_state["in_code_block"] = not parsing_state["in_code_block"]
+        
+        if parsing_state["in_code_block"]:
+            # 提取代码块语言
+            parsing_state["code_block_lang"] = line_stripped[3:].strip()
+            parsing_state["current_code_block"] = ""
+        else:
+            # 代码块结束，添加到当前所在的最深层级
+            target_section = self._get_target_section(
+                parsing_state["current_section"], 
+                parsing_state["current_subsection"], 
+                parsing_state["current_subsubsection"], 
+                parsing_state["current_subsubsubsection"]
+            )
+            
+            if target_section is not None:
+                if "code_blocks" not in target_section:
+                    target_section["code_blocks"] = []
+                
+                target_section["code_blocks"].append({
+                    "language": parsing_state["code_block_lang"],
+                    "code": parsing_state["current_code_block"]
+                })
+        
+        return True
+    
+    def _handle_document_title(self, line_index: int, line_stripped: str, lines: List[str], 
+                             parsing_state: Dict[str, Any], content_structure: Dict[str, Any]) -> bool:
+        """
+        处理文档标题和检测可能的副标题
+        
+        Args:
+            line_index: 当前行索引
+            line_stripped: 当前处理的行（已去除前后空白）
+            lines: 所有行
+            parsing_state: 当前解析状态
+            content_structure: 内容结构
+            
+        Returns:
+            是否处理了文档标题
+        """
+        if not line_stripped.startswith("# "):
+            return False
+            
+        content_structure["title"] = line_stripped[2:].strip()
+        parsing_state["found_title"] = True
+        logger.debug(f"找到文档标题: '{content_structure['title']}'")
+        
+        # 检查下一行是否可能是副标题（非标题格式但紧跟标题）
+        self._detect_possible_subtitle(line_index, lines, parsing_state)
+        
+        return True
+    
+    def _detect_possible_subtitle(self, line_index: int, lines: List[str], parsing_state: Dict[str, Any]) -> None:
+        """
+        检测可能的副标题
+        
+        Args:
+            line_index: 当前行索引
+            lines: 所有行
+            parsing_state: 当前解析状态
+        """
+        if line_index + 1 < len(lines):
+            next_line = lines[line_index+1].strip()
+            # 如果下一行不是标题格式且不为空，可能是副标题
+            if next_line and not next_line.startswith("#") and not next_line.startswith("```"):
+                parsing_state["subtitle_line"] = line_index + 1
+            # 如果下一行是空行，检查下下行是否是可能的副标题
+            elif not next_line and line_index + 2 < len(lines):
+                next_next_line = lines[line_index+2].strip()
+                if next_next_line and not next_next_line.startswith("#") and not next_next_line.startswith("```"):
+                    parsing_state["subtitle_line"] = line_index + 2
+    
+    def _handle_headings(self, line_stripped: str, parsing_state: Dict[str, Any], 
+                        content_structure: Dict[str, Any]) -> bool:
+        """
+        处理各级标题（二级到五级）
+        
+        Args:
+            line_stripped: 当前处理的行（已去除前后空白）
+            parsing_state: 当前解析状态
+            content_structure: 内容结构
+            
+        Returns:
+            是否处理了标题
+        """
+        # 处理二级标题
+        if line_stripped.startswith("## "):
+            self._handle_section_heading(line_stripped, parsing_state, content_structure)
+            return True
+            
+        # 处理三级标题
+        if line_stripped.startswith("### "):
+            self._handle_subsection_heading(line_stripped, parsing_state)
+            return True
+            
+        # 处理四级标题
+        if line_stripped.startswith("#### "):
+            self._handle_subsubsection_heading(line_stripped, parsing_state)
+            return True
+            
+        # 处理五级标题
+        if line_stripped.startswith("##### "):
+            self._handle_subsubsubsection_heading(line_stripped, parsing_state)
+            return True
+            
+        return False
+    
+    def _handle_section_heading(self, line_stripped: str, parsing_state: Dict[str, Any], 
+                             content_structure: Dict[str, Any]) -> None:
+        """
+        处理二级标题（主章节）
+        
+        Args:
+            line_stripped: 当前处理的行（已去除前后空白）
+            parsing_state: 当前解析状态
+            content_structure: 内容结构
+        """
+        section_title = line_stripped[3:].strip()
+        parsing_state["current_section"] = {
+            "title": section_title,
+            "content": [],
+            "items": [],
+            "level": 2,
+            "type": "content"  # 默认为内容页类型
+        }
+        
+        # 重置子章节跟踪
+        parsing_state["current_subsection"] = None
+        parsing_state["current_subsubsection"] = None
+        parsing_state["current_subsubsubsection"] = None
+        
+        # 特殊章节类型识别
+        self._identify_special_section_type(section_title, parsing_state, content_structure)
+        
+        content_structure["sections"].append(parsing_state["current_section"])
+    
+    def _identify_special_section_type(self, section_title: str, parsing_state: Dict[str, Any], 
+                                    content_structure: Dict[str, Any]) -> None:
+        """
+        识别特殊章节类型
+        
+        Args:
+            section_title: 章节标题
+            parsing_state: 当前解析状态
+            content_structure: 内容结构
+        """
+        lower_title = section_title.lower()
+        
+        # 识别开篇章节
+        if any(keyword in lower_title for keyword in ["介绍", "introduction", "概述", "overview"]) and len(content_structure["sections"]) == 0:
+            parsing_state["current_section"]["type"] = "opening"
+            
+        # 识别结束章节
+        elif any(keyword in lower_title for keyword in ["总结", "结论", "conclusion", "未来展望", "future work"]):
+            parsing_state["current_section"]["type"] = "closing"
+    
+    def _handle_subsection_heading(self, line_stripped: str, parsing_state: Dict[str, Any]) -> None:
+        """
+        处理三级标题（子章节）
+        
+        Args:
+            line_stripped: 当前处理的行（已去除前后空白）
+            parsing_state: 当前解析状态
+        """
+        subheading_title = line_stripped[4:].strip()
+        
+        if parsing_state["current_section"] is not None:
+            if "subsections" not in parsing_state["current_section"]:
+                parsing_state["current_section"]["subsections"] = []
+            
+            parsing_state["current_subsection"] = {
+                "title": subheading_title,
+                "content": [],
+                "items": [],
+                "level": 3
+            }
+            
+            # 重置更深层级的章节跟踪
+            parsing_state["current_subsubsection"] = None
+            parsing_state["current_subsubsubsection"] = None
+            
+            parsing_state["current_section"]["subsections"].append(parsing_state["current_subsection"])
+    
+    def _handle_subsubsection_heading(self, line_stripped: str, parsing_state: Dict[str, Any]) -> None:
+        """
+        处理四级标题（子子章节）
+        
+        Args:
+            line_stripped: 当前处理的行（已去除前后空白）
+            parsing_state: 当前解析状态
+        """
+        subsubheading_title = line_stripped[5:].strip()
+        
+        if parsing_state["current_subsection"] is not None:
+            if "subsections" not in parsing_state["current_subsection"]:
+                parsing_state["current_subsection"]["subsections"] = []
+            
+            parsing_state["current_subsubsection"] = {
+                "title": subsubheading_title,
+                "content": [],
+                "items": [],
+                "level": 4
+            }
+            
+            # 重置更深层级的章节跟踪
+            parsing_state["current_subsubsubsection"] = None
+            
+            parsing_state["current_subsection"]["subsections"].append(parsing_state["current_subsubsection"])
+    
+    def _handle_subsubsubsection_heading(self, line_stripped: str, parsing_state: Dict[str, Any]) -> None:
+        """
+        处理五级标题（子子子章节）
+        
+        Args:
+            line_stripped: 当前处理的行（已去除前后空白）
+            parsing_state: 当前解析状态
+        """
+        subsubsubheading_title = line_stripped[6:].strip()
+        
+        if parsing_state["current_subsubsection"] is not None:
+            if "subsections" not in parsing_state["current_subsubsection"]:
+                parsing_state["current_subsubsection"]["subsections"] = []
+            
+            parsing_state["current_subsubsubsection"] = {
+                "title": subsubsubheading_title,
+                "content": [],
+                "items": [],
+                "level": 5
+            }
+            
+            parsing_state["current_subsubsection"]["subsections"].append(parsing_state["current_subsubsubsection"])
+    
+    def _handle_content_elements(self, line_stripped: str, parsing_state: Dict[str, Any]) -> None:
+        """
+        处理内容元素（列表项、表格、图片和普通段落）
+        
+        Args:
+            line_stripped: 当前处理的行（已去除前后空白）
+            parsing_state: 当前解析状态
+        """
+        # 获取当前应添加内容的目标章节
+        target_section = self._get_target_section(
+            parsing_state["current_section"], 
+            parsing_state["current_subsection"], 
+            parsing_state["current_subsubsection"], 
+            parsing_state["current_subsubsubsection"]
+        )
+        
+        if target_section is None:
+            return
+            
+        # 检测列表项 (- 或 * 项目)
+        if line_stripped.startswith("- ") or line_stripped.startswith("* "):
+            item_text = line_stripped[2:].strip()
+            target_section["items"].append(item_text)
+            
+        # 检测有序列表项 (1. 项目)
+        elif re.match(r"^\d+\.\s", line_stripped):
+            item_text = re.sub(r"^\d+\.\s+", "", line_stripped)
+            if "ordered_items" not in target_section:
+                target_section["ordered_items"] = []
+            target_section["ordered_items"].append(item_text)
+            
+        # 检测表格
+        elif "|" in line_stripped:
+            self._handle_table(line_stripped, target_section)
+            
+        # 处理图片链接
+        elif re.search(r"!\[.*?\]\(.*?\)", line_stripped):
+            self._handle_image(line_stripped, target_section)
+            
+        # 处理普通段落
+        else:
+            target_section["content"].append(line_stripped)
+    
+    def _handle_table(self, line_stripped: str, target_section: Dict[str, Any]) -> None:
+        """
+        处理表格行
+        
+        Args:
+            line_stripped: 当前处理的行（已去除前后空白）
+            target_section: 目标章节
+        """
+        if "tables" not in target_section:
+            target_section["tables"] = []
+            target_section["tables"].append([])
+        
+        # 跳过表格分隔行 (|---|---|)
+        if re.search(r"^[\|\s\-:]+$", line_stripped):
+            return
+            
+        target_section["tables"][-1].append(
+            [cell.strip() for cell in line_stripped.split("|") if cell.strip()]
+        )
+    
+    def _handle_image(self, line_stripped: str, target_section: Dict[str, Any]) -> None:
+        """
+        处理图片链接
+        
+        Args:
+            line_stripped: 当前处理的行（已去除前后空白）
+            target_section: 目标章节
+        """
+        if "images" not in target_section:
+            target_section["images"] = []
+        
+        # 提取图片描述和URL
+        match = re.search(r"!\[(.*?)\]\((.*?)\)", line_stripped)
+        if match:
+            alt_text, url = match.groups()
+            target_section["images"].append({
+                "alt": alt_text,
+                "url": url
+            })
+    
+    def _count_total_sections(self, content_structure: Dict[str, Any]) -> int:
+        """
+        递归计算所有层级的章节总数
+        
+        Args:
+            content_structure: 内容结构
+            
+        Returns:
+            章节总数
+        """
+        total = len(content_structure["sections"])
+        
+        # 使用辅助函数递归计算子章节数
+        def count_subsections(sections):
+            count = 0
+            for section in sections:
+                if "subsections" in section:
+                    count += len(section["subsections"])
+                    count += count_subsections(section["subsections"])
+            return count
+        
+        total += count_subsections(content_structure["sections"])
+        return total
+    
+    def _log_parsing_results(self, content_structure: Dict[str, Any]) -> None:
+        """
+        记录解析结果的日志
+        
+        Args:
+            content_structure: 内容结构
+        """
         # 计算所有层级的章节总数
-        total_sections = section_count
-        for section in content_structure["sections"]:
-            if "subsections" in section:
-                total_sections += len(section["subsections"])
-                for subsection in section["subsections"]:
-                    if "subsections" in subsection:
-                        total_sections += len(subsection["subsections"])
-                        for subsubsection in subsection["subsections"]:
-                            if "subsections" in subsubsection:
-                                total_sections += len(subsubsection["subsections"])
+        total_sections = self._count_total_sections(content_structure)
         
         # 记录解析的标题和副标题信息
         title_status = "成功" if content_structure["title"] else "未找到"
         subtitle_status = "成功" if content_structure["subtitle"] else "未找到"
         
         logger.info(f"Markdown解析完成，标题: '{content_structure.get('title')}' ({title_status}), 副标题: '{content_structure.get('subtitle')}' ({subtitle_status}), 总层级章节数: {total_sections}")
-        
-        return content_structure
     
     def _get_target_section(self, section, subsection, subsubsection, subsubsubsection):
         """
