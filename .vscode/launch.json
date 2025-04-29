@@ -13,12 +13,12 @@
             }
         },
         {
-            "name": "运行PPT工作流(MCP介绍)",
+            "name": "运行PPT工作流",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/run_workflow.py",
             "args": [
-                "--md_file", "tests/testfiles/MCP介绍.md",
+                "--md_file", "tests/testfiles/技术思维五导教学内容.md",
                 "--ppt_template", "tests/testfiles/Iphone16Pro.pptx",
                 "--output_dir", "workspace/output",
                 "--trace"
