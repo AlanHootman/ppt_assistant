@@ -143,12 +143,7 @@ class ModelManager:
         """
         logger.info(f"调用OpenAI生成文本: {model}")
         
-        # 开发环境模拟调用
-        if os.environ.get("DEV_ENV") == "true":
-            logger.info(f"[DEV] 模拟OpenAI API请求: {model}")
-            await asyncio.sleep(1)
-            return "这是一个模拟的OpenAI API响应"
-        
+
         try:
             # 获取文本模型客户端
             client = self._get_client("text")
@@ -187,12 +182,7 @@ class ModelManager:
         """
         logger.info(f"生成文本嵌入: {model}")
         
-        # 开发环境模拟调用
-        if os.environ.get("DEV_ENV") == "true":
-            logger.info(f"[DEV] 模拟OpenAI嵌入API请求: {model}")
-            await asyncio.sleep(0.5)
-            return [0.1] * 10
-        
+
         try:
             # 获取嵌入模型客户端
             client = self._get_client("embedding")
@@ -228,12 +218,6 @@ class ModelManager:
         # 检查图像文件是否存在
         if not os.path.exists(image_path):
             raise FileNotFoundError(f"图像文件不存在: {image_path}")
-        
-        # 开发环境模拟调用
-        if os.environ.get("DEV_ENV") == "true":
-            logger.info(f"[DEV] 模拟OpenAI视觉API请求: {model}")
-            await asyncio.sleep(1.5)
-            return "这是一个模拟的OpenAI视觉API响应，分析了图像内容"
         
         try:
             # 获取视觉模型客户端
@@ -296,27 +280,7 @@ class ModelManager:
         """
         logger.info(f"使用视觉模型分析多图像: {model}, 图像数量: {len(images)}")
         
-        # 开发环境模拟调用
-        if os.environ.get("DEV_ENV") == "true":
-            logger.info(f"[DEV] 模拟OpenAI视觉API多图像请求: {model}")
-            await asyncio.sleep(2)
-            return json.dumps({
-                "templateName": "模拟模板",
-                "style": "现代简约",
-                "visualFeatures": {
-                    "colorScheme": "蓝色主题",
-                    "designStyle": "商务风格",
-                    "layoutComplexity": "中等",
-                    "textDensity": "适中"
-                },
-                "recommendations": {
-                    "textContent": "适合包含中等文字内容",
-                    "dataVisualization": "支持各类图表",
-                    "imageContent": "图片展示效果良好",
-                    "presentationFlow": "结构清晰"
-                }
-            }, ensure_ascii=False)
-        
+       
         try:
             # 获取视觉模型客户端
             client = self._get_client("vision")
