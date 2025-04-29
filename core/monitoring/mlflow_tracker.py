@@ -24,14 +24,15 @@ logger = logging.getLogger(__name__)
 class MLflowTracker:
     """MLflow跟踪器用于记录工作流执行数据"""
     
-    def __init__(self, tracking_uri="http://127.0.0.1:5000", experiment_name="workflow_executions"):
+    def __init__(self, tracking_uri=None, experiment_name="workflow_executions"):
         """初始化MLflow跟踪器
         
         Args:
-            tracking_uri: MLflow跟踪服务器URI
+            tracking_uri: MLflow跟踪服务器URI，如未指定则从环境变量获取
             experiment_name: 实验名称
         """
-        self.tracking_uri = tracking_uri
+        # 从环境变量获取tracking_uri（如果未指定），默认为http://127.0.0.1:5000
+        self.tracking_uri = tracking_uri or os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
         self.experiment_name = experiment_name
         self.active_run = None
         
@@ -42,7 +43,7 @@ class MLflowTracker:
         # 启用OpenAI自动跟踪
         mlflow.openai.autolog()
         
-        logger.info(f"MLflow跟踪器已初始化: URI={tracking_uri}, 实验={experiment_name}")
+        logger.info(f"MLflow跟踪器已初始化: URI={self.tracking_uri}, 实验={experiment_name}")
     
     def start_workflow_run(self, session_id=None, workflow_name=None):
         """开始工作流运行
