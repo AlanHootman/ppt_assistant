@@ -84,73 +84,43 @@ class SlideGeneratorAgent(BaseAgent):
         logger.info("开始生成幻灯片")
         
         try:
-            # 检查PPTManager是否已初始化
-            if not hasattr(self, 'ppt_manager') or self.ppt_manager is None:
-                raise ValueError("PPTManager未初始化")
+            # 获取PPT模板路径和内容计划
+            template_path = getattr(state, 'template_path', None) or getattr(state, 'ppt_template_path', None)
             
-            # 检查内容规划是否存在
-            if not state.content_plan:
-                raise ValueError("缺少内容规划，无法生成幻灯片")
-            
-            # 统一模板路径参数，优先使用template_path，兼容ppt_template_path
-            template_path = state.template_path if hasattr(state, 'template_path') and state.template_path else state.ppt_template_path if hasattr(state, 'ppt_template_path') else None
-            if not template_path or not os.path.exists(template_path):
-                raise ValueError(f"无效的PPT模板路径: {template_path}")
-            
-            # 检查state中的presentation是否存在：如果存在则使用state中的presentation，否则通过ppt_manager加载
-            if hasattr(state, 'presentation') and state.presentation:
-                presentation = state.presentation
-            else:
-                # 加载PPT模板
+            # 获取或加载presentation
+            presentation = getattr(state, 'presentation', None)
+            if not presentation:
+                logger.info(f"加载PPT模板: {template_path}")
                 presentation = self.ppt_manager.load_presentation(template_path)
-                logger.info(f"已加载PPT模板: {template_path}")
 
-
-            # 获取当前章节索引
+            # 获取当前章节内容
             current_index = state.current_section_index
-            if current_index is None:
-                raise ValueError("当前章节索引未定义")
-                
-            # 检查索引是否在有效范围内
-            if current_index < 0 or current_index >= len(state.content_plan):
-                raise ValueError(f"无效的章节索引: {current_index}，内容规划共有{len(state.content_plan)}个章节")
-            
-            # 获取当前要处理的章节
             current_section = state.content_plan[current_index]
             logger.info(f"处理章节 {current_index + 1}/{len(state.content_plan)}: {current_section.get('slide_type', '未知类型')}")
             
-
-            # 获取PPT的JSON结构，用于获取模板幻灯片ID
+            # 获取PPT的JSON结构并找到模板幻灯片ID
             ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
-            logger.info(f"已获取PPT JSON结构，包含 {len(ppt_json.get('slides', []))} 张幻灯片")
-            
-            # 获取模板幻灯片ID
             template_info = current_section.get("template", {})
             slide_id = self._get_template_slide_id(template_info, ppt_json)
-            logger.info(f"已选择模板幻灯片ID: {slide_id}")
             
             # 复制模板幻灯片
+            logger.info(f"复制模板幻灯片ID: {slide_id}")
             duplicate_result = self.ppt_manager.duplicate_slide_by_id(
                 presentation=presentation,
                 slide_id=slide_id
             )
             
-            if not duplicate_result["success"]:
-                raise ValueError(f"复制模板幻灯片失败: {duplicate_result.get('message', '未知错误')}")
-                
+            # 获取新幻灯片信息并更新presentation
             new_slide_id = duplicate_result["slide_id"]
-            # 更新presentation对象，确保包含新创建的幻灯片
             presentation = duplicate_result["presentation"]
             
-            logger.info(f"已复制模板幻灯片, 新幻灯片ID: {new_slide_id}")
-            
-            # 直接获取新幻灯片的详细信息
+            # 获取新幻灯片的详细信息
             slide_result = self.ppt_manager.get_slide_json_by_id(
                 presentation=presentation,
                 slide_id=new_slide_id            
             )
-                    
-            # 使用LLM进行内容-元素智能匹配
+            
+            # 使用LLM匹配内容到幻灯片元素
             logger.info("调用LLM进行内容-元素智能匹配")
             llm_matches = await self._llm_match_content_to_elements(
                 slide_type=current_section.get("slide_type", "content"),
@@ -158,31 +128,22 @@ class SlideGeneratorAgent(BaseAgent):
                 current_section=current_section
             )
             
-            if not llm_matches:
-                raise ValueError("LLM未能正确匹配内容和元素")
-            
             # 应用LLM匹配结果到幻灯片
-            logger.info(f"开始应用LLM匹配结果，共 {len(llm_matches)} 项")
-            success = await self._apply_llm_matches(presentation, new_slide_id, llm_matches)
-            
-            if not success:
-                raise ValueError("应用LLM匹配结果失败")
-            
-
-            # 将presentation保存到state中
-            state.presentation = presentation
+            logger.info(f"应用LLM匹配结果，共 {len(llm_matches)} 项")
+            await self._apply_llm_matches(presentation, new_slide_id, llm_matches)
             
             # 更新状态
+            state.presentation = presentation
+            
+            # 初始化generated_slides如果不存在
             if not hasattr(state, 'generated_slides') or state.generated_slides is None:
                 state.generated_slides = []
             
-            # 添加已生成的幻灯片信息
-            slide_info = {
+            # 添加生成的幻灯片信息
+            state.generated_slides.append({
                 "section_index": current_index,
                 "slide_id": new_slide_id,
-            }
-            state.generated_slides.append(slide_info)
-            logger.info(f"已更新状态，添加生成的幻灯片信息")
+            })
             
             return state
             

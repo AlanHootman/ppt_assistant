@@ -61,32 +61,16 @@ class PPTFinalizerAgent(BaseAgent):
         logger.info("开始清理和保存PPT")
         
         try:
-            # 检查PPTManager是否已初始化
-            if not hasattr(self, 'ppt_manager') or self.ppt_manager is None:
-                raise ValueError("PPTManager未初始化")
-            
-            # 检查是否有已生成的幻灯片
-            if not hasattr(state, "generated_slides") or not state.generated_slides:
-                error_msg = "没有已生成的幻灯片可供处理"
-                self.record_failure(state, error_msg)
-                return state
-            
-            # 检查state中是否有presentation对象
-            if not hasattr(state, "presentation") or state.presentation is None:
-                error_msg = "状态中缺少presentation对象，无法保存PPT"
-                self.record_failure(state, error_msg)
-                return state
-            
-            # 获取presentation对象
-            presentation = state.presentation
+            # 获取presentation对象和已生成的幻灯片
+            presentation = getattr(state, "presentation", None)
+            generated_slides = getattr(state, "generated_slides", [])
             
             # 删除未使用的幻灯片（只保留generated_slides中记录的幻灯片）
-            self._delete_unused_slides(presentation, state.generated_slides)
+            logger.info("删除未使用的模板幻灯片")
+            self._delete_unused_slides(presentation, generated_slides)
             
-            # 获取输出目录
-            output_dir = state.output_dir if hasattr(state, "output_dir") and state.output_dir else "workspace/output"
-            
-            # 确保输出目录存在
+            # 获取或创建输出目录
+            output_dir = getattr(state, "output_dir", "workspace/output")
             os.makedirs(output_dir, exist_ok=True)
             
             # 生成输出文件路径
@@ -94,13 +78,12 @@ class PPTFinalizerAgent(BaseAgent):
             output_filename = f"presentation_{state.session_id}_{timestamp}.pptx"
             output_path = os.path.join(output_dir, output_filename)
             
-            # 使用PPTManager保存演示文稿
-            logger.info(f"正在保存演示文稿到: {output_path}")
+            # 保存演示文稿
+            logger.info(f"保存演示文稿到: {output_path}")
             saved_path = self.ppt_manager.save_presentation(presentation, output_path)
             
             # 更新状态
             state.output_ppt_path = saved_path
-            
             logger.info(f"PPT已成功保存: {saved_path}")
             
             # 记录检查点
