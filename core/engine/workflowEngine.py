@@ -433,9 +433,9 @@ class WorkflowEngine:
             # 注意：真实的PPTAnalysisAgent是在run_async中通过await调用的
             self._mock_ppt_analyzer(state)
         elif node_name == "content_planner":
-            # 注意：真实的ContentPlanningAgent需要异步执行，此处使用模拟实现
+            # 注意：真实的ContentPlanningAgent需要异步执行，此处只记录警告
             logger.warning("content_planner节点需要异步执行，应由调用者处理")
-            self._mock_content_planner(state)
+            # 不再调用模拟方法，因为run_async中已经异步调用了真实实现
         elif node_name == "slide_generator":
             self._mock_slide_generator(state)
         elif node_name == "slide_validator":

@@ -16,7 +16,7 @@ from typing import Dict, Any, List, Optional
 from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
-from config.prompts.markdown_agent_prompts import ANALYSIS_PROMPT, SECTION_EXTRACTION_PROMPT
+from config.prompts.markdown_agent_prompts import ANALYSIS_PROMPT
 from core.utils.markdown_parser import MarkdownParser
 
 logger = logging.getLogger(__name__)
@@ -176,39 +176,28 @@ class MarkdownAgent(BaseAgent):
         Returns:
             解析后的结构
         """
-        # 尝试从响应中提取JSON
         try:
-            # 清理响应中的markdown格式代码块
+            # 提取JSON内容（如果在代码块中）
             json_text = response
             if "```json" in response:
-                # 提取JSON代码块
-                pattern = r"```(?:json)?\s*([\s\S]*?)```"
-                matches = re.findall(pattern, response)
-                if matches:
-                    json_text = matches[0]
+                match = re.search(r"```(?:json)?\s*([\s\S]*?)```", response)
+                if match:
+                    json_text = match.group(1)
             
             # 解析JSON
-            enhanced_structure = json.loads(json_text)
+            structure = json.loads(json_text)
             
-            # 确保保留标题和副标题
-            if not enhanced_structure.get("title"):
-                enhanced_structure["title"] = fallback_structure.get("title", "")
-                logger.warning("LLM返回结果缺少title字段，使用基础解析的标题")
+            # 确保关键字段存在
+            structure["title"] = structure.get("title") or fallback_structure.get("title", "")
+            structure["subtitle"] = structure.get("subtitle", fallback_structure.get("subtitle", ""))
             
-            if "subtitle" not in enhanced_structure:
-                enhanced_structure["subtitle"] = fallback_structure.get("subtitle", "")
-                logger.warning("LLM返回结果缺少subtitle字段，使用基础解析的副标题")
+            if not structure.get("sections") or not isinstance(structure["sections"], list):
+                structure["sections"] = fallback_structure.get("sections", [])
+                logger.warning("响应中没有有效的sections字段，使用基础解析的章节内容")
             
-            # 验证sections字段存在且为列表
-            if not enhanced_structure.get("sections") or not isinstance(enhanced_structure["sections"], list):
-                logger.warning("LLM返回结果缺少有效的sections字段，使用基础解析的章节")
-                enhanced_structure["sections"] = fallback_structure.get("sections", [])
+            logger.info(f"解析成功 - 标题: '{structure['title']}', 副标题: '{structure['subtitle']}'")
             
-            # 记录标题信息
-            logger.info(f"解析后的文档标题: {enhanced_structure.get('title')}")
-            logger.info(f"解析后的文档副标题: {enhanced_structure.get('subtitle')}")
-            
-            return enhanced_structure
+            return structure
             
         except Exception as e:
             logger.error(f"解析大模型响应失败: {str(e)}")
@@ -235,40 +224,3 @@ class MarkdownAgent(BaseAgent):
         state.record_failure(error)
         logger.error(f"记录失败: {error}")
     
-    def _extract_sections_with_llm(self, markdown_text: str) -> Dict[str, Any]:
-        """
-        使用LLM提取Markdown结构（示例实现，实际项目中会集成OpenAI等）
-        
-        Args:
-            markdown_text: Markdown文本
-            
-        Returns:
-            LLM解析的结构化内容
-        """
-        # 此为示例实现，实际项目中会调用OpenAI等LLM
-        logger.info(f"使用LLM({self.llm_model})解析Markdown")
-        
-        # 构建上下文
-        context = {
-            "markdown_text": markdown_text
-        }
-        
-        # 使用Jinja2模板
-        prompt = self.model_manager.render_template(SECTION_EXTRACTION_PROMPT, context)
-        
-        # 模拟LLM解析结果
-        return {
-            "title": "示例文档标题",
-            "sections": [
-                {
-                    "title": "示例章节1",
-                    "content": ["这是章节1的内容"],
-                    "items": ["列表项1", "列表项2"]
-                },
-                {
-                    "title": "示例章节2",
-                    "content": ["这是章节2的内容"],
-                    "items": ["列表项A", "列表项B"]
-                }
-            ]
-        } 
