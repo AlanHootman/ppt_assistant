@@ -125,7 +125,12 @@ class MarkdownAgent(BaseAgent):
         Returns:
             增强后的结构化内容
         """
-        logger.info(f"使用大模型({self.llm_model})进行内容增强分析")
+        title = basic_structure.get("title", "无标题")
+        subtitle = basic_structure.get("subtitle", "")
+        logger.info(f"使用大模型({self.llm_model})进行内容增强分析，文档标题: '{title}'")
+        
+        # 记录基础结构中的标题和副标题
+        logger.debug(f"基础解析标题: '{title}', 副标题: '{subtitle}'")
         
         # 构建提示词 - 使用Jinja2模板
         context = {
@@ -148,6 +153,11 @@ class MarkdownAgent(BaseAgent):
             # 解析JSON响应
             enhanced_structure = self._parse_llm_response(response, basic_structure)
             logger.info("大模型增强分析完成")
+            
+            # 记录生成的文档结构概要
+            sections_count = len(enhanced_structure.get("sections", []))
+            logger.info(f"增强后的结构: 标题: '{enhanced_structure.get('title')}', 副标题: '{enhanced_structure.get('subtitle')}', 章节数: {sections_count}")
+            
             return enhanced_structure
             
         except Exception as e:
@@ -179,6 +189,25 @@ class MarkdownAgent(BaseAgent):
             
             # 解析JSON
             enhanced_structure = json.loads(json_text)
+            
+            # 确保保留标题和副标题
+            if not enhanced_structure.get("title"):
+                enhanced_structure["title"] = fallback_structure.get("title", "")
+                logger.warning("LLM返回结果缺少title字段，使用基础解析的标题")
+            
+            if "subtitle" not in enhanced_structure:
+                enhanced_structure["subtitle"] = fallback_structure.get("subtitle", "")
+                logger.warning("LLM返回结果缺少subtitle字段，使用基础解析的副标题")
+            
+            # 验证sections字段存在且为列表
+            if not enhanced_structure.get("sections") or not isinstance(enhanced_structure["sections"], list):
+                logger.warning("LLM返回结果缺少有效的sections字段，使用基础解析的章节")
+                enhanced_structure["sections"] = fallback_structure.get("sections", [])
+            
+            # 记录标题信息
+            logger.info(f"解析后的文档标题: {enhanced_structure.get('title')}")
+            logger.info(f"解析后的文档副标题: {enhanced_structure.get('subtitle')}")
+            
             return enhanced_structure
             
         except Exception as e:
