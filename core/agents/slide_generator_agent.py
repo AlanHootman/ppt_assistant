@@ -108,6 +108,93 @@ class SlideGeneratorAgent(BaseAgent):
             logger.exception(e)
             raise RuntimeError(error_msg)
     
+    def _ensure_default_fields(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        确保结果字典包含所需的默认字段
+        
+        Args:
+            result: 结果字典
+            
+        Returns:
+            包含默认字段的结果字典
+        """
+        result.setdefault("has_issues", False)
+        result.setdefault("issues", [])
+        result.setdefault("suggestions", [])
+        return result
+    
+    def _check_validation_prerequisites(self, state: AgentState) -> bool:
+        """
+        检查验证前置条件
+        
+        Args:
+            state: 当前状态
+            
+        Returns:
+            是否满足前置条件
+        """
+        if not hasattr(state, "current_slide") or not state.current_slide:
+            logger.error("没有当前幻灯片可供验证")
+            state.validation_result = False
+            state.validation_issues = ["缺少幻灯片数据"]
+            state.validation_suggestions = ["重新生成幻灯片"]
+            return False
+            
+        if not hasattr(state, "content_plan") or not state.content_plan:
+            logger.error("没有内容计划可供验证")
+            state.validation_result = False
+            state.validation_issues = ["缺少内容计划"]
+            state.validation_suggestions = ["重新生成内容计划"]
+            return False
+            
+        return True
+    
+    def _update_validation_result(self, state: AgentState, analysis: Dict[str, Any]) -> None:
+        """
+        更新验证结果
+        
+        Args:
+            state: 当前状态
+            analysis: 分析结果
+        """
+        # 获取分析结果
+        issues = analysis.get("issues", [])
+        suggestions = analysis.get("suggestions", [])
+        quality_score = analysis.get("quality_score", 0)
+        
+        # 更新状态
+        state.validation_issues = issues
+        state.validation_suggestions = suggestions
+        
+        # 记录质量分数
+        if not hasattr(state, "quality_scores"):
+            state.quality_scores = []
+        state.quality_scores.append(quality_score)
+        
+        # 记录验证信息
+        if state.validation_result:
+            logger.info(f"幻灯片验证通过，质量评分: {quality_score}/10")
+        else:
+            logger.warning(f"幻灯片验证不通过，质量评分: {quality_score}/10")
+            logger.warning(f"问题: {issues}")
+            logger.info(f"修复建议: {suggestions}")
+            
+        # 记录验证次数
+        logger.info(f"总验证尝试次数: {state.validation_attempts}") 
+
+    def _set_validation_failure(self, state: AgentState, issue: str, suggestions: List[str]) -> None:
+        """
+        设置验证失败状态
+        
+        Args:
+            state: 当前状态
+            issue:
+            suggestions:
+        """
+        state.validation_result = False
+        state.validation_issues = [issue]
+        state.validation_suggestions = suggestions
+
     async def _prepare_presentation(self, state: AgentState) -> Any:
         """
         准备演示文稿对象
@@ -128,115 +215,7 @@ class SlideGeneratorAgent(BaseAgent):
             presentation = self.ppt_manager.load_presentation(template_path)
         
         return presentation
-    
-    async def _generate_slide(self, state: AgentState, presentation: Any) -> None:
-        """
-        生成幻灯片内容
-        
-        Args:
-            state: 当前状态
-            presentation: 演示文稿对象
-        """
-        # 获取当前章节内容
-        current_index = state.current_section_index
-        current_section = state.content_plan[current_index]
-        logger.info(f"处理章节 {current_index + 1}/{len(state.content_plan)}: {current_section.get('slide_type', '未知类型')}")
-        
-        # 第一步：找到并复制模板幻灯片
-        new_slide_id, presentation = await self._duplicate_template_slide(presentation, current_section)
-        
-        # # 如果presentation已在_duplicate_template_slide中更新，我们需要从中获取最新的
-        # if hasattr(presentation, 'updated') and presentation.updated:
-        #     # presentation已在内部更新，无需额外操作
-        #     pass
-        
-        # 第二步：规划并执行幻灯片内容填充操作
-        operations = await self._plan_and_execute_content_operations(
-            presentation, new_slide_id, current_section
-        )
-        
-        # 更新状态
-        state.presentation = presentation
-        
-        # 初始化generated_slides如果不存在
-        if not hasattr(state, 'generated_slides') or state.generated_slides is None:
-            state.generated_slides = []
-        
-        # 更新当前幻灯片信息，供验证使用
-        state.current_slide = {
-            "section_index": current_index,
-            "slide_id": new_slide_id,
-            "operations": operations
-        }
-    
-    async def _duplicate_template_slide(self, presentation: Any, current_section: Dict[str, Any]) -> str:
-        """
-        找到并复制模板幻灯片
-        
-        Args:
-            presentation: 演示文稿对象
-            current_section: 当前章节内容
-            
-        Returns:
-            新幻灯片的ID
-        """
-        # 获取PPT的JSON结构并找到模板幻灯片ID
-        ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
-        template_info = current_section.get("template", {})
-        slide_id = self._get_template_slide_id(template_info, ppt_json)
-        
-        # 复制模板幻灯片
-        logger.info(f"复制模板幻灯片ID: {slide_id}")
-        duplicate_result = self.ppt_manager.duplicate_slide_by_id(
-            presentation=presentation,
-            slide_id=slide_id
-        )
-        
-        # 获取新幻灯片信息并可能更新presentation
-        new_slide_id = duplicate_result["slide_id"]
-        
-        # # 如果PPT管理器返回了更新后的presentation对象，我们应该使用它
-        if "presentation" in duplicate_result:
-            # 更新传入的presentation对象（通过引用）
-            # 注意：由于Python的参数传递特性，这不会影响原始的presentation对象引用
-            # 我们需要在调用方更新引用
-            presentation = duplicate_result["presentation"]
-        
-        return new_slide_id, presentation
-    
-    async def _plan_and_execute_content_operations(
-        self, presentation: Any, slide_id: str, current_section: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """
-        规划并执行幻灯片内容填充操作
-        
-        Args:
-            presentation: 演示文稿对象
-            slide_id: 幻灯片ID
-            current_section: 当前章节内容
-            
-        Returns:
-            执行的操作列表
-        """
-        # 获取新幻灯片的详细信息
-        slide_result = self.ppt_manager.get_slide_json_by_id(
-            presentation=presentation,
-            slide_id=slide_id            
-        )
-        
-        # 使用LLM匹配内容到幻灯片元素
-        logger.info("调用LLM进行内容-元素智能匹配及操作规划")
-        operations = await self._plan_slide_operations(
-            slide_elements=slide_result,
-            current_section=current_section
-        )
-        
-        # 执行LLM规划的操作
-        logger.info(f"执行幻灯片操作，共 {len(operations)} 项")
-        await self._execute_operations(presentation, slide_id, operations)
-        
-        return operations
-    
+
     def _get_template_slide_id(self, template_info: Dict[str, Any], ppt_json: Dict[str, Any]) -> str:
         """
         从模板信息中获取幻灯片ID
@@ -264,51 +243,65 @@ class SlideGeneratorAgent(BaseAgent):
         # 如果template_info中没有slide_id和slideIndex，直接抛出异常
         raise ValueError("template_info中缺少slide_id或slideIndex，无法确定要使用的模板幻灯片")
     
-    async def _plan_slide_operations(self, slide_elements: List[Dict[str, Any]], current_section: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _get_real_slide_index(self, presentation: Any, slide_id: str) -> Optional[int]:
         """
-        使用LLM规划幻灯片操作，包括内容匹配和特殊操作
+        获取幻灯片的实际索引
         
         Args:
-            slide_elements: 幻灯片元素列表
-            current_section: 当前处理的章节信息
+            presentation: 演示文稿对象
+            slide_id: 幻灯片ID
             
         Returns:
-            操作指令列表
+            幻灯片的实际索引，失败返回None
+        """
+        # 获取幻灯片索引
+        slide_index = self._get_slide_index_by_id(presentation, slide_id)
+        if slide_index is None:
+            logger.error(f"无法找到ID为 {slide_id} 的幻灯片")
+            return None
+            
+        # 修正：使用实际索引而不是slide_index值
+        real_slide_index = None
+        for i, slide in enumerate(presentation.slides):
+            if hasattr(slide, 'slide_id') and slide.slide_id == slide_id:
+                real_slide_index = i
+                break
+                
+        if real_slide_index is None:
+            logger.error(f"无法找到ID为 {slide_id} 的幻灯片实际索引")
+            return None
+            
+        logger.info(f"找到幻灯片索引: {real_slide_index}")
+        return real_slide_index
+    
+    def _get_slide_index_by_id(self, presentation: Any, slide_id: str) -> Optional[int]:
+        """
+        根据幻灯片ID获取索引
+        
+        Args:
+            presentation: PPT演示文稿对象
+            slide_id: 幻灯片ID
+            
+        Returns:
+            幻灯片索引，未找到时返回None
         """
         try:
-            # 构建提示词上下文
-            context = self._build_operation_context(slide_elements, current_section)
+            # 获取所有幻灯片
+            ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
+            slides = ppt_json.get("slides", [])
             
-            # 获取LLM响应
-            operations = await self._get_operations_from_llm(context)
+            # 遍历查找匹配ID的幻灯片
+            for i, slide in enumerate(slides):
+                if slide.get("slide_id") == slide_id:
+                    return i
             
-            if operations:
-                logger.info(f"LLM成功返回 {len(operations)} 个操作指令")
-                return operations
-            else:
-                logger.warning("无法从LLM响应中解析出有效的操作指令，将使用默认匹配")
-                return self._generate_default_operations(slide_elements, current_section)
-                
+            logger.warning(f"未找到ID为 {slide_id} 的幻灯片")
+            return None
+            
         except Exception as e:
-            logger.exception(f"规划幻灯片操作时出错: {str(e)}")
-            return self._generate_default_operations(slide_elements, current_section)
-    
-    def _build_operation_context(self, slide_elements: List[Dict[str, Any]], current_section: Dict[str, Any]) -> Dict[str, str]:
-        """
-        构建提示词上下文
-        
-        Args:
-            slide_elements: 幻灯片元素列表
-            current_section: 当前处理的章节信息
-            
-        Returns:
-            上下文字典
-        """
-        return {
-            "slide_elements_json": json.dumps(slide_elements, ensure_ascii=False, indent=2, cls=EnumEncoder),
-            "content_json": json.dumps(current_section, ensure_ascii=False, indent=2, cls=EnumEncoder)
-        }
-    
+            logger.warning(f"获取幻灯片索引时出错: {str(e)}")
+            return None
+
     async def _get_operations_from_llm(self, context: Dict[str, str]) -> List[Dict[str, Any]]:
         """
         从LLM获取操作指令
@@ -332,6 +325,38 @@ class SlideGeneratorAgent(BaseAgent):
         
         # 解析LLM响应
         return self._parse_llm_response(response)
+
+    def _validate_operation(self, operation: Dict[str, Any]) -> bool:
+        """
+        验证操作有效性
+        
+        Args:
+            operation: 操作指令
+            
+        Returns:
+            操作是否有效
+        """
+        element_id = operation.get("element_id")
+        if not element_id:
+            logger.warning(f"跳过缺少element_id的操作: {operation}")
+            return False
+        return True
+
+    def _build_operation_context(self, slide_elements: List[Dict[str, Any]], current_section: Dict[str, Any]) -> Dict[str, str]:
+        """
+        构建提示词上下文
+        
+        Args:
+            slide_elements: 幻灯片元素列表
+            current_section: 当前处理的章节信息
+            
+        Returns:
+            上下文字典
+        """
+        return {
+            "slide_elements_json": json.dumps(slide_elements, ensure_ascii=False, indent=2, cls=EnumEncoder),
+            "content_json": json.dumps(current_section, ensure_ascii=False, indent=2, cls=EnumEncoder)
+        }
     
     def _parse_llm_response(self, response: str) -> List[Dict[str, Any]]:
         """
@@ -376,341 +401,159 @@ class SlideGeneratorAgent(BaseAgent):
             logger.exception(f"解析LLM响应时出错: {str(e)}")
             return []
     
-    def _generate_default_operations(self, slide_elements: List[Dict[str, Any]], current_section: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _extract_json_from_response(self, response: str) -> str:
         """
-        生成默认的操作指令，用于LLM响应解析失败时
+        从响应中提取JSON文本
+        
+        Args:
+            response: 响应文本
+            
+        Returns:
+            JSON文本
+        """
+        # 尝试直接解析JSON响应
+        json_text = response
+        
+        # 如果响应包含JSON代码块，提取它
+        if "```json" in response:
+            pattern = r"```(?:json)?\s*([\s\S]*?)```"
+            matches = re.findall(pattern, response)
+            if matches:
+                json_text = matches[0]
+                
+        return json_text
+    
+    def _parse_vision_response(self, response: str) -> Dict[str, Any]:
+        """
+        解析视觉模型响应
+        
+        Args:
+            response: 视觉模型响应文本
+            
+        Returns:
+            解析后的结果字典
+        """
+        try:
+            # 提取JSON部分
+            json_text = self._extract_json_from_response(response)
+            
+            # 解析JSON
+            result = json.loads(json_text)
+            
+            # 确保结果有必要的字段
+            if not isinstance(result, dict):
+                raise ValueError("响应不是有效的JSON对象")
+            
+            # 添加默认字段
+            return self._ensure_default_fields(result)
+            
+        except Exception as e:
+            logger.error(f"解析视觉模型响应时出错: {str(e)}")
+            return {
+                "has_issues": True,
+                "issues": ["解析响应失败"],
+                "suggestions": ["尝试重新生成"]
+            }
+    
+    async def _generate_slide(self, state: AgentState, presentation: Any) -> None:
+        """
+        生成幻灯片内容
+        
+        Args:
+            state: 当前状态
+            presentation: 演示文稿对象
+        """
+        # 获取当前章节内容
+        current_index = state.current_section_index
+        current_section = state.content_plan[current_index]
+        logger.info(f"处理章节 {current_index + 1}/{len(state.content_plan)}: {current_section.get('slide_type', '未知类型')}")
+        
+        # 第一步：找到并复制模板幻灯片
+        new_slide_id, presentation = await self._duplicate_template_slide(presentation, current_section)
+        
+        # # 如果presentation已在_duplicate_template_slide中更新，我们需要从中获取最新的
+        # if hasattr(presentation, 'updated') and presentation.updated:
+        #     # presentation已在内部更新，无需额外操作
+        #     pass
+        
+        # 第二步：规划并执行幻灯片内容填充操作
+        operations = await self._plan_and_execute_content_operations(
+            presentation, new_slide_id, current_section
+        )
+        
+        # 更新状态
+        state.presentation = presentation
+        
+        # 初始化generated_slides如果不存在
+        if not hasattr(state, 'generated_slides') or state.generated_slides is None:
+            state.generated_slides = []
+        
+        # 更新当前幻灯片信息，供验证使用
+        state.current_slide = {
+            "section_index": current_index,
+            "slide_id": new_slide_id,
+            "operations": operations
+        }
+    
+    async def _plan_and_execute_content_operations(
+        self, presentation: Any, slide_id: str, current_section: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """
+        规划并执行幻灯片内容填充操作
+        
+        Args:
+            presentation: 演示文稿对象
+            slide_id: 幻灯片ID
+            current_section: 当前章节内容
+            
+        Returns:
+            执行的操作列表
+        """
+        # 获取新幻灯片的详细信息
+        slide_result = self.ppt_manager.get_slide_json_by_id(
+            presentation=presentation,
+            slide_id=slide_id            
+        )
+        
+        # 使用LLM匹配内容到幻灯片元素
+        logger.info("调用LLM进行内容-元素智能匹配及操作规划")
+        operations = await self._plan_slide_operations(
+            slide_elements=slide_result,
+            current_section=current_section
+        )
+        
+        # 执行LLM规划的操作
+        logger.info(f"执行幻灯片操作，共 {len(operations)} 项")
+        await self._execute_operations(presentation, slide_id, operations)
+        
+        return operations
+    
+    async def _plan_slide_operations(self, slide_elements: List[Dict[str, Any]], current_section: Dict[str, Any]) -> List[Dict[str, Any]]:
+        """
+        使用LLM规划幻灯片操作，包括内容匹配和特殊操作
         
         Args:
             slide_elements: 幻灯片元素列表
             current_section: 当前处理的章节信息
             
         Returns:
-            默认操作指令列表
-        """
-        operations = []
-        
-        # 尝试找到标题元素和内容元素
-        title_element = None
-        content_elements = []
-        
-        for element in slide_elements:
-            element_name = element.get("metadata", {}).get("shape_name", "").lower()
-            element_type = element.get("element_type", "").lower()
-            
-            # 查找标题元素
-            if element_type == "title" or "title" in element_name:
-                title_element = element
-            # 查找内容元素
-            elif element_type == "content" or "content" in element_name or "text" in element_type:
-                content_elements.append(element)
-        
-        # 添加标题替换操作
-        if title_element and "title" in current_section:
-            operations.append({
-                "element_id": title_element.get("element_id"),
-                "operation": "replace_text",
-                "content": current_section.get("title", "未命名幻灯片")
-            })
-        
-        # 添加内容替换操作
-        if content_elements and "content" in current_section:
-            # 获取内容文本
-            content_text = current_section.get("content", "")
-            if isinstance(content_text, list):
-                # 如果是列表，转换为项目符号
-                formatted_content = ""
-                for item in content_text:
-                    formatted_content += f"• {item}\n"
-                content_text = formatted_content.strip()
-            
-            # 添加内容替换操作
-            operations.append({
-                "element_id": content_elements[0].get("element_id"),
-                "operation": "replace_text",
-                "content": content_text
-            })
-        
-        return operations
-    
-    async def _execute_operations(self, presentation: Any, slide_id: str, operations: List[Dict[str, Any]]) -> bool:
-        """
-        执行幻灯片操作指令
-        
-        Args:
-            presentation: PPT演示文稿对象
-            slide_id: 幻灯片ID
-            operations: 操作指令列表
-            
-        Returns:
-            是否成功执行所有操作
-        """
-        if not operations:
-            logger.warning("没有操作指令可执行")
-            return False
-        
-        success_count = 0
-        total_count = len(operations)
-        
-        for operation in operations:
-            if not self._validate_operation(operation):
-                continue
-                
-            try:
-                # 执行操作
-                result = await self._execute_single_operation(presentation, slide_id, operation)
-                
-                if result.get("success"):
-                    success_count += 1
-                    logger.info(f"成功执行操作 {operation.get('operation')} 于元素 {operation.get('element_id')}")
-                else:
-                    logger.warning(f"执行操作 {operation.get('operation')} 失败: {result.get('message')}")
-            
-            except Exception as e:
-                logger.warning(f"执行操作时出错: {str(e)}")
-        
-        # 计算成功率
-        success_rate = success_count / total_count if total_count > 0 else 0
-        logger.info(f"操作执行完成，成功率: {success_rate:.2%} ({success_count}/{total_count})")
-        
-        # 如果有任何操作成功应用，就认为整体成功
-        return success_count > 0
-    
-    def _validate_operation(self, operation: Dict[str, Any]) -> bool:
-        """
-        验证操作有效性
-        
-        Args:
-            operation: 操作指令
-            
-        Returns:
-            操作是否有效
-        """
-        element_id = operation.get("element_id")
-        if not element_id:
-            logger.warning(f"跳过缺少element_id的操作: {operation}")
-            return False
-        return True
-    
-    async def _execute_single_operation(self, presentation: Any, slide_id: str, operation: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        执行单个操作
-        
-        Args:
-            presentation: PPT演示文稿对象
-            slide_id: 幻灯片ID
-            operation: 操作指令
-            
-        Returns:
-            操作结果
-        """
-        element_id = operation.get("element_id")
-        operation_type = operation.get("operation", "replace_text")
-        content = operation.get("content")
-        
-        # 根据操作类型执行不同的操作
-        if operation_type == "replace_text":
-            # 文本替换操作
-            return await self._replace_text(presentation, slide_id, element_id, content)
-        elif operation_type == "adjust_font_size":
-            # 调整字体大小
-            return self.ppt_manager.adjust_text_font_size(
-                presentation=presentation,
-                slide_id=slide_id,
-                element_id=element_id,
-                font_size=int(content)
-            )
-        elif operation_type == "replace_image":
-            # 替换图片
-            return self.ppt_manager.replace_image_by_element_id(
-                presentation=presentation,
-                slide_id=slide_id,
-                element_id=element_id,
-                image_path=content
-            )
-        elif operation_type == "add_image_caption":
-            # 添加图片说明
-            return self.ppt_manager.add_image_caption(
-                presentation=presentation,
-                slide_id=slide_id,
-                element_id=element_id,
-                caption=content
-            )
-        else:
-            logger.warning(f"未知的操作类型: {operation_type}")
-            return {"success": False, "message": f"未知的操作类型: {operation_type}"}
-    
-    async def _replace_text(self, presentation: Any, slide_id: str, element_id: str, content: Any) -> Dict[str, Any]:
-        """
-        替换文本内容
-        
-        Args:
-            presentation: PPT演示文稿对象
-            slide_id: 幻灯片ID
-            element_id: 元素ID
-            content: 文本内容，可以是字符串或列表
-            
-        Returns:
-            操作结果
-        """
-        # 处理不同类型的内容
-        if isinstance(content, list):
-            # 列表内容（如项目符号）
-            formatted_content = ""
-            for item in content:
-                if item and item.strip():
-                    formatted_content += f"• {item.strip()}\n"
-            
-            if formatted_content:
-                return self.ppt_manager.edit_text_element_by_id(
-                    presentation=presentation,
-                    slide_id=slide_id,
-                    element_id=element_id,
-                    new_text=formatted_content.strip()
-                )
-        else:
-            # 字符串内容
-            return self.ppt_manager.edit_text_element_by_id(
-                presentation=presentation,
-                slide_id=slide_id,
-                element_id=element_id,
-                new_text=str(content).strip()
-            )
-        
-        return {"success": False, "message": "无有效内容可替换"}
-    
-    
-    def _get_slide_index_by_id(self, presentation: Any, slide_id: str) -> Optional[int]:
-        """
-        根据幻灯片ID获取索引
-        
-        Args:
-            presentation: PPT演示文稿对象
-            slide_id: 幻灯片ID
-            
-        Returns:
-            幻灯片索引，未找到时返回None
+            操作指令列表
         """
         try:
-            # 获取所有幻灯片
-            ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
-            slides = ppt_json.get("slides", [])
+            # 构建提示词上下文
+            context = self._build_operation_context(slide_elements, current_section)
             
-            # 遍历查找匹配ID的幻灯片
-            for i, slide in enumerate(slides):
-                if slide.get("slide_id") == slide_id:
-                    return i
+            # 获取LLM响应
+            operations = await self._get_operations_from_llm(context)
             
-            logger.warning(f"未找到ID为 {slide_id} 的幻灯片")
-            return None
-            
+            if operations:
+                logger.info(f"LLM成功返回 {len(operations)} 个操作指令")
+                return operations
+            else:
+                logger.warning("无法从LLM响应中解析出有效的操作指令，将使用默认匹配")
+                
         except Exception as e:
-            logger.warning(f"获取幻灯片索引时出错: {str(e)}")
-            return None
-    
-    async def _validate_slide(self, state: AgentState, presentation: Any) -> None:
-        """
-        验证生成的幻灯片质量，并根据多模态模型分析结果进行迭代优化
-        
-        Args:
-            state: 当前状态
-            presentation: PPT演示文稿对象
-        """
-        logger.info("开始验证生成的幻灯片")
-        
-        # 1. 检查前置条件
-        if not self._check_validation_prerequisites(state):
-            return
-        
-        try:
-            # 2. 准备验证所需参数
-            current_slide = state.current_slide
-            slide_id = current_slide.get("slide_id")
-            operations = current_slide.get("operations", [])
-            current_section = state.content_plan[state.current_section_index]
-            
-            # 初始化验证尝试次数
-            if not hasattr(state, "validation_attempts") or state.validation_attempts is None:
-                state.validation_attempts = 0
-            
-            # 最大迭代次数
-            max_iterations = 3
-            has_issues = True
-            iteration_count = 0
-            
-            # 3. 获取幻灯片详细信息，供多模态模型分析
-            slide_elements = self.ppt_manager.get_slide_json_by_id(
-                presentation=presentation,
-                slide_id=slide_id            
-            )
-            
-            # 4. 验证幻灯片索引
-            real_slide_index = await self._get_real_slide_index(presentation, slide_id)
-            if real_slide_index is None:
-                self._set_validation_failure(state, f"无法找到ID为 {slide_id} 的幻灯片索引", ["检查幻灯片ID是否正确"])
-                return
-            
-            # 5. 迭代优化循环
-            while has_issues and iteration_count < max_iterations:
-                iteration_count += 1
-                logger.info(f"开始第 {iteration_count} 次幻灯片优化迭代")
-                
-                # 5.1 渲染幻灯片为图片
-                image_path = await self._render_slide_to_image(state, presentation, real_slide_index)
-                if not image_path:
-                    break
-                
-                # 更新幻灯片图片路径
-                current_slide["image_path"] = image_path
-                
-                # 5.2 使用多模态模型分析幻灯片
-                analysis = await self._analyze_with_vision_model(
-                    image_path=image_path, 
-                    slide_elements=slide_elements,
-                    current_section=current_section
-                )
-                
-                # 检查是否有问题需要修复
-                has_issues = analysis.get("has_issues", False)
-                if not has_issues:
-                    logger.info(f"第 {iteration_count} 次分析未发现问题，优化完成")
-                    break
-                
-                # 5.3 获取修改操作列表
-                fix_operations = analysis.get("operations", [])
-                if not fix_operations:
-                    logger.warning(f"第 {iteration_count} 次分析发现问题，但未提供修复操作")
-                    break
-                
-                # 5.4 执行修复操作
-                logger.info(f"执行第 {iteration_count} 次修复操作，共 {len(fix_operations)} 项")
-                success = await self._execute_operations(presentation, slide_id, fix_operations)
-                
-                if success:
-                    # 合并操作记录
-                    current_slide["operations"] = operations + fix_operations
-                    operations = current_slide["operations"]
-                    logger.info(f"第 {iteration_count} 次修复操作执行成功")
-                else:
-                    logger.warning(f"第 {iteration_count} 次修复操作执行失败")
-                    break
-            
-            # 6. 记录最终验证结果
-            state.validation_attempts += iteration_count
-            state.validation_result = not has_issues
-            
-            if has_issues and iteration_count >= max_iterations:
-                logger.warning(f"已达到最大迭代次数 {max_iterations}，强制通过验证")
-                state.validation_result = True
-                analysis.setdefault("issues", []).append(f"经过 {iteration_count} 次修改尝试，仍有未解决的问题")
-            
-            # 7. 更新验证结果
-            self._update_validation_result(state, analysis)
-            
-        except Exception as e:
-            error_msg = f"幻灯片验证失败: {str(e)}"
-            logger.error(error_msg)
-            logger.exception(e)
-            self._set_validation_failure(state, "验证过程出错", ["检查日志并修复错误"])
+            logger.exception(f"规划幻灯片操作时出错: {str(e)}")
     
     async def _analyze_with_vision_model(self, image_path: str, slide_elements: List[Dict[str, Any]], 
                                         current_section: Dict[str, Any]) -> Dict[str, Any]:
@@ -779,145 +622,202 @@ class SlideGeneratorAgent(BaseAgent):
                 "suggestions": ["检查日志并修复错误"]
             }
     
-    def _parse_vision_response(self, response: str) -> Dict[str, Any]:
+    async def _validate_slide(self, state: AgentState, presentation: Any) -> None:
         """
-        解析视觉模型响应
+        验证生成的幻灯片质量，并根据多模态模型分析结果进行迭代优化
         
         Args:
-            response: 视觉模型响应文本
-            
-        Returns:
-            解析后的结果字典
+            state: 当前状态
+            presentation: PPT演示文稿对象
         """
+        logger.info("开始验证生成的幻灯片")
+        
+        # 1. 检查前置条件
+        if not self._check_validation_prerequisites(state):
+            return
+        
         try:
-            # 提取JSON部分
-            json_text = self._extract_json_from_response(response)
+            # 2. 准备验证所需参数
+            current_slide = state.current_slide
+            slide_id = current_slide.get("slide_id")
+            operations = current_slide.get("operations", [])
+            current_section = state.content_plan[state.current_section_index]
             
-            # 解析JSON
-            result = json.loads(json_text)
+            # 初始化验证尝试次数
+            if not hasattr(state, "validation_attempts") or state.validation_attempts is None:
+                state.validation_attempts = 0
             
-            # 确保结果有必要的字段
-            if not isinstance(result, dict):
-                raise ValueError("响应不是有效的JSON对象")
+            # 最大迭代次数
+            max_iterations = 3
+            has_issues = True
+            iteration_count = 0
             
-            # 添加默认字段
-            return self._ensure_default_fields(result)
+            # 3. 获取幻灯片详细信息，供多模态模型分析
+            slide_elements = self.ppt_manager.get_slide_json_by_id(
+                presentation=presentation,
+                slide_id=slide_id            
+            )
+            
+            # 4. 验证幻灯片索引
+            real_slide_index = self._get_real_slide_index(presentation, slide_id)
+            if real_slide_index is None:
+                self._set_validation_failure(state, f"无法找到ID为 {slide_id} 的幻灯片索引", ["检查幻灯片ID是否正确"])
+                return
+            
+            # 5. 迭代优化循环
+            while has_issues and iteration_count < max_iterations:
+                iteration_count += 1
+                logger.info(f"开始第 {iteration_count} 次幻灯片优化迭代")
+                
+                # 5.1 渲染幻灯片为图片
+                image_path = await self._render_slide_to_image(state, presentation, real_slide_index)
+                if not image_path:
+                    break
+                
+                # 更新幻灯片图片路径
+                current_slide["image_path"] = image_path
+                
+                # 5.2 使用多模态模型分析幻灯片
+                analysis = await self._analyze_with_vision_model(
+                    image_path=image_path, 
+                    slide_elements=slide_elements,
+                    current_section=current_section
+                )
+                
+                # 检查是否有问题需要修复
+                has_issues = analysis.get("has_issues", False)
+                if not has_issues:
+                    logger.info(f"第 {iteration_count} 次分析未发现问题，优化完成")
+                    break
+                
+                # 5.3 获取修改操作列表
+                fix_operations = analysis.get("operations", [])
+                if not fix_operations:
+                    logger.warning(f"第 {iteration_count} 次分析发现问题，但未提供修复操作")
+                    break
+                
+                # 5.4 执行修复操作
+                logger.info(f"执行第 {iteration_count} 次修复操作，共 {len(fix_operations)} 项")
+                success = await self._execute_operations(presentation, slide_id, fix_operations)
+                
+                if success:
+                    # 合并操作记录
+                    current_slide["operations"] = operations + fix_operations
+                    operations = current_slide["operations"]
+                    logger.info(f"第 {iteration_count} 次修复操作执行成功")
+                else:
+                    logger.warning(f"第 {iteration_count} 次修复操作执行失败")
+                    break
+            
+            # 6. 记录最终验证结果
+            state.validation_attempts += iteration_count
+            state.validation_result = not has_issues
+            
+            if has_issues and iteration_count >= max_iterations:
+                logger.warning(f"已达到最大迭代次数 {max_iterations}，强制通过验证")
+                state.validation_result = True
+                analysis.setdefault("issues", []).append(f"经过 {iteration_count} 次修改尝试，仍有未解决的问题")
+            
+            # 7. 更新验证结果
+            self._update_validation_result(state, analysis)
             
         except Exception as e:
-            logger.error(f"解析视觉模型响应时出错: {str(e)}")
-            return {
-                "has_issues": True,
-                "issues": ["解析响应失败"],
-                "suggestions": ["尝试重新生成"]
-            }
+            error_msg = f"幻灯片验证失败: {str(e)}"
+            logger.error(error_msg)
+            logger.exception(e)
+            self._set_validation_failure(state, "验证过程出错", ["检查日志并修复错误"])
     
-    def _extract_json_from_response(self, response: str) -> str:
+    async def _execute_operations(self, presentation: Any, slide_id: str, operations: List[Dict[str, Any]]) -> bool:
         """
-        从响应中提取JSON文本
+        执行幻灯片操作指令
         
         Args:
-            response: 响应文本
-            
-        Returns:
-            JSON文本
-        """
-        # 尝试直接解析JSON响应
-        json_text = response
-        
-        # 如果响应包含JSON代码块，提取它
-        if "```json" in response:
-            pattern = r"```(?:json)?\s*([\s\S]*?)```"
-            matches = re.findall(pattern, response)
-            if matches:
-                json_text = matches[0]
-                
-        return json_text
-    
-    def _ensure_default_fields(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        确保结果字典包含所需的默认字段
-        
-        Args:
-            result: 结果字典
-            
-        Returns:
-            包含默认字段的结果字典
-        """
-        result.setdefault("has_issues", False)
-        result.setdefault("issues", [])
-        result.setdefault("suggestions", [])
-        return result
-    
-    def _check_validation_prerequisites(self, state: AgentState) -> bool:
-        """
-        检查验证前置条件
-        
-        Args:
-            state: 当前状态
-            
-        Returns:
-            是否满足前置条件
-        """
-        if not hasattr(state, "current_slide") or not state.current_slide:
-            logger.error("没有当前幻灯片可供验证")
-            state.validation_result = False
-            state.validation_issues = ["缺少幻灯片数据"]
-            state.validation_suggestions = ["重新生成幻灯片"]
-            return False
-            
-        if not hasattr(state, "content_plan") or not state.content_plan:
-            logger.error("没有内容计划可供验证")
-            state.validation_result = False
-            state.validation_issues = ["缺少内容计划"]
-            state.validation_suggestions = ["重新生成内容计划"]
-            return False
-            
-        return True
-    
-    def _set_validation_failure(self, state: AgentState, issue: str, suggestions: List[str]) -> None:
-        """
-        设置验证失败状态
-        
-        Args:
-            state: 当前状态
-            issue:
-            suggestions:
-        """
-        state.validation_result = False
-        state.validation_issues = [issue]
-        state.validation_suggestions = suggestions
-    
-    async def _get_real_slide_index(self, presentation: Any, slide_id: str) -> Optional[int]:
-        """
-        获取幻灯片的实际索引
-        
-        Args:
-            presentation: 演示文稿对象
+            presentation: PPT演示文稿对象
             slide_id: 幻灯片ID
+            operations: 操作指令列表
             
         Returns:
-            幻灯片的实际索引，失败返回None
+            是否成功执行所有操作
         """
-        # 获取幻灯片索引
-        slide_index = self._get_slide_index_by_id(presentation, slide_id)
-        if slide_index is None:
-            logger.error(f"无法找到ID为 {slide_id} 的幻灯片")
-            return None
-            
-        # 修正：使用实际索引而不是slide_index值
-        real_slide_index = None
-        for i, slide in enumerate(presentation.slides):
-            if hasattr(slide, 'slide_id') and slide.slide_id == slide_id:
-                real_slide_index = i
-                break
+        if not operations:
+            logger.warning("没有操作指令可执行")
+            return False
+        
+        success_count = 0
+        total_count = len(operations)
+        
+        for operation in operations:
+            if not self._validate_operation(operation):
+                continue
                 
-        if real_slide_index is None:
-            logger.error(f"无法找到ID为 {slide_id} 的幻灯片实际索引")
-            return None
+            try:
+                # 执行操作
+                result = await self._execute_single_operation(presentation, slide_id, operation)
+                
+                if result.get("success"):
+                    success_count += 1
+                    logger.info(f"成功执行操作 {operation.get('operation')} 于元素 {operation.get('element_id')}")
+                else:
+                    logger.warning(f"执行操作 {operation.get('operation')} 失败: {result.get('message')}")
             
-        logger.info(f"找到幻灯片索引: {real_slide_index}")
-        return real_slide_index
+            except Exception as e:
+                logger.warning(f"执行操作时出错: {str(e)}")
+        
+        # 计算成功率
+        success_rate = success_count / total_count if total_count > 0 else 0
+        logger.info(f"操作执行完成，成功率: {success_rate:.2%} ({success_count}/{total_count})")
+        
+        # 如果有任何操作成功应用，就认为整体成功
+        return success_count > 0
     
+    async def _execute_single_operation(self, presentation: Any, slide_id: str, operation: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        执行单个操作
+        
+        Args:
+            presentation: PPT演示文稿对象
+            slide_id: 幻灯片ID
+            operation: 操作指令
+            
+        Returns:
+            操作结果
+        """
+        element_id = operation.get("element_id")
+        operation_type = operation.get("operation", "replace_text")
+        content = operation.get("content")
+        
+        # 根据操作类型执行不同的操作
+        if operation_type == "replace_text":
+            # 文本替换操作
+            return await self._replace_text(presentation, slide_id, element_id, content)
+        elif operation_type == "adjust_font_size":
+            # 调整字体大小
+            return self.ppt_manager.adjust_text_font_size(
+                presentation=presentation,
+                slide_id=slide_id,
+                element_id=element_id,
+                font_size=int(content)
+            )
+        elif operation_type == "replace_image":
+            # 替换图片
+            return self.ppt_manager.replace_image_by_element_id(
+                presentation=presentation,
+                slide_id=slide_id,
+                element_id=element_id,
+                image_path=content
+            )
+        elif operation_type == "add_image_caption":
+            # 添加图片说明
+            return self.ppt_manager.add_image_caption(
+                presentation=presentation,
+                slide_id=slide_id,
+                element_id=element_id,
+                caption=content
+            )
+        else:
+            logger.warning(f"未知的操作类型: {operation_type}")
+            return {"success": False, "message": f"未知的操作类型: {operation_type}"}
+        
     async def _render_slide_to_image(self, state: AgentState, presentation: Any, slide_index: int) -> Optional[str]:
         """
         渲染幻灯片为图片
@@ -966,35 +866,76 @@ class SlideGeneratorAgent(BaseAgent):
                 logger.info(f"删除临时PPTX文件: {temp_pptx_path}")
                 temp_pptx_path.unlink()
     
-    def _update_validation_result(self, state: AgentState, analysis: Dict[str, Any]) -> None:
+    async def _duplicate_template_slide(self, presentation: Any, current_section: Dict[str, Any]) -> str:
         """
-        更新验证结果
+        找到并复制模板幻灯片
         
         Args:
-            state: 当前状态
-            analysis: 分析结果
-        """
-        # 获取分析结果
-        issues = analysis.get("issues", [])
-        suggestions = analysis.get("suggestions", [])
-        quality_score = analysis.get("quality_score", 0)
-        
-        # 更新状态
-        state.validation_issues = issues
-        state.validation_suggestions = suggestions
-        
-        # 记录质量分数
-        if not hasattr(state, "quality_scores"):
-            state.quality_scores = []
-        state.quality_scores.append(quality_score)
-        
-        # 记录验证信息
-        if state.validation_result:
-            logger.info(f"幻灯片验证通过，质量评分: {quality_score}/10")
-        else:
-            logger.warning(f"幻灯片验证不通过，质量评分: {quality_score}/10")
-            logger.warning(f"问题: {issues}")
-            logger.info(f"修复建议: {suggestions}")
+            presentation: 演示文稿对象
+            current_section: 当前章节内容
             
-        # 记录验证次数
-        logger.info(f"总验证尝试次数: {state.validation_attempts}") 
+        Returns:
+            新幻灯片的ID
+        """
+        # 获取PPT的JSON结构并找到模板幻灯片ID
+        ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
+        template_info = current_section.get("template", {})
+        slide_id = self._get_template_slide_id(template_info, ppt_json)
+        
+        # 复制模板幻灯片
+        logger.info(f"复制模板幻灯片ID: {slide_id}")
+        duplicate_result = self.ppt_manager.duplicate_slide_by_id(
+            presentation=presentation,
+            slide_id=slide_id
+        )
+        
+        # 获取新幻灯片信息并可能更新presentation
+        new_slide_id = duplicate_result["slide_id"]
+        
+        # # 如果PPT管理器返回了更新后的presentation对象，我们应该使用它
+        if "presentation" in duplicate_result:
+            # 更新传入的presentation对象（通过引用）
+            # 注意：由于Python的参数传递特性，这不会影响原始的presentation对象引用
+            # 我们需要在调用方更新引用
+            presentation = duplicate_result["presentation"]
+        
+        return new_slide_id, presentation
+    
+    async def _replace_text(self, presentation: Any, slide_id: str, element_id: str, content: Any) -> Dict[str, Any]:
+        """
+        替换文本内容
+        
+        Args:
+            presentation: PPT演示文稿对象
+            slide_id: 幻灯片ID
+            element_id: 元素ID
+            content: 文本内容，可以是字符串或列表
+            
+        Returns:
+            操作结果
+        """
+        # 处理不同类型的内容
+        if isinstance(content, list):
+            # 列表内容（如项目符号）
+            formatted_content = ""
+            for item in content:
+                if item and item.strip():
+                    formatted_content += f"• {item.strip()}\n"
+            
+            if formatted_content:
+                return self.ppt_manager.edit_text_element_by_id(
+                    presentation=presentation,
+                    slide_id=slide_id,
+                    element_id=element_id,
+                    new_text=formatted_content.strip()
+                )
+        else:
+            # 字符串内容
+            return self.ppt_manager.edit_text_element_by_id(
+                presentation=presentation,
+                slide_id=slide_id,
+                element_id=element_id,
+                new_text=str(content).strip()
+            )
+        
+        return {"success": False, "message": "无有效内容可替换"}
