@@ -59,6 +59,9 @@ class Settings:
         # 工作流配置
         self.WORKFLOW_CONFIG_DIR = self.CONFIG_DIR / "workflow"
         
+        # 幻灯片生成配置
+        self.MAX_SLIDE_ITERATIONS = int(os.environ.get("MAX_SLIDE_ITERATIONS", "1"))
+        
         logger.info(f"加载系统配置，项目根目录: {self.BASE_DIR}")
     
     def get_workflow_config_path(self, workflow_name: str) -> Path:

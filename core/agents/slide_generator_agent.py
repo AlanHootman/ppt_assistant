@@ -67,6 +67,10 @@ class SlideGeneratorAgent(BaseAgent):
         self.temperature = model_config.get("temperature", 0.7)
         self.max_tokens = model_config.get("max_tokens", 4000)
         
+        # 获取迭代优化相关配置
+        from config.settings import settings
+        self.max_iterations = config.get("max_iterations", settings.MAX_SLIDE_ITERATIONS)
+        
         # 初始化PPTManager
         try:
             from interfaces.ppt_api import PPTManager
@@ -76,7 +80,7 @@ class SlideGeneratorAgent(BaseAgent):
             logger.error(f"无法导入PPTManager: {str(e)}")
             self.ppt_manager = None
         
-        logger.info(f"初始化SlideGeneratorAgent，使用模型: {self.llm_model}")
+        logger.info(f"初始化SlideGeneratorAgent，使用模型: {self.llm_model}, 最大迭代次数: {self.max_iterations}")
     
     async def run(self, state: AgentState) -> AgentState:
         """
@@ -647,8 +651,6 @@ class SlideGeneratorAgent(BaseAgent):
             if not hasattr(state, "validation_attempts") or state.validation_attempts is None:
                 state.validation_attempts = 0
             
-            # 最大迭代次数
-            max_iterations = 3
             has_issues = True
             iteration_count = 0
             
@@ -665,7 +667,7 @@ class SlideGeneratorAgent(BaseAgent):
                 return
             
             # 5. 迭代优化循环
-            while has_issues and iteration_count < max_iterations:
+            while has_issues and iteration_count < self.max_iterations:
                 iteration_count += 1
                 logger.info(f"开始第 {iteration_count} 次幻灯片优化迭代")
                 
@@ -713,8 +715,8 @@ class SlideGeneratorAgent(BaseAgent):
             state.validation_attempts += iteration_count
             state.validation_result = not has_issues
             
-            if has_issues and iteration_count >= max_iterations:
-                logger.warning(f"已达到最大迭代次数 {max_iterations}，强制通过验证")
+            if has_issues and iteration_count >= self.max_iterations:
+                logger.warning(f"已达到最大迭代次数 {self.max_iterations}，强制通过验证")
                 state.validation_result = True
                 analysis.setdefault("issues", []).append(f"经过 {iteration_count} 次修改尝试，仍有未解决的问题")
             
