@@ -18,6 +18,7 @@ import enum
 from pathlib import Path
 import uuid
 import tempfile
+from config.settings import settings
 
 from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
@@ -68,7 +69,6 @@ class SlideGeneratorAgent(BaseAgent):
         self.max_tokens = model_config.get("max_tokens", 4000)
         
         # 获取迭代优化相关配置
-        from config.settings import settings
         self.max_iterations = config.get("max_iterations", settings.MAX_SLIDE_ITERATIONS)
         
         # 初始化PPTManager
