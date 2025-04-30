@@ -96,40 +96,62 @@ LLM_PPT_ELEMENT_MATCHING_PROMPT = """你是专业的PPT生成AI助手，我需�
 
 只返回JSON格式的操作指令，不要包含其他解释。"""
 
-SLIDE_FIX_OPERATIONS_PROMPT = """你是一位PPT修复专家。幻灯片验证过程发现了一些问题，需要你提供修复操作。
 
-## 幻灯片信息
+SLIDE_SELF_VALIDATION_PROMPT = """你是一位专业PPT质量检查与修改专家。请分析提供的幻灯片截图，并评估其质量与内容。
+
+## 章节内容信息
 ```json
-{{ slide_json }}
+{{ section_json }}
 ```
 
-## 原始操作
+## 幻灯片元素信息
 ```json
-{{ original_operations }}
+{{ slide_elements_json }}
 ```
 
-## 验证问题
-```json
-{{ issues }}
-```
+请仔细分析幻灯片，重点检查以下方面:
+1. 文本溢出或截断：文本是否超出了文本框边界
+2. 布局平衡：元素分布是否合理，整体布局是否平衡
+3. 可读性：字体大小是否适合，文本是否清晰可读
+4. 颜色对比度：文本与背景的对比度是否足够
+5. 内容密度：幻灯片内容是否过于拥挤
+6. 视觉吸引力：整体设计是否美观，吸引人
+7. 内容与章节主题的匹配度：内容是否符合当前章节的主题
+8. 图片与文本的协调性：图片是否与相关文本内容协调(如果有图片)
 
-## 修复建议
-```json
-{{ suggestions }}
-```
+请以JSON格式回答，包含以下字段：
+1. has_issues: 布尔值，表示是否存在问题
+2. issues: 问题列表
+3. suggestions: 改进建议列表(如果有问题)
+4. operations: 具体修改操作列表，每个操作包含以下字段：
+   - element_id: 需要修改的元素ID
+   - operation: 操作类型(replace_text/adjust_font_size/replace_image/add_image_caption)
+   - content: 新的内容或参数值
+   - reason: 修改原因
+5. quality_score: 1-10分的质量评分
 
-请提供修复操作指令，指出要修改哪些元素以及如何修改。格式如下：
+输出示例:
 ```json
 {
+  "has_issues": true,
+  "issues": ["文本在右下角溢出", "标题与内容颜色对比度不足"],
+  "suggestions": ["缩短右下角文本或减小字号", "将标题颜色加深以增加对比度"],
   "operations": [
     {
-      "element_id": "元素ID",
-      "operation": "replace_text/adjust_font_size/replace_image/add_image_caption",
-      "content": "新内容或数值",
-      "reason": "修复原因"
+      "element_id": "text_box_3",
+      "operation": "replace_text",
+      "content": "简化后的内容",
+      "reason": "原文本过长导致溢出"
+    },
+    {
+      "element_id": "title_1",
+      "operation": "adjust_font_size",
+      "content": 28,
+      "reason": "增大字号提高可读性"
     }
-  ]
+  ],
+  "quality_score": 6
 }
 ```
 
-只返回JSON数据，不要包含其他解释。""" 
+请仅返回JSON格式结果，不要包含其他解释。""" 

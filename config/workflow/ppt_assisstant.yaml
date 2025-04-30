@@ -26,11 +26,6 @@ workflow:
       config:
         model_type: vision  # 对应环境变量VISION_MODEL
         
-    - name: slide_validator
-      agent: SlideValidatorAgent
-      config:
-        model_type: vision  # 对应环境变量VISION_MODEL
-        
     - name: ppt_finalizer
       agent: PPTFinalizerAgent
   
@@ -45,8 +40,6 @@ workflow:
     - from: content_planner
       to: slide_generator
     - from: slide_generator
-      to: slide_validator
-    - from: slide_validator
       to: next_slide_or_end
       condition:
         pass: next_slide_or_end

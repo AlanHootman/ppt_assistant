@@ -96,7 +96,8 @@ class WorkflowEngine:
         # 添加节点
         for node_config in nodes:
             node_name = node_config.get("name")
-            if node_name:
+            # 跳过slide_validator节点，因为它的功能已合并到slide_generator
+            if node_name and node_name != "slide_validator":
                 # 当前使用占位节点，稍后会被真实Agent替换
                 workflow.add_node(node_name, self._placeholder_node(node_name))
                 logger.debug(f"添加节点: {node_name}")
@@ -382,8 +383,6 @@ class WorkflowEngine:
                     await self._execute_content_planner(state)
                 elif node_name == "slide_generator":
                     await self._execute_slide_generator(state)
-                elif node_name == "slide_validator":
-                    await self._execute_slide_validator(state)
                 elif node_name == "ppt_finalizer":
                     await self._execute_ppt_finalizer(state)
                 elif node_name == "next_slide_or_end":
@@ -501,16 +500,13 @@ class WorkflowEngine:
             
             # 循环生成幻灯片，直到所有内容处理完毕
             while state.has_more_content:
-                # 4. 执行幻灯片生成
+                # 4. 执行幻灯片生成 (已包含验证功能)
                 await self._execute_and_validate_node("slide_generator", state)
                 
-                # 5. 执行验证节点
-                # await self._execute_and_validate_node("slide_validator", state)
-                
-                # 6. 检查是否还有更多内容
+                # 5. 检查是否还有更多内容
                 await self._execute_and_validate_node("next_slide_or_end", state)
             
-            # 7. 完成PPT生成
+            # 6. 完成PPT生成
             await self._execute_and_validate_node("ppt_finalizer", state)
             
             # 保存最终状态
@@ -590,7 +586,7 @@ class WorkflowEngine:
     
     async def _execute_slide_generator(self, state: AgentState) -> None:
         """
-        使用真实的SlideGeneratorAgent生成幻灯片
+        使用真实的SlideGeneratorAgent生成幻灯片，包含自验证功能
         
         Args:
             state: 代理状态
@@ -626,12 +622,11 @@ class WorkflowEngine:
                 logger.error(f"错误详情: {traceback.format_exc()}")
                 state.record_failure(f"执行SlideGeneratorAgent失败: {str(agent_error)}")
                 
-            
         except Exception as e:
             logger.error(f"初始化或执行SlideGeneratorAgent失败: {str(e)}")
             logger.error(f"错误详情: {traceback.format_exc()}")
             state.record_failure(f"执行SlideGeneratorAgent失败: {str(e)}")
-            
+    
     async def _execute_next_slide_or_end(self, state: AgentState) -> None:
         """
         检查是否还有更多内容需要处理，更新状态
@@ -677,12 +672,12 @@ class WorkflowEngine:
                     state.generated_slides.append(state.current_slide)
                 
                 logger.info(f"添加已验证的幻灯片到生成列表: {slide_id}")
-            
-            # 更新章节索引
-            if state.current_section_index is None:
-                state.current_section_index = 0
-            else:
-                state.current_section_index += 1
+                
+                # 更新章节索引
+                if state.current_section_index is None:
+                    state.current_section_index = 0
+                else:
+                    state.current_section_index += 1
             
             # 检查是否还有更多内容
             state.has_more_content = (state.current_section_index < total_slides)
@@ -812,67 +807,67 @@ class WorkflowEngine:
             state.record_failure(error_msg)
             raise 
 
-    async def _execute_slide_validator(self, state: AgentState) -> None:
-        """
-        执行幻灯片验证
+    # async def _execute_slide_validator(self, state: AgentState) -> None:
+    #     """
+    #     执行幻灯片验证
         
-        Args:
-            state: 当前状态
-        """
-        try:
-            logger.info("执行真实的SlideValidatorAgent处理")
+    #     Args:
+    #         state: 当前状态
+    #     """
+    #     try:
+    #         logger.info("执行真实的SlideValidatorAgent处理")
             
-            # 从配置中获取slide_validator节点的配置
-            node_config = None
-            for node in self.config.get("workflow", {}).get("nodes", []):
-                if node.get("name") == "slide_validator":
-                    node_config = node.get("config", {})
-                    break
+    #         # 从配置中获取slide_validator节点的配置
+    #         node_config = None
+    #         for node in self.config.get("workflow", {}).get("nodes", []):
+    #             if node.get("name") == "slide_validator":
+    #                 node_config = node.get("config", {})
+    #                 break
             
-            if not node_config:
-                node_config = {"model_type": "vision", "max_retries": "3"}
-                logger.warning("未找到slide_validator节点配置，使用默认配置")
+    #         if not node_config:
+    #             node_config = {"model_type": "vision", "max_retries": "3"}
+    #             logger.warning("未找到slide_validator节点配置，使用默认配置")
             
-            # 创建SlideValidatorAgent实例
-            from core.agents.slide_validator_agent import SlideValidatorAgent
-            slide_validator_agent = SlideValidatorAgent(node_config)
+    #         # 创建SlideValidatorAgent实例
+    #         from core.agents.slide_validator_agent import SlideValidatorAgent
+    #         slide_validator_agent = SlideValidatorAgent(node_config)
             
-            # 执行幻灯片验证
-            try:
-                updated_state = await slide_validator_agent.run(state)
+    #         # 执行幻灯片验证
+    #         try:
+    #             updated_state = await slide_validator_agent.run(state)
                 
-                # 更新状态的关键属性
-                state.validation_result = updated_state.validation_result
-                if hasattr(updated_state, 'validation_issues'):
-                    state.validation_issues = updated_state.validation_issues
-                if hasattr(updated_state, 'validation_suggestions'):
-                    state.validation_suggestions = updated_state.validation_suggestions
-                if hasattr(updated_state, 'current_section_index'):
-                    state.current_section_index = updated_state.current_section_index
-                if hasattr(updated_state, 'has_more_content'):
-                    state.has_more_content = updated_state.has_more_content
-                if hasattr(updated_state, 'generated_slides'):
-                    state.generated_slides = updated_state.generated_slides
-                if hasattr(updated_state, 'current_slide') and updated_state.current_slide:
-                    state.current_slide = updated_state.current_slide
+    #             # 更新状态的关键属性
+    #             state.validation_result = updated_state.validation_result
+    #             if hasattr(updated_state, 'validation_issues'):
+    #                 state.validation_issues = updated_state.validation_issues
+    #             if hasattr(updated_state, 'validation_suggestions'):
+    #                 state.validation_suggestions = updated_state.validation_suggestions
+    #             if hasattr(updated_state, 'current_section_index'):
+    #                 state.current_section_index = updated_state.current_section_index
+    #             if hasattr(updated_state, 'has_more_content'):
+    #                 state.has_more_content = updated_state.has_more_content
+    #             if hasattr(updated_state, 'generated_slides'):
+    #                 state.generated_slides = updated_state.generated_slides
+    #             if hasattr(updated_state, 'current_slide') and updated_state.current_slide:
+    #                 state.current_slide = updated_state.current_slide
                 
-                logger.info(f"SlideValidatorAgent执行完成，验证结果: {state.validation_result}")
+    #             logger.info(f"SlideValidatorAgent执行完成，验证结果: {state.validation_result}")
                 
-            except Exception as agent_error:
-                logger.error(f"SlideValidatorAgent执行出错: {str(agent_error)}")
-                logger.error(f"错误详情: {traceback.format_exc()}")
-                state.record_failure(f"执行SlideValidatorAgent失败: {str(agent_error)}")
-                # 设置默认的验证结果，确保工作流不会中断
-                state.validation_result = False
-                state.validation_issues = [str(agent_error)]
-                state.validation_suggestions = ["检查验证器错误日志并修复问题"]
+    #         except Exception as agent_error:
+    #             logger.error(f"SlideValidatorAgent执行出错: {str(agent_error)}")
+    #             logger.error(f"错误详情: {traceback.format_exc()}")
+    #             state.record_failure(f"执行SlideValidatorAgent失败: {str(agent_error)}")
+    #             # 设置默认的验证结果，确保工作流不会中断
+    #             state.validation_result = False
+    #             state.validation_issues = [str(agent_error)]
+    #             state.validation_suggestions = ["检查验证器错误日志并修复问题"]
             
-        except Exception as e:
-            error_msg = f"初始化或执行SlideValidatorAgent失败: {str(e)}"
-            logger.error(error_msg)
-            logger.error(f"错误详情: {traceback.format_exc()}")
-            state.record_failure(error_msg)
-            # 设置默认的验证结果，确保工作流不会中断
-            state.validation_result = False
-            state.validation_issues = [str(e)]
-            state.validation_suggestions = ["检查验证器错误日志并修复问题"] 
+    #     except Exception as e:
+    #         error_msg = f"初始化或执行SlideValidatorAgent失败: {str(e)}"
+    #         logger.error(error_msg)
+    #         logger.error(f"错误详情: {traceback.format_exc()}")
+    #         state.record_failure(error_msg)
+    #         # 设置默认的验证结果，确保工作流不会中断
+    #         state.validation_result = False
+    #         state.validation_issues = [str(e)]
+    #         state.validation_suggestions = ["检查验证器错误日志并修复问题"] 
