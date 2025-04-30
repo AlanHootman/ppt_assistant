@@ -127,41 +127,56 @@ class WorkflowMocks:
     @staticmethod
     def mock_markdown_parser(state: AgentState) -> None:
         """模拟Markdown解析实现 - 仅作为备用方法保留"""
-        try:
-            lines = state.raw_md.split("\n")
-            structure = {"title": "", "sections": []}
+        raw_md = getattr(state, 'raw_md', '')
+        logger.info(f"[模拟] 解析Markdown文本，长度: {len(raw_md) if raw_md else 0}")
+        
+        # 解析标题和子标题
+        title = "示例PPT"
+        subtitle = "自动生成"
+        
+        if raw_md:
+            lines = raw_md.split("\n")
+            if lines and lines[0].startswith("# "):
+                title = lines[0].replace("# ", "").strip()
+                if len(lines) > 1 and lines[1].startswith("## "):
+                    subtitle = lines[1].replace("## ", "").strip()
+        
+        # 创建模拟的内容结构
+        state.content_structure = {
+            "title": title,
+            "subtitle": subtitle,
+            "sections": []
+        }
+        
+        # 解析章节内容
+        if raw_md:
+            current_section = None
+            current_content = []
             
-            # 先找标题
-            for line in lines:
-                if line.strip().startswith("# "):
-                    structure["title"] = line.strip()[2:]
-                    break
-            
-            # 再处理章节，使用索引而不是对象引用
-            current_section_index = -1  # -1表示没有当前章节
-            
-            for line in lines:
-                line = line.strip()
-                if not line:
-                    continue
-                    
+            for line in raw_md.split("\n"):
                 if line.startswith("## "):
-                    # 新章节
-                    section_title = line[3:]
-                    structure["sections"].append({
-                        "title": section_title,
-                        "content": []
-                    })
-                    current_section_index = len(structure["sections"]) - 1
-                elif line.startswith("- ") and current_section_index >= 0:
-                    # 安全地添加到当前章节的内容中
-                    structure["sections"][current_section_index]["content"].append(line[2:])
+                    # 如果有未完成的章节，保存它
+                    if current_section:
+                        state.content_structure["sections"].append({
+                            "title": current_section,
+                            "content": current_content
+                        })
+                    
+                    # 开始新章节
+                    current_section = line.replace("## ", "").strip()
+                    current_content = []
+                elif line.startswith("- ") and current_section:
+                    # 添加到当前章节内容
+                    current_content.append(line.replace("- ", "").strip())
             
-            state.content_structure = structure
-            logger.info(f"[模拟] Markdown解析完成，标题: {structure.get('title')}, {len(structure.get('sections', []))}个章节")
-        except Exception as e:
-            logger.error(f"[模拟] Markdown解析错误: {str(e)}")
-            state.record_failure(f"Markdown解析错误: {str(e)}")
+            # 保存最后一个章节
+            if current_section:
+                state.content_structure["sections"].append({
+                    "title": current_section,
+                    "content": current_content
+                })
+        
+        logger.info(f"[模拟] Markdown解析完成: 标题='{title}', {len(state.content_structure.get('sections', []))}个章节")
     
     @staticmethod
     def create_placeholder_node(node_name: str):
@@ -215,36 +230,32 @@ class WorkflowMocks:
     @staticmethod
     def execute_mock_node_logic(node_name: str, state: AgentState) -> None:
         """
-        执行模拟节点逻辑
+        根据节点名称执行相应的模拟逻辑
         
         Args:
             node_name: 节点名称
             state: 代理状态
         """
-        # PPT模板分析节点
-        if node_name == "ppt_analyzer" and state.ppt_template_path:
+        # 记录开始执行
+        logger.info(f"模拟执行节点: {node_name}")
+        
+        # 根据节点类型选择执行逻辑
+        if node_name == "markdown_parser":
+            WorkflowMocks.mock_markdown_parser(state)
+        elif node_name == "ppt_analyzer":
             WorkflowMocks.mock_ppt_analyzer(state)
-        
-        # 布局决策节点
-        elif node_name == "layout_decider" and state.content_structure and state.layout_features:
-            WorkflowMocks.mock_layout_decider(state)
-        
-        # PPT生成节点
-        elif node_name == "ppt_generator" and state.decision_result:
+        elif node_name == "content_planner":
+            WorkflowMocks.mock_content_planner(state)
+        elif node_name == "slide_generator":
+            # 执行合并后的幻灯片生成和验证功能
+            WorkflowMocks.mock_slide_generator_with_validation(state)
+        elif node_name == "next_slide_or_end":
+            WorkflowMocks.mock_next_slide_or_end(state)
+        elif node_name == "ppt_finalizer":
             WorkflowMocks.mock_ppt_generator(state)
-        
-        # 验证节点
-        elif node_name == "validator":
-            WorkflowMocks.mock_validator(state)
         else:
-            logger.warning(f"[模拟] 节点 {node_name} 条件不满足或未找到对应处理函数")
-            # 添加更多的诊断信息
-            if node_name == "ppt_analyzer":
-                logger.warning(f"[模拟] ppt_analyzer 需要 ppt_template_path，当前值: {state.ppt_template_path is not None}")
-            elif node_name == "layout_decider":
-                logger.warning(f"[模拟] layout_decider 需要 content_structure 和 layout_features，当前值: {state.content_structure is not None}, {state.layout_features is not None}")
-            elif node_name == "ppt_generator":
-                logger.warning(f"[模拟] ppt_generator 需要 decision_result，当前值: {state.decision_result is not None}")
+            logger.warning(f"未知节点类型: {node_name}，使用通用模拟执行")
+            state.add_checkpoint(f"{node_name}_executed")
 
     @staticmethod
     def mock_content_planner(state: AgentState) -> None:
@@ -276,91 +287,88 @@ class WorkflowMocks:
                 "theme": state.layout_features.get("theme", {})
             }
             
+            # 更新为新的内容规划格式
+            state.content_plan = content_plan
+            
             logger.info(f"内容规划完成，计划生成 {len(content_plan)} 张幻灯片")
         else:
             logger.warning("无法执行内容规划，缺少内容结构或布局特征")
             state.record_failure("内容规划失败：缺少必要数据")
 
     @staticmethod
-    def mock_slide_generator(state: AgentState) -> None:
-        """模拟幻灯片生成节点实现"""
-        logger.info(f"模拟执行幻灯片生成节点，章节索引: {state.current_section_index}")
+    def mock_slide_generator_with_validation(state: AgentState) -> None:
+        """模拟幻灯片生成和验证合并节点实现"""
+        logger.info(f"模拟执行幻灯片生成节点(包含验证)，章节索引: {state.current_section_index}")
         
-        if state.decision_result and "slides" in state.decision_result:
-            slides = state.decision_result.get("slides", [])
+        content_plan = getattr(state, 'content_plan', None)
+        if not content_plan and state.decision_result and "slides" in state.decision_result:
+            content_plan = state.decision_result.get("slides", [])
             
+        if content_plan:
             if state.current_section_index is None:
                 state.current_section_index = 0
             
-            if 0 <= state.current_section_index < len(slides):
-                current_slide_plan = slides[state.current_section_index]
+            if 0 <= state.current_section_index < len(content_plan):
+                current_slide_plan = content_plan[state.current_section_index]
                 
                 # 模拟生成幻灯片
                 state.current_slide = {
                     "slide_id": f"slide_{state.current_section_index}",
                     "content": current_slide_plan.get("section", {}),
                     "template": current_slide_plan.get("template", {}),
-                    "image_path": f"workspace/sessions/{state.session_id}/slide_{state.current_section_index}.png"
+                    "image_path": f"workspace/sessions/{state.session_id}/slide_{state.current_section_index}.png",
+                    "operations": [
+                        {"element_id": "title_1", "operation": "replace_text", "content": "模拟标题"},
+                        {"element_id": "content_1", "operation": "replace_text", "content": "模拟内容项"}
+                    ]
                 }
                 
-                logger.info(f"幻灯片生成完成: {state.current_slide.get('slide_id')}")
+                # 内置验证功能
+                if not hasattr(state, "validation_attempts") or state.validation_attempts is None:
+                    state.validation_attempts = 0
+                state.validation_attempts += 1
+                
+                # 设置验证结果(始终为通过，以保持工作流进行)
+                state.validation_result = True
+                
+                logger.info(f"幻灯片生成和验证完成: {state.current_slide.get('slide_id')}, 验证通过: {state.validation_result}")
             else:
                 logger.warning(f"无效的章节索引: {state.current_section_index}")
                 state.record_failure(f"幻灯片生成失败：无效的章节索引 {state.current_section_index}")
+                state.validation_result = False
         else:
-            logger.warning("无法生成幻灯片，缺少决策结果")
-            state.record_failure("幻灯片生成失败：缺少决策结果")
-
-    @staticmethod
-    def mock_slide_validator(state: AgentState) -> None:
-        """模拟幻灯片验证节点实现"""
-        logger.info("模拟执行幻灯片验证节点")
-        
-        if state.current_slide:
-            # 模拟验证结果（通常应该有更复杂的验证逻辑）
-            # 这里简单地验证为通过，但可以根据需要添加随机失败或其他条件
-            state.validation_result = True
-            
-            if not hasattr(state, "validation_attempts") or state.validation_attempts is None:
-                state.validation_attempts = 0
-            state.validation_attempts += 1
-            
-            # 验证通过时，将当前幻灯片添加到已生成列表
-            if state.validation_result:
-                if not hasattr(state, "generated_slides") or state.generated_slides is None:
-                    state.generated_slides = []
-                state.generated_slides.append(state.current_slide)
-                logger.info(f"幻灯片验证通过: {state.current_slide.get('slide_id')}")
-            else:
-                logger.warning(f"幻灯片验证不通过: {state.current_slide.get('slide_id')}")
-        else:
-            logger.warning("无法验证幻灯片，缺少当前幻灯片数据")
-            state.record_failure("幻灯片验证失败：缺少当前幻灯片数据")
+            logger.warning("无法生成幻灯片，缺少内容计划或决策结果")
+            state.record_failure("幻灯片生成失败：缺少内容计划或决策结果")
             state.validation_result = False
 
     @staticmethod
     def mock_next_slide_or_end(state: AgentState) -> None:
-        """模拟检查是否还有更多内容节点实现"""
-        logger.info("模拟执行下一张幻灯片或结束节点")
+        """模拟next_slide_or_end节点实现"""
+        logger.info("模拟执行下一页或结束判断节点")
         
-        # 更新索引到下一章节
-        if state.current_section_index is None:
-            state.current_section_index = 0
-        else:
-            state.current_section_index += 1
+        content_plan = getattr(state, 'content_plan', None)
+        if not content_plan and hasattr(state, 'decision_result'):
+            content_plan = state.decision_result.get('slides', [])
+        
+        total_slides = len(content_plan) if content_plan else 0
+        
+        # 当前幻灯片已验证通过，将其添加到已生成列表中
+        if hasattr(state, 'current_slide') and state.current_slide and getattr(state, 'validation_result', False):
+            if not hasattr(state, 'generated_slides') or state.generated_slides is None:
+                state.generated_slides = []
+            state.generated_slides.append(state.current_slide)
+            logger.info(f"添加幻灯片到生成列表: {state.current_slide.get('slide_id')}")
+            
+            # 更新章节索引
+            if state.current_section_index is None:
+                state.current_section_index = 0
+            else:
+                state.current_section_index += 1
         
         # 检查是否还有更多内容需要处理
-        if state.decision_result and "slides" in state.decision_result:
-            state.has_more_content = (state.current_section_index < 
-                                     len(state.decision_result.get("slides", [])))
-            
-            if state.has_more_content:
-                logger.info(f"继续处理下一章节: {state.current_section_index}")
-            else:
-                logger.info("所有章节处理完毕")
-        else:
-            logger.warning("无法确定是否有更多内容，缺少决策结果")
-            state.has_more_content = False
+        state.has_more_content = state.current_section_index < total_slides if total_slides > 0 else False
+        
+        logger.info(f"章节进度: {state.current_section_index}/{total_slides}, 还有更多内容: {state.has_more_content}")
 
     @staticmethod
     def mock_ppt_finalizer(state: AgentState) -> None:

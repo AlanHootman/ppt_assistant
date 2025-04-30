@@ -21,12 +21,12 @@ class TestMarkdownParser(unittest.TestCase):
     def setUp(self):
         """测试前的准备工作"""
         self.parser = MarkdownParser()
-        
+
     def test_empty_markdown(self):
-        """测试解析空的Markdown文本"""
+    """测试解析空的Markdown文本"""
         result = self.parser.parse("")
         self.assertEqual(result, {"title": "", "subtitle": "", "sections": []})
-        
+
     def test_document_title_and_subtitle(self):
         """测试解析文档标题和副标题"""
         markdown = """# 主标题
@@ -38,11 +38,11 @@ class TestMarkdownParser(unittest.TestCase):
         result = self.parser.parse(markdown)
         self.assertEqual(result["title"], "主标题")
         self.assertEqual(result["subtitle"], "副标题")
-        
+
     def test_section_parsing(self):
         """测试章节解析"""
         markdown = """# 文档标题
-
+    
 ## 第一章节
 章节内容
 
