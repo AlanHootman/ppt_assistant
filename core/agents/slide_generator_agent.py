@@ -472,17 +472,12 @@ class SlideGeneratorAgent(BaseAgent):
         current_section = state.content_plan[current_index]
         logger.info(f"处理章节 {current_index + 1}/{len(state.content_plan)}: {current_section.get('slide_type', '未知类型')}")
         
-        # 第一步：找到并复制模板幻灯片
-        new_slide_id, presentation = await self._duplicate_template_slide(presentation, current_section)
-        
-        # # 如果presentation已在_duplicate_template_slide中更新，我们需要从中获取最新的
-        # if hasattr(presentation, 'updated') and presentation.updated:
-        #     # presentation已在内部更新，无需额外操作
-        #     pass
+        # 第一步：找到目标幻灯片
+        slide_id, presentation = await self._find_template_slide(presentation, current_section)
         
         # 第二步：规划并执行幻灯片内容填充操作
         operations = await self._plan_and_execute_content_operations(
-            presentation, new_slide_id, current_section
+            presentation, slide_id, current_section
         )
         
         # 更新状态
@@ -495,7 +490,7 @@ class SlideGeneratorAgent(BaseAgent):
         # 更新当前幻灯片信息，供验证使用
         state.current_slide = {
             "section_index": current_index,
-            "slide_id": new_slide_id,
+            "slide_id": slide_id,
             "operations": operations
         }
     
@@ -868,40 +863,56 @@ class SlideGeneratorAgent(BaseAgent):
                 logger.info(f"删除临时PPTX文件: {temp_pptx_path}")
                 temp_pptx_path.unlink()
     
-    async def _duplicate_template_slide(self, presentation: Any, current_section: Dict[str, Any]) -> str:
+    async def _find_template_slide(self, presentation: Any, current_section: Dict[str, Any]) -> tuple:
         """
-        找到并复制模板幻灯片
+        找到模板幻灯片
         
         Args:
             presentation: 演示文稿对象
             current_section: 当前章节内容
             
         Returns:
-            新幻灯片的ID
+            tuple: (幻灯片ID, 更新后的演示文稿对象)
         """
         # 获取PPT的JSON结构并找到模板幻灯片ID
         ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
         template_info = current_section.get("template", {})
         slide_id = self._get_template_slide_id(template_info, ppt_json)
         
-        # 复制模板幻灯片
-        logger.info(f"复制模板幻灯片ID: {slide_id}")
-        duplicate_result = self.ppt_manager.duplicate_slide_by_id(
-            presentation=presentation,
-            slide_id=slide_id
-        )
+        # 初始化已编辑幻灯片ID记录（如果不存在）
+        if not hasattr(self, "_edited_slides"):
+            self._edited_slides = set()
         
-        # 获取新幻灯片信息并可能更新presentation
-        new_slide_id = duplicate_result["slide_id"]
-        
-        # # 如果PPT管理器返回了更新后的presentation对象，我们应该使用它
-        if "presentation" in duplicate_result:
-            # 更新传入的presentation对象（通过引用）
-            # 注意：由于Python的参数传递特性，这不会影响原始的presentation对象引用
-            # 我们需要在调用方更新引用
-            presentation = duplicate_result["presentation"]
-        
-        return new_slide_id, presentation
+        # 判断幻灯片是否已编辑过
+        if slide_id in self._edited_slides:
+            logger.info(f"幻灯片 {slide_id} 已被编辑过，创建新幻灯片")
+            
+            # 获取模板布局信息
+            layout_name = template_info.get("layout", "Title and Content")
+            
+            # 创建新幻灯片
+            result = self.ppt_manager.create_slide_with_layout(
+                presentation=presentation,
+                layout_name=layout_name
+            )
+            
+            if result.get("success", False):
+                # 获取新创建的幻灯片ID
+                new_slide_id = result.get("slide_id")
+                logger.info(f"成功创建新幻灯片，ID: {new_slide_id}")
+                # 返回可能更新的presentation对象
+                presentation = result.get("presentation", presentation)
+                return new_slide_id, presentation
+            else:
+                # 创建失败，仍使用原幻灯片
+                logger.warning(f"创建新幻灯片失败: {result.get('message')}，使用原幻灯片")
+                return slide_id, presentation
+        else:
+            # 将当前幻灯片ID添加到已编辑列表
+            self._edited_slides.add(slide_id)
+            logger.info(f"使用现有幻灯片，ID: {slide_id}")
+            
+            return slide_id, presentation
     
     async def _replace_text(self, presentation: Any, slide_id: str, element_id: str, content: Any) -> Dict[str, Any]:
         """

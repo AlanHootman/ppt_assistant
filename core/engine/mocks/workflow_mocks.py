@@ -160,7 +160,7 @@ class WorkflowMocks:
                         state.content_structure["sections"].append({
                             "title": current_section,
                             "content": current_content
-                        })
+                    })
                     
                     # 开始新章节
                     current_section = line.replace("## ", "").strip()
@@ -358,12 +358,12 @@ class WorkflowMocks:
                 state.generated_slides = []
             state.generated_slides.append(state.current_slide)
             logger.info(f"添加幻灯片到生成列表: {state.current_slide.get('slide_id')}")
-            
+        
             # 更新章节索引
-            if state.current_section_index is None:
-                state.current_section_index = 0
-            else:
-                state.current_section_index += 1
+        if state.current_section_index is None:
+            state.current_section_index = 0
+        else:
+            state.current_section_index += 1
         
         # 检查是否还有更多内容需要处理
         state.has_more_content = state.current_section_index < total_slides if total_slides > 0 else False
