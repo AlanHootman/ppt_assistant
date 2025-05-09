@@ -111,7 +111,7 @@ class PPTFinalizerAgent(BaseAgent):
             
         for slide_id in template_slide_ids:
             try:
-                result = self.ppt_manager.delete_slide_by_id(presentation, slide_id)
+                result = self.ppt_manager.delete_slide(presentation, slide_id)
                 if result.get("success"):
                     logger.info(f"已删除模板幻灯片: {slide_id}")
                 else:
@@ -174,7 +174,7 @@ class PPTFinalizerAgent(BaseAgent):
             # 删除未使用的幻灯片
             for slide_id in slides_to_delete:
                 try:
-                    result = self.ppt_manager.delete_slide_by_id(presentation, slide_id)
+                    result = self.ppt_manager.delete_slide(presentation, slide_id)
                     if result.get("success"):
                         logger.info(f"已删除未使用的幻灯片: {slide_id}")
                     else:
