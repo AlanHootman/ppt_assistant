@@ -247,65 +247,6 @@ class SlideGeneratorAgent(BaseAgent):
         # 如果template_info中没有slide_id和slideIndex，直接抛出异常
         raise ValueError("template_info中缺少slide_id或slideIndex，无法确定要使用的模板幻灯片")
     
-    def _get_real_slide_index(self, presentation: Any, slide_id: str) -> Optional[int]:
-        """
-        获取幻灯片的实际索引
-        
-        Args:
-            presentation: 演示文稿对象
-            slide_id: 幻灯片ID
-            
-        Returns:
-            幻灯片的实际索引，失败返回None
-        """
-        # 获取幻灯片索引
-        slide_index = self._get_slide_index_by_id(presentation, slide_id)
-        if slide_index is None:
-            logger.error(f"无法找到ID为 {slide_id} 的幻灯片")
-            return None
-            
-        # 修正：使用实际索引而不是slide_index值
-        real_slide_index = None
-        for i, slide in enumerate(presentation.slides):
-            if hasattr(slide, 'slide_id') and slide.slide_id == slide_id:
-                real_slide_index = i
-                break
-                
-        if real_slide_index is None:
-            logger.error(f"无法找到ID为 {slide_id} 的幻灯片实际索引")
-            return None
-            
-        logger.info(f"找到幻灯片索引: {real_slide_index}")
-        return real_slide_index
-    
-    def _get_slide_index_by_id(self, presentation: Any, slide_id: str) -> Optional[int]:
-        """
-        根据幻灯片ID获取索引
-        
-        Args:
-            presentation: PPT演示文稿对象
-            slide_id: 幻灯片ID
-            
-        Returns:
-            幻灯片索引，未找到时返回None
-        """
-        try:
-            # 获取所有幻灯片
-            ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
-            slides = ppt_json.get("slides", [])
-            
-            # 遍历查找匹配ID的幻灯片
-            for i, slide in enumerate(slides):
-                if slide.get("slide_id") == slide_id:
-                    return i
-            
-            logger.warning(f"未找到ID为 {slide_id} 的幻灯片")
-            return None
-            
-        except Exception as e:
-            logger.warning(f"获取幻灯片索引时出错: {str(e)}")
-            return None
-
     async def _get_operations_from_llm(self, context: Dict[str, str]) -> List[Dict[str, Any]]:
         """
         从LLM获取操作指令
@@ -473,11 +414,11 @@ class SlideGeneratorAgent(BaseAgent):
         logger.info(f"处理章节 {current_index + 1}/{len(state.content_plan)}: {current_section.get('slide_type', '未知类型')}")
         
         # 第一步：找到目标幻灯片
-        slide_id, presentation = await self._find_template_slide(presentation, current_section)
+        slide_index, presentation = await self._find_template_slide(presentation, current_section)
         
         # 第二步：规划并执行幻灯片内容填充操作
         operations = await self._plan_and_execute_content_operations(
-            presentation, slide_id, current_section
+            presentation, slide_index, current_section
         )
         
         # 更新状态
@@ -490,12 +431,12 @@ class SlideGeneratorAgent(BaseAgent):
         # 更新当前幻灯片信息，供验证使用
         state.current_slide = {
             "section_index": current_index,
-            "slide_id": slide_id,
+            "slide_index": slide_index,
             "operations": operations
         }
     
     async def _plan_and_execute_content_operations(
-        self, presentation: Any, slide_id: str, current_section: Dict[str, Any]
+        self, presentation: Any, slide_index: int, current_section: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """
         规划并执行幻灯片内容填充操作
@@ -509,9 +450,9 @@ class SlideGeneratorAgent(BaseAgent):
             执行的操作列表
         """
         # 获取新幻灯片的详细信息
-        slide_result = self.ppt_manager.get_slide_json_by_id(
+        slide_result = self.ppt_manager.get_slide_json(
             presentation=presentation,
-            slide_id=slide_id            
+            slide_index=slide_index            
         )
         
         # 使用LLM匹配内容到幻灯片元素
@@ -523,7 +464,7 @@ class SlideGeneratorAgent(BaseAgent):
         
         # 执行LLM规划的操作
         logger.info(f"执行幻灯片操作，共 {len(operations)} 项")
-        await self._execute_operations(presentation, slide_id, operations)
+        await self._execute_operations(presentation, slide_index, operations)
         
         return operations
     
@@ -638,7 +579,7 @@ class SlideGeneratorAgent(BaseAgent):
         try:
             # 2. 准备验证所需参数
             current_slide = state.current_slide
-            slide_id = current_slide.get("slide_id")
+            slide_index = current_slide.get("slide_index")
             operations = current_slide.get("operations", [])
             current_section = state.content_plan[state.current_section_index]
             
@@ -650,16 +591,16 @@ class SlideGeneratorAgent(BaseAgent):
             iteration_count = 0
             
             # 3. 获取幻灯片详细信息，供多模态模型分析
-            slide_elements = self.ppt_manager.get_slide_json_by_id(
+            slide_elements = self.ppt_manager.get_slide_json(
                 presentation=presentation,
-                slide_id=slide_id            
+                slide_index=slide_index            
             )
             
-            # 4. 验证幻灯片索引
-            real_slide_index = self._get_real_slide_index(presentation, slide_id)
-            if real_slide_index is None:
-                self._set_validation_failure(state, f"无法找到ID为 {slide_id} 的幻灯片索引", ["检查幻灯片ID是否正确"])
-                return
+            # # 4. 验证幻灯片索引
+            # real_slide_index = self._get_real_slide_index(presentation, slide_index)
+            # if real_slide_index is None:
+            #     self._set_validation_failure(state, f"无法找到ID为 {slide_index} 的幻灯片索引", ["检查幻灯片ID是否正确"])
+            #     return
             
             # 5. 迭代优化循环
             while has_issues and iteration_count < self.max_iterations:
@@ -667,7 +608,7 @@ class SlideGeneratorAgent(BaseAgent):
                 logger.info(f"开始第 {iteration_count} 次幻灯片优化迭代")
                 
                 # 5.1 渲染幻灯片为图片
-                image_path = await self._render_slide_to_image(state, presentation, real_slide_index)
+                image_path = await self._render_slide_to_image(state, presentation, slide_index)
                 if not image_path:
                     break
                 
@@ -695,7 +636,7 @@ class SlideGeneratorAgent(BaseAgent):
                 
                 # 5.4 执行修复操作
                 logger.info(f"执行第 {iteration_count} 次修复操作，共 {len(fix_operations)} 项")
-                success = await self._execute_operations(presentation, slide_id, fix_operations)
+                success = await self._execute_operations(presentation, slide_index, fix_operations)
                 
                 if success:
                     # 合并操作记录
@@ -724,13 +665,13 @@ class SlideGeneratorAgent(BaseAgent):
             logger.exception(e)
             self._set_validation_failure(state, "验证过程出错", ["检查日志并修复错误"])
     
-    async def _execute_operations(self, presentation: Any, slide_id: str, operations: List[Dict[str, Any]]) -> bool:
+    async def _execute_operations(self, presentation: Any, slide_index: int, operations: List[Dict[str, Any]]) -> bool:
         """
         执行幻灯片操作指令
         
         Args:
             presentation: PPT演示文稿对象
-            slide_id: 幻灯片ID
+            slide_index: 幻灯片索引
             operations: 操作指令列表
             
         Returns:
@@ -749,7 +690,7 @@ class SlideGeneratorAgent(BaseAgent):
                 
             try:
                 # 执行操作
-                result = await self._execute_single_operation(presentation, slide_id, operation)
+                result = await self._execute_single_operation(presentation, slide_index, operation)
                 
                 if result.get("success"):
                     success_count += 1
@@ -767,13 +708,13 @@ class SlideGeneratorAgent(BaseAgent):
         # 如果有任何操作成功应用，就认为整体成功
         return success_count > 0
     
-    async def _execute_single_operation(self, presentation: Any, slide_id: str, operation: Dict[str, Any]) -> Dict[str, Any]:
+    async def _execute_single_operation(self, presentation: Any, slide_index: int, operation: Dict[str, Any]) -> Dict[str, Any]:
         """
         执行单个操作
         
         Args:
             presentation: PPT演示文稿对象
-            slide_id: 幻灯片ID
+            slide_index: 幻灯片索引
             operation: 操作指令
             
         Returns:
@@ -786,30 +727,22 @@ class SlideGeneratorAgent(BaseAgent):
         # 根据操作类型执行不同的操作
         if operation_type == "replace_text":
             # 文本替换操作
-            return await self._replace_text(presentation, slide_id, element_id, content)
+            return await self._replace_text(presentation, slide_index, element_id, content)
         elif operation_type == "adjust_font_size":
             # 调整字体大小
             return self.ppt_manager.adjust_text_font_size(
                 presentation=presentation,
-                slide_id=slide_id,
+                slide_index=slide_index,
                 element_id=element_id,
                 font_size=int(content)
             )
         elif operation_type == "replace_image":
             # 替换图片
-            return self.ppt_manager.replace_image_by_element_id(
+            return self.ppt_manager.replace_image(
                 presentation=presentation,
-                slide_id=slide_id,
+                slide_index=slide_index,
                 element_id=element_id,
                 image_path=content
-            )
-        elif operation_type == "add_image_caption":
-            # 添加图片说明
-            return self.ppt_manager.add_image_caption(
-                presentation=presentation,
-                slide_id=slide_id,
-                element_id=element_id,
-                caption=content
             )
         else:
             logger.warning(f"未知的操作类型: {operation_type}")
@@ -914,13 +847,13 @@ class SlideGeneratorAgent(BaseAgent):
             
             return slide_id, presentation
     
-    async def _replace_text(self, presentation: Any, slide_id: str, element_id: str, content: Any) -> Dict[str, Any]:
+    async def _replace_text(self, presentation: Any, slide_index: int, element_id: str, content: Any) -> Dict[str, Any]:
         """
         替换文本内容
         
         Args:
             presentation: PPT演示文稿对象
-            slide_id: 幻灯片ID
+            slide_index: 幻灯片索引
             element_id: 元素ID
             content: 文本内容，可以是字符串或列表
             
@@ -936,19 +869,19 @@ class SlideGeneratorAgent(BaseAgent):
                     formatted_content += f"• {item.strip()}\n"
             
             if formatted_content:
-                return self.ppt_manager.edit_text_element_by_id(
+                return self.ppt_manager.update_element_content(
                     presentation=presentation,
-                    slide_id=slide_id,
+                    slide_index=slide_index,
                     element_id=element_id,
-                    new_text=formatted_content.strip()
+                    new_content=formatted_content.strip()
                 )
         else:
             # 字符串内容
-            return self.ppt_manager.edit_text_element_by_id(
+            return self.ppt_manager.update_element_content(
                 presentation=presentation,
-                slide_id=slide_id,
+                slide_index=slide_index,
                 element_id=element_id,
-                new_text=str(content).strip()
+                new_content=str(content).strip()
             )
         
         return {"success": False, "message": "无有效内容可替换"}
