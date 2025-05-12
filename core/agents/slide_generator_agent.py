@@ -727,7 +727,6 @@ class SlideGeneratorAgent(BaseAgent):
         # 根据操作类型执行不同的操作
         if operation_type == "update_element_content":
             # 文本替换操作
-            # return await self._replace_text(presentation, slide_index, element_id, content)
             return self.ppt_manager.update_element_content(
                 presentation=presentation,
                 slide_index=slide_index,
@@ -760,6 +759,13 @@ class SlideGeneratorAgent(BaseAgent):
                 top=content.get("top"),
                 width=content.get("width"),
                 height=content.get("height")
+            )
+        elif operation_type == "delete_element":
+            # 删除元素
+            return self.ppt_manager.delete_element(
+                presentation=presentation,
+                slide_index=slide_index,
+                element_id=element_id
             )
         else:
             logger.warning(f"未知的操作类型: {operation_type}")
@@ -865,41 +871,3 @@ class SlideGeneratorAgent(BaseAgent):
             
             return slide_index, presentation
     
-    # async def _replace_text(self, presentation: Any, slide_index: int, element_id: str, content: Any) -> Dict[str, Any]:
-    #     """
-    #     替换文本内容
-        
-    #     Args:
-    #         presentation: PPT演示文稿对象
-    #         slide_index: 幻灯片索引
-    #         element_id: 元素ID
-    #         content: 文本内容，可以是字符串或列表
-            
-    #     Returns:
-    #         操作结果
-    #     """
-    #     # 处理不同类型的内容
-    #     if isinstance(content, list):
-    #         # 列表内容（如项目符号）
-    #         formatted_content = ""
-    #         for item in content:
-    #             if item and item.strip():
-    #                 formatted_content += f"• {item.strip()}\n"
-            
-    #         if formatted_content:
-    #             return self.ppt_manager.update_element_content(
-    #                 presentation=presentation,
-    #                 slide_index=slide_index,
-    #                 element_id=element_id,
-    #                 new_content=formatted_content.strip()
-    #             )
-    #     else:
-    #         # 字符串内容
-    #         return self.ppt_manager.update_element_content(
-    #             presentation=presentation,
-    #             slide_index=slide_index,
-    #             element_id=element_id,
-    #             new_content=str(content).strip()
-    #         )
-        
-    #     return {"success": False, "message": "无有效内容可替换"}
