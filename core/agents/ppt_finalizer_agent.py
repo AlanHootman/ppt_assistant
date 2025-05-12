@@ -147,39 +147,40 @@ class PPTFinalizerAgent(BaseAgent):
         
         Args:
             presentation: PPT演示文稿对象
-            generated_slides: 已生成的幻灯片列表，每个元素包含slide_id
+            generated_slides: 已生成的幻灯片列表，每个元素包含slide_index
         """
         if not self.ppt_manager:
             logger.warning("PPTManager未初始化，无法删除未使用的幻灯片")
             return
         
-        # 提取所有已生成的幻灯片ID
-        generated_slide_ids = [slide["slide_id"] for slide in generated_slides]
-        logger.info(f"已生成的幻灯片ID: {generated_slide_ids}")
+        # 提取所有已生成的幻灯片索引
+        generated_slide_indices = [slide.get("slide_index") for slide in generated_slides if slide.get("slide_index") is not None]
+        logger.info(f"已生成的幻灯片索引: {generated_slide_indices}")
         
         try:
             # 获取演示文稿中的所有幻灯片
             ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
             all_slides = ppt_json.get("slides", [])
             
-            # 找出需要删除的幻灯片ID（不在generated_slide_ids中的）
+            # 找出需要删除的幻灯片索引（不在generated_slide_indices中的）
             slides_to_delete = []
-            for slide in all_slides:
-                slide_id = slide.get("slide_id")
-                if slide_id and slide_id not in generated_slide_ids:
-                    slides_to_delete.append(slide_id)
+            for i, slide in enumerate(all_slides):
+                real_index = slide.get("real_index", i)
+                if real_index not in generated_slide_indices:
+                    slides_to_delete.append(real_index)
             
-            logger.info(f"需要删除的幻灯片ID: {slides_to_delete}")
+            logger.info(f"需要删除的幻灯片索引: {slides_to_delete}")
             
-            # 删除未使用的幻灯片
-            for slide_id in slides_to_delete:
+            # 删除未使用的幻灯片（从后向前删除，避免索引变化）
+            slides_to_delete.sort(reverse=True)
+            for slide_index in slides_to_delete:
                 try:
-                    result = self.ppt_manager.delete_slide(presentation, slide_id)
+                    result = self.ppt_manager.delete_slide(presentation, slide_index)
                     if result.get("success"):
-                        logger.info(f"已删除未使用的幻灯片: {slide_id}")
+                        logger.info(f"已删除未使用的幻灯片，索引: {slide_index}")
                     else:
-                        logger.warning(f"删除幻灯片失败: {slide_id}, 原因: {result.get('message')}")
+                        logger.warning(f"删除幻灯片失败，索引: {slide_index}, 原因: {result.get('message')}")
                 except Exception as e:
-                    logger.warning(f"删除幻灯片出错: {slide_id}, 原因: {str(e)}")
+                    logger.warning(f"删除幻灯片出错，索引: {slide_index}, 原因: {str(e)}")
         except Exception as e:
             logger.error(f"删除未使用幻灯片过程中发生错误: {str(e)}") 
