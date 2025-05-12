@@ -220,32 +220,32 @@ class SlideGeneratorAgent(BaseAgent):
         
         return presentation
 
-    def _get_template_slide_id(self, template_info: Dict[str, Any], ppt_json: Dict[str, Any]) -> str:
-        """
-        从模板信息中获取幻灯片ID
+    # def _get_template_slide_id(self, template_info: Dict[str, Any], ppt_json: Dict[str, Any]) -> str:
+    #     """
+    #     从模板信息中获取幻灯片ID
         
-        Args:
-            template_info: 模板信息
-            ppt_json: PPT的JSON结构
+    #     Args:
+    #         template_info: 模板信息
+    #         ppt_json: PPT的JSON结构
             
-        Returns:
-            幻灯片ID
-        """
-        if "slideIndex" in template_info:
-            slide_index = template_info["slideIndex"]
-            slides = ppt_json.get("slides", [])
+    #     Returns:
+    #         幻灯片ID
+    #     """
+    #     if "slideIndex" in template_info:
+    #         slide_index = template_info["slideIndex"]
+    #         slides = ppt_json.get("slides", [])
             
-            # 根据slideIndex(实际是real_index)查找对应的slide_id
-            for slide in slides:
-                # 检查slide是否包含real_index信息
-                if "real_index" in slide and slide["real_index"] == slide_index:
-                    return slide.get("real_index")
+    #         # 根据slideIndex(实际是real_index)查找对应的slide_id
+    #         for slide in slides:
+    #             # 检查slide是否包含real_index信息
+    #             if "real_index" in slide and slide["real_index"] == slide_index:
+    #                 return slide.get("real_index")
             
-            # 如果找不到匹配的real_index或index，直接抛出异常
-            raise ValueError(f"无法找到real_index或index为{slide_index}的幻灯片，请检查模板配置")
+    #         # 如果找不到匹配的real_index或index，直接抛出异常
+    #         raise ValueError(f"无法找到real_index或index为{slide_index}的幻灯片，请检查模板配置")
         
-        # 如果template_info中没有slide_id和slideIndex，直接抛出异常
-        raise ValueError("template_info中缺少slide_id或slideIndex，无法确定要使用的模板幻灯片")
+    #     # 如果template_info中没有slide_id和slideIndex，直接抛出异常
+    #     raise ValueError("template_info中缺少slide_id或slideIndex，无法确定要使用的模板幻灯片")
     
     async def _get_operations_from_llm(self, context: Dict[str, str]) -> List[Dict[str, Any]]:
         """
@@ -827,15 +827,16 @@ class SlideGeneratorAgent(BaseAgent):
         # 获取PPT的JSON结构并找到模板幻灯片ID
         ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
         template_info = current_section.get("template", {})
-        slide_id = self._get_template_slide_id(template_info, ppt_json)
+        slide_index = template_info.get("slide_index")
+        # slide_id = self._get_template_slide_id(template_info, ppt_json)
         
         # 初始化已编辑幻灯片ID记录（如果不存在）
         if not hasattr(self, "_edited_slides"):
             self._edited_slides = set()
         
         # 判断幻灯片是否已编辑过
-        if slide_id in self._edited_slides:
-            logger.info(f"幻灯片 {slide_id} 已被编辑过，创建新幻灯片")
+        if slide_index in self._edited_slides:
+            logger.info(f"幻灯片 {slide_index} 已被编辑过，创建新幻灯片")
             
             # 获取模板布局信息
             layout_name = template_info.get("layout", "Title and Content")
@@ -856,13 +857,13 @@ class SlideGeneratorAgent(BaseAgent):
             else:
                 # 创建失败，仍使用原幻灯片
                 logger.warning(f"创建新幻灯片失败: {result.get('message')}，使用原幻灯片")
-                return slide_id, presentation
+                return slide_index, presentation
         else:
             # 将当前幻灯片ID添加到已编辑列表
-            self._edited_slides.add(slide_id)
-            logger.info(f"使用现有幻灯片，ID: {slide_id}")
+            self._edited_slides.add(slide_index)
+            logger.info(f"使用现有幻灯片，ID: {slide_index}")
             
-            return slide_id, presentation
+            return slide_index, presentation
     
     # async def _replace_text(self, presentation: Any, slide_index: int, element_id: str, content: Any) -> Dict[str, Any]:
     #     """

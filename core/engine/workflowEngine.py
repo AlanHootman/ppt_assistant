@@ -691,40 +691,88 @@ class WorkflowEngine:
 
     async def _execute_ppt_analyzer(self, state: AgentState) -> None:
         """
-        使用真实的PPTAnalysisAgent分析PPT模板
+        执行PPT分析节点，支持从缓存加载
         
         Args:
-            state: 代理状态
+            state: 当前状态
         """
+        # 检查是否有PPT模板路径
+        if not state.ppt_template_path:
+            error_msg = "没有提供PPT模板路径"
+            logger.error(error_msg)
+            state.record_failure(error_msg)
+            return
+        
+        # 检查文件是否存在
+        template_path = Path(state.ppt_template_path)
+        if not template_path.exists():
+            error_msg = f"PPT模板文件不存在: {state.ppt_template_path}"
+            logger.error(error_msg)
+            state.record_failure(error_msg)
+            return
+        
+        # 尝试从缓存加载
         try:
-            logger.info("执行真实的PPTAnalysisAgent处理")
+            # 生成缓存文件路径
+            template_name = template_path.stem
+            cache_dir = settings.WORKSPACE_DIR / "ppt_cache"
+            cache_file = cache_dir / f"{template_name}_layout_features.json"
             
-            # 从配置中获取ppt_analyzer节点的配置
-            node_config = None
-            for node in self.config.get("workflow", {}).get("nodes", []):
-                if node.get("name") == "ppt_analyzer":
-                    node_config = node.get("config", {})
-                    break
-            
-            if not node_config:
-                node_config = {"model_type": "vision", "max_retries": "3"}
-                logger.warning("未找到ppt_analyzer节点配置，使用默认配置")
-            
-            # 创建PPTAnalysisAgent实例
-            ppt_analysis_agent = PPTAnalysisAgent(node_config)
-            
-            # 执行PPT模板分析
-            updated_state = await ppt_analysis_agent.run(state)
-            
-            # 更新状态（虽然run方法已经更新了状态，但为了清晰起见，再次赋值）
-            state.layout_features = updated_state.layout_features
-            
-            logger.info(f"PPTAnalysisAgent执行完成，布局特征: {state.layout_features is not None}")
-            
+            # 检查缓存文件是否存在
+            if cache_file.exists():
+                logger.info(f"发现PPT模板缓存文件: {cache_file}")
+                
+                # 从缓存加载
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    layout_features = json.load(f)
+                
+                # 更新状态
+                state.layout_features = layout_features
+                logger.info(f"从缓存加载PPT模板分析结果，模板名称: {layout_features.get('templateName', '未知')}")
+                
+                # 添加检查点
+                state.add_checkpoint("ppt_analyzer_completed")
+                
+                return
         except Exception as e:
-            logger.error(f"执行PPTAnalysisAgent失败: {str(e)}")
-            state.record_failure(f"执行PPTAnalysisAgent失败: {str(e)}")
-            raise
+            logger.warning(f"尝试从缓存加载PPT分析结果失败: {str(e)}，将执行完整分析")
+        
+        # 如果没有缓存或加载失败，执行完整分析
+        logger.info("开始分析PPT模板")
+        
+        # 获取节点配置
+        agent_config = {}
+        # 从配置中获取ppt_analyzer节点的配置
+        for node in self.config.get("workflow", {}).get("nodes", []):
+            if node.get("name") == "ppt_analyzer":
+                agent_config = node.get("config", {})
+                break
+        
+        if not agent_config:
+            agent_config = {"model_type": "vision", "max_retries": "3"}
+            logger.warning("未找到ppt_analyzer节点配置，使用默认配置")
+        
+        # 创建代理
+        agent = PPTAnalysisAgent(agent_config)
+        
+        # 执行分析
+        await agent.run(state)
+        
+        # 检查分析结果，如果成功则保存到缓存
+        if state.layout_features:
+            try:
+                # 确保缓存目录存在
+                cache_dir.mkdir(parents=True, exist_ok=True)
+                
+                # 保存到缓存
+                with open(cache_file, 'w', encoding='utf-8') as f:
+                    json.dump(state.layout_features, f, ensure_ascii=False, indent=2)
+                
+                logger.info(f"PPT模板分析结果已保存到缓存: {cache_file}")
+            except Exception as e:
+                logger.warning(f"保存PPT分析结果到缓存失败: {str(e)}")
+        else:
+            logger.warning("PPT模板分析未生成有效结果，无法保存到缓存")
     
     async def _execute_content_planner(self, state: AgentState) -> None:
         """

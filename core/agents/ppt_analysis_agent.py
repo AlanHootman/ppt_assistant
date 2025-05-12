@@ -51,10 +51,13 @@ class PPTAnalysisAgent(BaseAgent):
         self.temperature = model_config.get("temperature", 0.7)
         self.max_tokens = model_config.get("max_tokens", 4000)
         
+        # 图片分析批次大小配置
+        self.batch_size = config.get("batch_size", 5)
+        
         # 初始化PPT管理器
         self.ppt_manager = PPTManager()
         
-        logger.info(f"初始化PPTAnalysisAgent，使用模型: {self.vision_model}")
+        logger.info(f"初始化PPTAnalysisAgent，使用模型: {self.vision_model}, 批次大小: {self.batch_size}")
     
     async def run(self, state: AgentState) -> AgentState:
         """
@@ -234,16 +237,14 @@ class PPTAnalysisAgent(BaseAgent):
         """
         logger.info(f"使用视觉模型分析 {len(image_paths)} 张幻灯片图像")
         
-        # 为了避免向模型传递太多图像，我们选择最有代表性的几张幻灯片进行分析
-        # 如果图像超过30张，只选择前30张
-        representative_images = image_paths[:min(30, len(image_paths))]
+        # 使用配置的批次大小
+        batch_size = self.batch_size
         
-        # 准备图像索引信息，帮助模型识别每张图片对应原始PPT中的哪一页
-        image_indices = []
-        for i, image_path in enumerate(representative_images):
+        # 准备所有图像索引信息
+        all_image_indices = []
+        for i, image_path in enumerate(image_paths):
             # 从图像路径中提取文件名
             filename = os.path.basename(image_path)
-            # 文件命名通常为 "slide-1.png", "slide-2.png" 等
             # 尝试提取真实的幻灯片索引
             real_index = i  # 默认索引
             
@@ -258,81 +259,186 @@ class PPTAnalysisAgent(BaseAgent):
                 except ValueError:
                     pass
             
-            image_indices.append({
+            all_image_indices.append({
                 "filename": filename,
                 "position": i,  # 在当前分析中的位置
                 "slideIndex": real_index  # 在原始PPT中的索引
             })
         
-        # 对于每张图像，使用视觉模型进行分析
-        # 使用Jinja2模板构建提示词
+        # 准备模板信息
         template_info = {
             "template_name": presentation_json.get("name", "未知模板"),
             "slide_count": presentation_json.get("slide_count", 0),
             "theme": presentation_json.get("theme", {})
         }
         
-        # 准备模板上下文
-        context = {
-            "template_info": template_info,
-            "has_images": len(representative_images) > 0,
-            "image_indices": image_indices
+        # 分批处理图像
+        batched_results = []
+        batch_count = (len(image_paths) + batch_size - 1) // batch_size
+        
+        for batch_idx in range(batch_count):
+            start_idx = batch_idx * batch_size
+            end_idx = min(start_idx + batch_size, len(image_paths))
+            
+            batch_images = image_paths[start_idx:end_idx]
+            batch_indices = all_image_indices[start_idx:end_idx]
+            
+            logger.info(f"处理第 {batch_idx + 1}/{batch_count} 批图像，包含 {len(batch_images)} 张图片")
+            
+            # 准备模板上下文
+            context = {
+                "template_info": template_info,
+                "has_images": True,
+                "image_indices": batch_indices,
+                "presentation_json": presentation_json,
+                "is_batch": True,
+                "batch_info": {
+                    "current": batch_idx + 1,
+                    "total": batch_count
+                }
+            }
+            
+            # 渲染提示词
+            prompt = self.model_manager.render_template(TEMPLATE_ANALYSIS_PROMPT, context)
+            
+            try:
+                # 构建图片列表
+                images = []
+                for i, image_path in enumerate(batch_images):
+                    if os.path.exists(image_path):
+                        images.append({
+                            "url": f"file://{image_path}", 
+                            "detail": "high"
+                        })
+                
+                # 调用视觉模型API
+                if hasattr(self.model_manager, 'generate_vision_response'):
+                    vision_response = await self.model_manager.generate_vision_response(
+                        model=self.vision_model,
+                        prompt=prompt,
+                        images=images,
+                        temperature=self.temperature,
+                        max_tokens=self.max_tokens
+                    )
+                    
+                    # 解析JSON响应
+                    try:
+                        # 清理响应中的markdown格式代码块
+                        json_text = vision_response
+                        if "```json" in vision_response:
+                            import re
+                            pattern = r"```(?:json)?\s*([\s\S]*?)```"
+                            matches = re.findall(pattern, vision_response)
+                            if matches:
+                                json_text = matches[0]
+                        
+                        batch_result = json.loads(json_text)
+                        logger.info(f"第 {batch_idx + 1} 批图像视觉模型分析成功")
+                        batched_results.append(batch_result)
+                    except Exception as e:
+                        logger.error(f"解析第 {batch_idx + 1} 批视觉模型响应失败: {str(e)}")
+                        # 继续处理下一批，不中断整个过程
+                else:
+                    logger.warning("模型管理器不支持视觉模型调用，使用默认分析结果")
+                    # 添加默认结果
+                    default_result = self._get_default_visual_analysis(template_info, batch_indices)
+                    batched_results.append(default_result)
+                    
+            except Exception as e:
+                logger.error(f"第 {batch_idx + 1} 批视觉模型分析失败: {str(e)}")
+                # 继续处理下一批，不中断整个过程
+        
+        # 如果所有批次都失败，返回默认分析结果
+        if not batched_results:
+            logger.warning("所有批次分析都失败，返回默认分析结果")
+            return self._get_default_visual_analysis(template_info, all_image_indices)
+        
+        # 合并分析结果
+        return self._merge_batch_results(batched_results, template_info)
+    
+    def _merge_batch_results(self, results: List[Dict[str, Any]], template_info: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        合并多批次分析结果
+        
+        Args:
+            results: 多批次分析结果列表
+            template_info: 模板信息
+            
+        Returns:
+            合并后的分析结果
+        """
+        if not results:
+            return self._get_default_visual_analysis(template_info)
+        
+        # 如果只有一个批次，直接返回
+        if len(results) == 1:
+            return results[0]
+        
+        # 提取第一个有效结果作为基础
+        merged_result = {
+            "templateName": template_info.get("template_name", "未知模板"),
+            "style": results[0].get("style", "professional"),
+            "visualFeatures": results[0].get("visualFeatures", {})
         }
         
-        # 使用模型管理器的模板渲染方法
-        prompt = self.model_manager.render_template(TEMPLATE_ANALYSIS_PROMPT, context)
+        # 合并所有幻灯片布局
+        all_slide_layouts = []
+        for result in results:
+            slide_layouts = result.get("slideLayouts", [])
+            if slide_layouts:
+                all_slide_layouts.extend(slide_layouts)
         
-        # 由于视觉模型API调用需要具体的实现，这里模拟一个分析结果
-        # 实际项目中应该调用self.model_manager提供的视觉模型API
+        # 确保幻灯片布局按照索引排序
+        all_slide_layouts.sort(key=lambda x: x.get("slideIndex", 0))
+        merged_result["slideLayouts"] = all_slide_layouts
         
-        try:
-            # 构建图片列表，实际项目中这些图片应该被编码并传给视觉模型
-            images = []
-            for i, image_path in enumerate(representative_images):
-                if os.path.exists(image_path):
-                    # 将索引信息添加到图片描述中，帮助模型理解图片对应关系
-                    slide_index = image_indices[i]["slideIndex"]
-                    images.append({
-                        "url": f"file://{image_path}", 
-                        "detail": "high"
-                    })
-            
-            # 调用视觉模型API
-            if hasattr(self.model_manager, 'generate_vision_response'):
-                vision_response = await self.model_manager.generate_vision_response(
-                    model=self.vision_model,
-                    prompt=prompt,
-                    images=images,
-                    temperature=self.temperature,
-                    max_tokens=self.max_tokens
-                )
-                
-                # 解析JSON响应
-                try:
-                    # 清理响应中的markdown格式代码块
-                    json_text = vision_response
-                    if "```json" in vision_response:
-                        import re
-                        pattern = r"```(?:json)?\s*([\s\S]*?)```"
-                        matches = re.findall(pattern, vision_response)
-                        if matches:
-                            json_text = matches[0]
+        # 合并布局分组
+        layout_groups = {}
+        for result in results:
+            for group in result.get("layoutGroups", []):
+                group_name = group.get("groupName")
+                if not group_name:
+                    continue
                     
-                    analysis_result = json.loads(json_text)
-                    logger.info("视觉模型分析成功")
-                    return analysis_result
-                except Exception as e:
-                    logger.error(f"解析视觉模型响应失败: {str(e)}")
-                    # 返回一个默认的分析结果
-                    return self._get_default_visual_analysis(template_info, image_indices)
-            else:
-                logger.warning("模型管理器不支持视觉模型调用，使用默认分析结果")
-                return self._get_default_visual_analysis(template_info, image_indices)
+                if group_name not in layout_groups:
+                    layout_groups[group_name] = {
+                        "groupName": group_name,
+                        "slideIndices": [],
+                        "commonFeatures": group.get("commonFeatures", "")
+                    }
                 
-        except Exception as e:
-            logger.error(f"视觉模型分析失败: {str(e)}")
-            # 如果分析失败，返回一个默认的分析结果
-            return self._get_default_visual_analysis(template_info, image_indices)
+                # 合并索引并去重
+                layout_groups[group_name]["slideIndices"].extend(group.get("slideIndices", []))
+                layout_groups[group_name]["slideIndices"] = list(set(layout_groups[group_name]["slideIndices"]))
+        
+        merged_result["layoutGroups"] = list(layout_groups.values())
+        
+        # 使用最后一个批次的推荐建议，通常最后一个批次有更全面的信息
+        merged_result["recommendations"] = results[-1].get("recommendations", {})
+        
+        # 合并幻灯片摘要信息
+        slide_summary = {
+            "openingSlides": [],
+            "contentSlides": [],
+            "closingSlides": [],
+            "presentationFlow": results[-1].get("slideSummary", {}).get("presentationFlow", "")
+        }
+        
+        for result in results:
+            summary = result.get("slideSummary", {})
+            slide_summary["openingSlides"].extend(summary.get("openingSlides", []))
+            slide_summary["contentSlides"].extend(summary.get("contentSlides", []))
+            slide_summary["closingSlides"].extend(summary.get("closingSlides", []))
+        
+        # 去重并排序
+        slide_summary["openingSlides"] = sorted(list(set(slide_summary["openingSlides"])))
+        slide_summary["contentSlides"] = sorted(list(set(slide_summary["contentSlides"])))
+        slide_summary["closingSlides"] = sorted(list(set(slide_summary["closingSlides"])))
+        
+        merged_result["slideSummary"] = slide_summary
+        
+        logger.info(f"成功合并 {len(results)} 批分析结果，共有 {len(all_slide_layouts)} 个幻灯片布局分析")
+        return merged_result
     
     def _get_default_visual_analysis(self, template_info: Dict[str, Any], image_indices: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
