@@ -11,7 +11,6 @@ TEMPLATE_ANALYSIS_PROMPT = """
 2. 可用的布局类型及其特点
 3. 每种布局适合的内容类型
 4. 设计元素和颜色方案
-5. 字体和排版特点
 
 {% if template_info %}
 模板信息:
