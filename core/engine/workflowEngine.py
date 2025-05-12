@@ -35,10 +35,7 @@ try:
     HAS_MLFLOW = True
 except ImportError:
     HAS_MLFLOW = False
-# 暂时注释掉不存在的导入
-# from core.agents.layout_agent import LayoutAgent
-# from core.agents.ppt_agent import PPTAgent
-from core.utils.markdown_parser import MarkdownParser
+
 
 # 配置日志
 logger = logging.getLogger(__name__)
