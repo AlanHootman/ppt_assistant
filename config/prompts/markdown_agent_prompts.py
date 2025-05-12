@@ -11,8 +11,6 @@ ANALYSIS_PROMPT = """
 1. "semantic_type": 内容的语义类型，如"concept", "process", "comparison", "list", "timeline", "data", "case_study"等
 2. "relation_type": 内容之间的关系类型，如"sequence", "cause_effect", "problem_solution", "hierarchical"等
 3. "visualization_suggestion": 建议的可视化方式，如"bullet_points", "flowchart", "diagram", "chart", "table", "image"等
-4. "key_points": 提取的关键点列表，以便在PPT中突出显示
-5. "summary": 总结性描述，简明扼要表达该部分主旨
 
 {% if markdown_text %}
 Markdown文本:

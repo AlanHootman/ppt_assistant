@@ -54,7 +54,7 @@ TEMPLATE_ANALYSIS_PROMPT = """
   },
   "slideLayouts": [
     {
-      "slideIndex": 0,
+      "slide_index": 0,
       "type": "封面页/标题页", 
       "purpose": "演示开始页面",
       "structure": {
@@ -67,18 +67,14 @@ TEMPLATE_ANALYSIS_PROMPT = """
         {
           "type": "titleText",
           "position": "上部居中",
-          "size": "大",
-          "fontStyle": "粗体"
         },
         {
           "type": "subtitleText",
           "position": "中部居中",
-          "size": "中"
         },
         {
           "type": "logoImage",
           "position": "右下角",
-          "size": "小",
           "caption": "公司徽标，蓝色和绿色渐变设计"
         }
       ],
@@ -86,7 +82,7 @@ TEMPLATE_ANALYSIS_PROMPT = """
       "bestPractices": "标题简洁明了，副标题可提供更多上下文"
     },
     {
-      "slideIndex": 1,
+      "slide_index": 1,
       "type": "内容页", 
       "purpose": "展示具体内容",
       "structure": "左侧标题，右侧内容区块",
@@ -94,7 +90,6 @@ TEMPLATE_ANALYSIS_PROMPT = """
         {
           "type": "titleText",
           "position": "左侧栏",
-          "size": "中"
         },
         {
           "type": "bulletPoints",
@@ -107,14 +102,12 @@ TEMPLATE_ANALYSIS_PROMPT = """
         {
           "type": "textBlock",
           "position": "底部",
-          "size": "小",
           "paragraphCount": 2,
           "paragraphDescription": "第一段为简短介绍，第二段为详细说明"
         },
         {
           "type": "image",
           "position": "右上角",
-          "size": "小",
           "caption": "产品示意图，展示了主要功能界面"
         }
       ],
