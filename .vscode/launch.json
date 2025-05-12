@@ -2,17 +2,6 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "运行PPT工作流(默认)",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/run_workflow.py",
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
             "name": "运行PPT工作流",
             "type": "python",
             "request": "launch",
@@ -38,6 +27,23 @@
                 "--md_file", "${input:markdownFile}",
                 "--ppt_template", "${input:templateFile}",
                 "--output_dir", "${input:outputDir}"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "运行PPT离线解析器",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/scripts/ppt_analyzer_offline.py",
+            "args": [
+                "analyze",
+                "tests/testfiles/蓝绿色商务简约年终工作总结汇报PPT模板.pptx",
+                "-o", "workspace/ppt_cache",
+                "-f"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
