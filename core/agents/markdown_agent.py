@@ -17,7 +17,6 @@ from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
 from config.prompts.markdown_agent_prompts import ANALYSIS_PROMPT
-from core.utils.markdown_parser import MarkdownParser
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +44,6 @@ class MarkdownAgent(BaseAgent):
         self.temperature = model_config.get("temperature", 0.7)
         self.max_tokens = model_config.get("max_tokens", 4000)
         
-        # 创建解析器实例
-        self.markdown_parser = MarkdownParser()
         logger.info(f"初始化MarkdownAgent，使用模型: {self.llm_model}")
     
     async def run(self, state: AgentState) -> AgentState:
@@ -68,25 +65,9 @@ class MarkdownAgent(BaseAgent):
             return state
         
         try:
-
-
-            # 使用MarkdownParser进行基础解析
-            basic_structure = self.markdown_parser.parse(state.raw_md)
-            
-            # 提取额外信息
-            keywords = self.markdown_parser.extract_keywords(state.raw_md)
-            math_formulas = self.markdown_parser.parse_math_formulas(state.raw_md)
-            images = self.markdown_parser.parse_images(state.raw_md)
-            
-            # 将提取的信息添加到结构中
-            basic_structure["keywords"] = keywords
-            if math_formulas:
-                basic_structure["math_formulas"] = math_formulas
-            if images:
-                basic_structure["images"] = images
-            
-            # 使用大模型对内容进行深度理解
-            enhanced_structure = await self._enhance_with_llm(state.raw_md, basic_structure)
+            # 直接使用大模型解析Markdown内容
+            logger.info("直接使用大模型解析Markdown结构")
+            enhanced_structure = await self._parse_with_llm(state.raw_md)
             
             # 更新状态
             state.content_structure = enhanced_structure
@@ -101,41 +82,21 @@ class MarkdownAgent(BaseAgent):
         
         return state
     
-    def _parse_markdown(self, markdown_text: str) -> Dict[str, Any]:
+    async def _parse_with_llm(self, markdown_text: str) -> Dict[str, Any]:
         """
-        基础解析Markdown文本，提取基本结构（保留兼容性）
-        
-        Args:
-            markdown_text: Markdown文本
-            
-        Returns:
-            解析后的基本结构化内容
-        """
-        # 直接使用新的MarkdownParser
-        return self.markdown_parser.parse(markdown_text)
-    
-    async def _enhance_with_llm(self, markdown_text: str, basic_structure: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        使用大模型增强Markdown解析结果，添加语义理解和关系分析
+        直接使用大模型解析Markdown文本，不依赖基础解析器
         
         Args:
             markdown_text: 原始Markdown文本
-            basic_structure: 基础解析结果
             
         Returns:
-            增强后的结构化内容
+            解析后的结构化内容
         """
-        title = basic_structure.get("title", "无标题")
-        subtitle = basic_structure.get("subtitle", "")
-        logger.info(f"使用大模型({self.llm_model})进行内容增强分析，文档标题: '{title}'")
+        logger.info(f"使用大模型({self.llm_model})直接进行Markdown结构解析")
         
-        # 记录基础结构中的标题和副标题
-        logger.debug(f"基础解析标题: '{title}', 副标题: '{subtitle}'")
-        
-        # 构建提示词 - 使用Jinja2模板
+        # 构建提示词上下文
         context = {
             "markdown_text": markdown_text,
-            "basic_structure": basic_structure
         }
         
         # 使用模型管理器的模板渲染方法
@@ -151,19 +112,23 @@ class MarkdownAgent(BaseAgent):
             )
             
             # 解析JSON响应
-            enhanced_structure = self._parse_llm_response(response, basic_structure)
-            logger.info("大模型增强分析完成")
+            structure = self._parse_llm_response(response, {"title": "", "subtitle": "", "sections": []})
+            logger.info("大模型解析完成")
+            
+            # 清理结构中的Markdown格式
+            self._clean_markdown_formatting(structure)
+            logger.info("清理Markdown格式标记完成")
             
             # 记录生成的文档结构概要
-            sections_count = len(enhanced_structure.get("sections", []))
-            logger.info(f"增强后的结构: 标题: '{enhanced_structure.get('title')}', 副标题: '{enhanced_structure.get('subtitle')}', 章节数: {sections_count}")
+            sections_count = len(structure.get("sections", []))
+            logger.info(f"解析结构: 标题: '{structure.get('title')}', 副标题: '{structure.get('subtitle')}', 章节数: {sections_count}")
             
-            return enhanced_structure
+            return structure
             
         except Exception as e:
-            logger.error(f"大模型分析失败: {str(e)}")
-            # 如果大模型分析失败，返回基础结构
-            return basic_structure
+            logger.error(f"大模型解析失败: {str(e)}")
+            # 创建一个基础的空结构作为返回
+            return {"title": "", "subtitle": "", "sections": []}
     
     def _parse_llm_response(self, response: str, fallback_structure: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -183,6 +148,10 @@ class MarkdownAgent(BaseAgent):
                 match = re.search(r"```(?:json)?\s*([\s\S]*?)```", response)
                 if match:
                     json_text = match.group(1)
+            elif "```" in response:
+                match = re.search(r"```\s*([\s\S]*?)```", response)
+                if match:
+                    json_text = match.group(1)
             
             # 解析JSON
             structure = json.loads(json_text)
@@ -194,6 +163,10 @@ class MarkdownAgent(BaseAgent):
             if not structure.get("sections") or not isinstance(structure["sections"], list):
                 structure["sections"] = fallback_structure.get("sections", [])
                 logger.warning("响应中没有有效的sections字段，使用基础解析的章节内容")
+            else:
+                # 确保每个章节都有必需的字段
+                for section in structure["sections"]:
+                    self._ensure_section_structure(section)
             
             logger.info(f"解析成功 - 标题: '{structure['title']}', 副标题: '{structure['subtitle']}'")
             
@@ -202,6 +175,40 @@ class MarkdownAgent(BaseAgent):
         except Exception as e:
             logger.error(f"解析大模型响应失败: {str(e)}")
             return fallback_structure
+    
+    def _ensure_section_structure(self, section: Dict[str, Any]) -> None:
+        """
+        确保章节结构符合预期格式
+        
+        Args:
+            section: 章节结构
+        """
+        # 确保标题存在
+        if "title" not in section:
+            section["title"] = "未命名章节"
+        
+        # 确保content数组存在
+        if "content" not in section:
+            section["content"] = []
+        elif not isinstance(section["content"], list):
+            section["content"] = [str(section["content"])]
+        
+        # 确保语义类型字段存在
+        if "semantic_type" not in section:
+            section["semantic_type"] = "concept"
+        
+        # 确保关系类型字段存在
+        if "relation_type" not in section:
+            section["relation_type"] = "hierarchical"
+        
+        # 确保可视化建议字段存在
+        if "visualization_suggestion" not in section:
+            section["visualization_suggestion"] = "bullet_points"
+        
+        # 递归处理子章节
+        if "subsections" in section and isinstance(section["subsections"], list):
+            for subsection in section["subsections"]:
+                self._ensure_section_structure(subsection)
     
     def add_checkpoint(self, state: AgentState) -> None:
         """
@@ -223,4 +230,86 @@ class MarkdownAgent(BaseAgent):
         """
         state.record_failure(error)
         logger.error(f"记录失败: {error}")
+    
+    def _clean_markdown_formatting(self, structure: Dict[str, Any]) -> None:
+        """
+        递归清理结构中的Markdown格式标记，如加粗(**文字**)、斜体(*文字*)等
+        
+        Args:
+            structure: 需要清理的结构
+        """
+        # 清理标题和副标题
+        if "title" in structure:
+            structure["title"] = self._clean_md_text(structure["title"])
+        if "subtitle" in structure:
+            structure["subtitle"] = self._clean_md_text(structure["subtitle"])
+        
+        # 清理sections
+        for section in structure.get("sections", []):
+            self._clean_section_markdown(section)
+    
+    def _clean_section_markdown(self, section: Dict[str, Any]) -> None:
+        """
+        递归清理章节中的Markdown格式
+        
+        Args:
+            section: 需要清理的章节
+        """
+        # 清理标题
+        if "title" in section:
+            section["title"] = self._clean_md_text(section["title"])
+        
+        # 清理content
+        if "content" in section and isinstance(section["content"], list):
+            for i, item in enumerate(section["content"]):
+                if isinstance(item, str):
+                    # 普通文本项
+                    section["content"][i] = self._clean_md_text(item)
+                elif isinstance(item, dict):
+                    # 结构化内容项（如列表）
+                    if "type" in item and "items" in item and isinstance(item["items"], list):
+                        item["items"] = [self._clean_md_text(list_item) for list_item in item["items"]]
+        
+        # 递归清理子章节
+        if "subsections" in section and isinstance(section["subsections"], list):
+            for subsection in section["subsections"]:
+                self._clean_section_markdown(subsection)
+    
+    def _clean_md_text(self, text: str) -> str:
+        """
+        清理单个文本中的Markdown格式
+        
+        Args:
+            text: 需要清理的文本
+            
+        Returns:
+            清理后的文本
+        """
+        if not isinstance(text, str):
+            return text
+        
+        # 清理加粗 (**text** 或 __text__)
+        text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
+        text = re.sub(r'__(.*?)__', r'\1', text)
+        
+        # 清理斜体 (*text* 或 _text_)
+        text = re.sub(r'(?<!\*)\*(?!\*)(.*?)(?<!\*)\*(?!\*)', r'\1', text)
+        text = re.sub(r'(?<!_)_(?!_)(.*?)(?<!_)_(?!_)', r'\1', text)
+        
+        # 清理行内代码 (`text`)
+        text = re.sub(r'`(.*?)`', r'\1', text)
+        
+        # 清理删除线 (~~text~~)
+        text = re.sub(r'~~(.*?)~~', r'\1', text)
+        
+        # 清理链接 [text](url)
+        text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)
+        
+        # 清理图片 ![alt](url)
+        text = re.sub(r'!\[(.*?)\]\(.*?\)', r'\1', text)
+        
+        # 清理HTML标签
+        text = re.sub(r'<[^>]*>', '', text)
+        
+        return text
     

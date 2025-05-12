@@ -496,6 +496,50 @@ class MarkdownParser:
         if target_section is None:
             return
             
+        # 检测加粗文本标题格式（如"**问题引导**："或"**学习任务**："）
+        bold_title_match = re.match(r"^\*\*(.*?)\*\*\s*[:：]", line_stripped)
+        if bold_title_match or line_stripped.startswith("**") and (":" in line_stripped or "：" in line_stripped):
+            # 提取标题部分
+            if bold_title_match:
+                subtitle = bold_title_match.group(1).strip()
+            else:
+                # 处理其他可能的加粗标题格式
+                subtitle_parts = re.split(r"[:：]", line_stripped.replace("**", ""), 1)
+                subtitle = subtitle_parts[0].strip()
+            
+            # 创建新的子部分
+            new_subsection = {
+                "title": subtitle,
+                "content": [],
+                "items": [],
+                "level": target_section.get("level", 3) + 1  # 设置为当前部分的下一级
+            }
+            
+            # 获取冒号后的剩余内容（如果有）
+            remaining_content = re.sub(r"^\*\*(.*?)\*\*\s*[:：]\s*", "", line_stripped).strip()
+            if remaining_content:
+                new_subsection["content"].append(remaining_content)
+            
+            # 将新子部分添加到当前部分
+            if "subsections" not in target_section:
+                target_section["subsections"] = []
+            
+            target_section["subsections"].append(new_subsection)
+            
+            # 更新解析状态以跟踪新创建的子部分
+            # 根据当前部分的层级决定更新哪个状态变量
+            if target_section == parsing_state["current_section"]:
+                parsing_state["current_subsection"] = new_subsection
+                parsing_state["current_subsubsection"] = None
+                parsing_state["current_subsubsubsection"] = None
+            elif target_section == parsing_state["current_subsection"]:
+                parsing_state["current_subsubsection"] = new_subsection
+                parsing_state["current_subsubsubsection"] = None
+            elif target_section == parsing_state["current_subsubsection"]:
+                parsing_state["current_subsubsubsection"] = new_subsection
+            
+            return
+        
         # 检测列表项 (- 或 * 项目)
         if line_stripped.startswith("- ") or line_stripped.startswith("* "):
             item_text = line_stripped[2:].strip()
