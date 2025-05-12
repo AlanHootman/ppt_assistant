@@ -19,6 +19,8 @@ from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionMessageParam
 # 添加Jinja2模板支持
 from jinja2 import Template
+# 导入全局设置
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -93,31 +95,43 @@ class ModelManager:
         return client
     
     def get_model_config(self, model_type):
-        """获取指定类型的模型配置"""
+        """
+        获取指定类型的模型配置
+        
+        Args:
+            model_type: 模型类型 (text, vision, embedding)
+            
+        Returns:
+            模型配置字典
+        """
+        # 从全局设置中获取模型默认参数
+        model_defaults = settings.get_model_defaults(model_type)
+        
         # 根据模型类型返回对应的模型名称和默认参数
         if model_type == "text":
             return {
                 "model": self.text_model,
-                "temperature": os.environ.get("LLM_TEMPERATURE", 0.2),
-                "max_tokens": os.environ.get("LLM_MAX_TOKENS", 128000)
+                "temperature": model_defaults.get("temperature"),
+                "max_tokens": model_defaults.get("max_tokens")
             }
         elif model_type == "vision":
             return {
                 "model": self.vision_model,
-                "temperature": os.environ.get("VISION_TEMPERATURE", 0.2),
-                "max_tokens": os.environ.get("VISION_MAX_TOKENS", 128000)
+                "temperature": model_defaults.get("temperature"),
+                "max_tokens": model_defaults.get("max_tokens")
             }
         elif model_type == "embedding":
             return {
                 "model": self.embedding_model,
-                "dimensions": 1536
+                "dimensions": model_defaults.get("dimensions", 1536)
             }
         else:
             logger.warning(f"未知模型类型: {model_type}，使用text类型")
+            text_defaults = settings.get_model_defaults("text")
             return {
                 "model": self.text_model,
-                "temperature": 0.7,
-                "max_tokens": 4000
+                "temperature": text_defaults.get("temperature"),
+                "max_tokens": text_defaults.get("max_tokens")
             }
     
     async def generate_text(self, 

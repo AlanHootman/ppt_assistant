@@ -65,6 +65,7 @@ class SlideGeneratorAgent(BaseAgent):
         model_config = self.model_manager.get_model_config(self.model_type)
         self.llm_model = model_config.get("model")
         self.vision_model = model_config.get("model")  # 为验证功能使用同一个视觉模型
+        # 直接使用模型配置中的值，不再需要类型转换
         self.temperature = model_config.get("temperature")
         self.max_tokens = model_config.get("max_tokens")
         

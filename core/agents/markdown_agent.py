@@ -41,6 +41,7 @@ class MarkdownAgent(BaseAgent):
         # 初始化模型属性
         model_config = self.model_manager.get_model_config(self.model_type)
         self.llm_model = model_config.get("model")
+        # 直接使用模型配置中的值，不再需要类型转换
         self.temperature = model_config.get("temperature")
         self.max_tokens = model_config.get("max_tokens")
         

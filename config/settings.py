@@ -66,7 +66,35 @@ class Settings:
         self.PPT_CACHE_DIR = self.WORKSPACE_DIR / "ppt_cache"
         self.PPT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
         
+        # 模型默认参数配置 - 统一管理所有Agent使用的默认值
+        self.MODEL_DEFAULTS = {
+            # 各种类型模型的默认参数
+            "text": {
+                "temperature": float(os.environ.get("LLM_TEMPERATURE", "0.7")),
+                "max_tokens": int(os.environ.get("LLM_MAX_TOKENS", "128000"))
+            },
+            "vision": {
+                "temperature": float(os.environ.get("VISION_TEMPERATURE", "0.7")),
+                "max_tokens": int(os.environ.get("VISION_MAX_TOKENS", "128000"))
+            },
+            "embedding": {
+                "dimensions": int(os.environ.get("EMBEDDING_DIMENSIONS", "1536"))
+            }
+        }
+        
         logger.info(f"加载系统配置，项目根目录: {self.BASE_DIR}")
+    
+    def get_model_defaults(self, model_type: str = "text") -> Dict[str, Any]:
+        """
+        获取指定类型模型的默认参数
+        
+        Args:
+            model_type: 模型类型，支持 text、vision、embedding
+            
+        Returns:
+            模型默认参数字典
+        """
+        return self.MODEL_DEFAULTS.get(model_type, self.MODEL_DEFAULTS["text"])
     
     def get_workflow_config_path(self, workflow_name: str) -> Path:
         """
@@ -81,4 +109,4 @@ class Settings:
         return self.WORKFLOW_CONFIG_DIR / f"{workflow_name}.yaml"
 
 # 创建全局配置实例
-settings = Settings() 
+settings = Settings()
