@@ -734,7 +734,7 @@ class SlideGeneratorAgent(BaseAgent):
                 element_id=element_id,
                 new_content=str(content).strip()
             )
-        elif operation_type == "adjust_font_size":
+        elif operation_type == "adjust_text_font_size":
             # 调整字体大小
             return self.ppt_manager.adjust_text_font_size(
                 presentation=presentation,
