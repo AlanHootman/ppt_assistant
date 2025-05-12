@@ -65,8 +65,8 @@ class SlideGeneratorAgent(BaseAgent):
         model_config = self.model_manager.get_model_config(self.model_type)
         self.llm_model = model_config.get("model")
         self.vision_model = model_config.get("model")  # 为验证功能使用同一个视觉模型
-        self.temperature = model_config.get("temperature", 0.7)
-        self.max_tokens = model_config.get("max_tokens", 4000)
+        self.temperature = model_config.get("temperature")
+        self.max_tokens = model_config.get("max_tokens")
         
         # 获取迭代优化相关配置
         self.max_iterations = config.get("max_iterations", settings.MAX_SLIDE_ITERATIONS)

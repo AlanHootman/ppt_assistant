@@ -98,14 +98,14 @@ class ModelManager:
         if model_type == "text":
             return {
                 "model": self.text_model,
-                "temperature": 0.7,
-                "max_tokens": 4000
+                "temperature": os.environ.get("LLM_TEMPERATURE", 0.2),
+                "max_tokens": os.environ.get("LLM_MAX_TOKENS", 128000)
             }
         elif model_type == "vision":
             return {
                 "model": self.vision_model,
-                "temperature": 0.7,
-                "max_tokens": 4000
+                "temperature": os.environ.get("VISION_TEMPERATURE", 0.2),
+                "max_tokens": os.environ.get("VISION_MAX_TOKENS", 128000)
             }
         elif model_type == "embedding":
             return {

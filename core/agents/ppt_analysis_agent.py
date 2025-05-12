@@ -48,8 +48,8 @@ class PPTAnalysisAgent(BaseAgent):
         # 初始化模型属性
         model_config = self.model_manager.get_model_config(self.model_type)
         self.vision_model = model_config.get("model")
-        self.temperature = model_config.get("temperature", 0.7)
-        self.max_tokens = model_config.get("max_tokens", 4000)
+        self.temperature = model_config.get("temperature")
+        self.max_tokens = model_config.get("max_tokens")
         
         # 图片分析批次大小配置
         self.batch_size = config.get("batch_size", 5)
