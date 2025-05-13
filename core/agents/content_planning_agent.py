@@ -140,26 +140,26 @@ class ContentPlanningAgent(BaseAgent):
         """
         # 获取presentation信息
         presentation_json = None
-        if ppt_template_path:
-            try:
-                # 导入PPT管理器
-                from libs.ppt_manager.interfaces.ppt_api import PPTManager
+        # if ppt_template_path:
+        #     try:
+        #         # 导入PPT管理器
+        #         from libs.ppt_manager.interfaces.ppt_api import PPTManager
                 
-                # 创建PPT管理器实例
-                ppt_manager = PPTManager()
+        #         # 创建PPT管理器实例
+        #         ppt_manager = PPTManager()
                 
-                # 加载PPT文件
-                presentation = ppt_manager.load_presentation(ppt_template_path)
+        #         # 加载PPT文件
+        #         presentation = ppt_manager.load_presentation(ppt_template_path)
                 
-                # 获取PPT文件的详细信息
-                presentation_json = ppt_manager.get_presentation_json(presentation, include_details=True)
+        #         # 获取PPT文件的详细信息
+        #         presentation_json = ppt_manager.get_presentation_json(presentation, include_details=True)
                 
-                # 加载成功日志
-                logger.info(f"成功加载PPT模板文件: {ppt_template_path}")
+        #         # 加载成功日志
+        #         logger.info(f"成功加载PPT模板文件: {ppt_template_path}")
                 
-            except Exception as e:
-                logger.error(f"加载PPT模板文件失败: {str(e)}")
-                presentation_json = None
+        #     except Exception as e:
+        #         logger.error(f"加载PPT模板文件失败: {str(e)}")
+        #         presentation_json = None
         
         # 构建提示词
         prompt = self._build_planning_prompt(sections, available_layouts, title, subtitle, presentation_json)
@@ -207,12 +207,12 @@ class ContentPlanningAgent(BaseAgent):
         # 将sections和layouts转换为格式化的JSON字符串
         sections_json = json.dumps(sections, ensure_ascii=False, indent=2)
         layouts_json = json.dumps(layouts, ensure_ascii=False, indent=2)
-        presentation_json_str = json.dumps(presentation_json, ensure_ascii=False, indent=2)
+        # presentation_json_str = json.dumps(presentation_json, ensure_ascii=False, indent=2)
         # 使用Jinja2模板渲染
         context = {
             "sections_json": sections_json,
             "layouts_json": layouts_json,
-            "presentation_json": presentation_json_str,
+            # "presentation_json": presentation_json_str,
             "title": title,
             "subtitle": subtitle
         }
