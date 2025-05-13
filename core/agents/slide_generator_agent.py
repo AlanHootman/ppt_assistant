@@ -415,7 +415,7 @@ class SlideGeneratorAgent(BaseAgent):
         logger.info(f"处理章节 {current_index + 1}/{len(state.content_plan)}: {current_section.get('slide_type', '未知类型')}")
         
         # 第一步：找到目标幻灯片
-        slide_index, presentation = await self._find_template_slide(presentation, current_section)
+        slide_index, presentation = await self._find_template_slide(state, presentation, current_section)
         
         # 第二步：规划并执行幻灯片内容填充操作
         operations = await self._plan_and_execute_content_operations(
@@ -820,11 +820,12 @@ class SlideGeneratorAgent(BaseAgent):
                 logger.info(f"删除临时PPTX文件: {temp_pptx_path}")
                 temp_pptx_path.unlink()
     
-    async def _find_template_slide(self, presentation: Any, current_section: Dict[str, Any]) -> tuple:
+    async def _find_template_slide(self, state: AgentState, presentation: Any, current_section: Dict[str, Any]) -> tuple:
         """
         找到模板幻灯片
         
         Args:
+            state: 当前状态
             presentation: 演示文稿对象
             current_section: 当前章节内容
             
@@ -835,18 +836,17 @@ class SlideGeneratorAgent(BaseAgent):
         ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
         template_info = current_section.get("template", {})
         slide_index = template_info.get("slide_index")
-        # slide_id = self._get_template_slide_id(template_info, ppt_json)
         
-        # 初始化已编辑幻灯片ID记录（如果不存在）
-        if not hasattr(self, "_edited_slides"):
-            self._edited_slides = set()
+        # 从state获取已编辑幻灯片ID记录
+        if not hasattr(state, "edited_slides") or state.edited_slides is None:
+            state.edited_slides = set()
         
         # 判断幻灯片是否已编辑过
-        if slide_index in self._edited_slides:
+        if slide_index in state.edited_slides:
             logger.info(f"幻灯片 {slide_index} 已被编辑过，创建新幻灯片")
             
             # 获取模板布局信息
-            layout_name = template_info.get("layout", "Title and Content")
+            layout_name = template_info.get("layout_name", "Title and Content")
             
             # 创建新幻灯片
             result = self.ppt_manager.create_slide_with_layout(
@@ -867,7 +867,7 @@ class SlideGeneratorAgent(BaseAgent):
                 return slide_index, presentation
         else:
             # 将当前幻灯片ID添加到已编辑列表
-            self._edited_slides.add(slide_index)
+            state.edited_slides.add(slide_index)
             logger.info(f"使用现有幻灯片，ID: {slide_index}")
             
             return slide_index, presentation
