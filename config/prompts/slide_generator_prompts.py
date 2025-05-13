@@ -5,50 +5,49 @@
 幻灯片生成Agent提示词配置
 """
 
-LLM_PPT_ELEMENT_MATCHING_PROMPT = """你是专业的PPT生成AI助手，我需要你将特定内容与幻灯片上的元素进行精确匹配，并生成替换操作。
+LLM_PPT_ELEMENT_MATCHING_PROMPT = """你是专业的PPT生成AI助手，需要将内容与幻灯片元素进行精确匹配，并生成操作指令。
 
-## 幻灯片信息
+## 输入信息
+
+### 幻灯片元素结构
 ```json
 {{ slide_elements_json }}
 ```
 
-## 内容信息
+### 待放置内容
 ```json
 {{ content_json }}
 ```
 
-请仔细分析幻灯片结构和内容，生成一份详细的操作指令，指示如何将内容恰当地放置到幻灯片模板中。
-你需要返回JSON格式的操作列表，用于执行具体的修改。
+## 任务说明
+分析对比幻灯片元素结构与待放置内容，为每个内容选择最合适的元素生成操作指令。你的职责是：
+1. 仔细分析slide_elements_json中所有可用元素
+2. 根据content_json的内容选择最合适的元素进行匹配
+3. 生成准确的操作指令，将内容放置到对应元素中
 
-PPT系统支持的操作类型包括:
-1. update_element_content - 替换文本内容
-   - 参数:
-     - element_id: 要更新的元素ID
-     - content: 新的文本内容(字符串)
+## 重要约束
+1. **元素ID必须严格来自slide_elements_json提供的element_id**，不能凭空创建ID
+2. 对于group类型元素，应优先选择其中的text类型子元素进行文本替换
+3. 标题内容应放在title类型元素中，列表内容应放在content/body类型元素中
+4. 内容过长时，可考虑调整字体大小，但不要随意截断内容
 
-2. adjust_text_font_size - 调整字体大小
-   - 参数:
-     - element_id: 要调整字体的元素ID
-     - content: 新的字体大小(整数，单位为磅pt)
+## 支持的操作类型
 
-3. adjust_element_position - 调整元素位置和大小
-   - 参数:
-     - element_id: 要调整的元素ID
-     - content: 包含以下可选字段的对象:
-       - left: 左侧位置(数值，单位为磅pt)
-       - top: 顶部位置(数值，单位为磅pt)
-       - width: 宽度(数值，单位为磅pt)
-       - height: 高度(数值，单位为磅pt)
-       
+### 1. update_element_content - 替换文本内容
+- **element_id**: 必须来自slide_elements_json中的元素ID
+- **content**: 新的文本内容(字符串)
 
-请根据元素类型、位置和内容特点，进行智能匹配。特别注意:
-- 标题应放在标题区域(title)
-- 项目符号列表应放在内容区域(content/body)
-- 内容过长时，考虑拆分或调整字体大小
-- 表格内容应保持结构
-- 图片替换需要确保新图片路径有效
+### 2. adjust_text_font_size - 调整字体大小
+- **element_id**: 必须来自slide_elements_json中的元素ID
+- **content**: 新的字体大小(整数，单位为磅pt)
 
-返回格式示例:
+## 元素选择策略
+1. **对于标题内容**：查找name或type包含"title"的元素
+2. **对于正文内容**：查找name或type包含"content"、"text"、"body"的元素
+3. **对于group元素**：检查其children属性，优先选择其中的text类型元素
+4. **多个可选元素时**：根据元素位置、大小和预期用途选择最合适的
+
+## 输出格式
 ```json
 {
   "operations": [
@@ -63,92 +62,104 @@ PPT系统支持的操作类型包括:
       "content": "• 第一阶段已完成\n• 第二阶段正在进行\n• 第三阶段计划下月启动"
     },
     {
-      "element_id": "title_2",
+      "element_id": "subtitle_1",
       "operation": "adjust_text_font_size",
       "content": 24
-    },
-    {
-      "element_id": "chart_1",
-      "operation": "adjust_element_position",
-      "content": {
-        "left": 100,
-        "top": 200,
-        "width": 400,
-        "height": 300
-      }
     }
   ]
 }
 ```
 
-请确保所有操作的参数都符合要求，并且元素ID必须与幻灯片元素中的ID匹配。只返回JSON格式的操作指令，不要包含其他解释。"""
+## 检查清单
+- 确认所有element_id均来自slide_elements_json
+- 检查group元素是否正确处理，尤其是text子元素
+- 验证操作类型与参数格式是否正确
+- 确保标题、正文等内容放置在合适的元素中
+- 检查是否有需要调整字体大小的长文本
+
+只返回JSON格式的操作指令，不要包含其他解释。"""
 
 
-SLIDE_SELF_VALIDATION_PROMPT = """你是一位专业PPT质量检查与修改专家。请分析提供的幻灯片截图，并评估其质量与内容。
+SLIDE_SELF_VALIDATION_PROMPT = """你是一位专业PPT质量检查与修改专家，需要分析幻灯片并提出改进建议。
 
-## 章节内容信息
+## 输入信息
+
+### 章节内容信息
 ```json
 {{ section_json }}
 ```
 
-## 幻灯片元素信息
+### 幻灯片元素信息
 ```json
 {{ slide_elements_json }}
 ```
 
-请仔细分析幻灯片，重点检查以下方面:
-1. 文本溢出或截断：文本是否超出了文本框边界
-2. 布局平衡：元素分布是否合理，整体布局是否平衡
-3. 可读性：字体大小是否适合，文本是否清晰可读
-4. 颜色对比度：文本与背景的对比度是否足够
-5. 内容密度：幻灯片内容是否过于拥挤
-6. 视觉吸引力：整体设计是否美观，吸引人
-7. 内容与章节主题的匹配度：内容是否符合当前章节的主题
-8. 图片与文本的协调性：图片是否与相关文本内容协调(如果有图片)
-9. 模板残留内容：是否存在模板中的占位文本或多余元素
+## 检查重点
+请仔细分析幻灯片，重点检查以下关键方面：
 
-清理模板残留元素的指导原则:
-- 删除包含"点击添加文本"、"点击编辑"等模板指导文本的元素
-- 删除重复内容或已被新内容替代但仍然保留的旧元素
-- 删除多余的未使用的项目符号点或列表标记
-- 删除不包含实际内容的空文本框
-- 删除与整体内容不相关的模板示例文本
-- 注意：请勿删除背景、品牌元素、装饰图形等不影响内容展示的视觉元素
+### 1. 内容呈现完整性
+- 检查section_json中的内容是否在幻灯片上得到有效呈现
+- 确认重要内容点是否完整展示
+- 验证内容的层次结构和组织是否清晰
 
-请以JSON格式回答，包含以下字段：
-1. has_issues: 布尔值，表示是否存在问题
-2. issues: 问题列表
-3. suggestions: 改进建议列表(如果有问题)
-4. operations: 具体修改操作列表，每个操作包含以下字段：
-   - element_id: 需要修改的元素ID
-   - operation: 操作类型，可以是:
-     - update_element_content: 更新文本内容
-     - adjust_text_font_size: 调整字体大小
-     - adjust_element_position: 调整元素位置和大小
-     - delete_element: 删除元素
-   - content: 根据操作类型提供相应的内容或参数值
-   - reason: 修改原因
-5. quality_score: 1-10分的质量评分
+### 2. 文本溢出问题
+- 检查文本是否超出了文本框边界
+- 识别可能被截断的文本内容
+- 评估文本在元素中的显示是否完整
 
-操作参数要求:
-- update_element_content: content应为字符串
-- adjust_text_font_size: content应为整数
-- adjust_element_position: content应为包含left/top/width/height的对象
-- delete_element: 不需要content参数，直接设置操作类型为delete_element即可
+### 3. 布局平衡性
+- 评估元素分布是否合理
+- 检查整体布局是否平衡
+- 确认重要元素的突出程度是否适当
 
-关于delete_element:
-- 此操作用于删除PPT模板中的残留元素或不必要的元素
-- 只删除文本类元素或影响版面的多余元素组
-- 不应删除背景图、装饰图形、品牌元素等视觉设计元素
-- 删除前应确认该元素确实是模板残留或与当前内容无关
-- 建议同时提供删除理由，说明为什么该元素应被删除
+### 4. 内容密度
+- 判断幻灯片内容是否过于拥挤
+- 评估每页内容量是否适中
+- 建议是否需要拆分内容到多页
 
-输出示例:
+### 5. 文本可读性
+- 检查字体大小是否适合阅读
+- 评估文本与背景的对比是否清晰
+- 确认文本格式是否规范一致
+
+## 操作类型说明
+
+### 1. update_element_content - 更新文本内容
+- **element_id**: 需要更新的元素ID
+- **content**: 新的文本内容(字符串)
+- 适用于：修正文本内容、调整文字表述、简化过长内容
+
+### 2. adjust_text_font_size - 调整字体大小
+- **element_id**: 需要调整字体的元素ID
+- **content**: 新的字体大小(整数，单位为磅pt)
+- 适用于：解决文本溢出、提高可读性
+
+### 3. adjust_element_position - 调整元素位置和大小
+- **element_id**: 需要调整的元素ID
+- **content**: 位置参数对象，可包含以下字段：
+  - left: 左侧位置(数值)
+  - top: 顶部位置(数值)
+  - width: 宽度(数值)
+  - height: 高度(数值)
+- 适用于：改善布局平衡、解决元素重叠问题
+
+## 输出格式
+请以JSON格式返回你的评估结果，包含以下字段：
+
 ```json
 {
   "has_issues": true,
-  "issues": ["存在模板占位文本", "文本在右下角溢出", "标题与内容颜色对比度不足"],
-  "suggestions": ["删除模板占位符", "缩短右下角文本或减小字号", "将标题颜色加深以增加对比度"],
+  "issues": [
+    "内容未完整呈现：缺少核心要点X和Y",
+    "右侧文本框文字溢出",
+    "布局不平衡：左侧空白过多",
+    "内容过于拥挤"
+  ],
+  "suggestions": [
+    "调整右侧文本框大小或减少文字量",
+    "重新排列元素以平衡布局",
+    "考虑将部分内容移至新页面"
+  ],
   "operations": [
     {
       "element_id": "text_box_3",
@@ -163,27 +174,24 @@ SLIDE_SELF_VALIDATION_PROMPT = """你是一位专业PPT质量检查与修改专�
       "reason": "增大字号提高可读性"
     },
     {
-      "element_id": "chart_1",
+      "element_id": "content_area",
       "operation": "adjust_element_position",
       "content": {
         "width": 450,
         "height": 320
       },
-      "reason": "扩大图表尺寸提高可读性"
-    },
-    {
-      "element_id": "placeholder_text_1",
-      "operation": "delete_element",
-      "reason": "删除包含'点击添加标题'的模板占位符"
-    },
-    {
-      "element_id": "empty_bullet_point_3",
-      "operation": "delete_element",
-      "reason": "删除多余的未使用项目符号点"
+      "reason": "扩大内容区域以容纳全部文本"
     }
   ],
   "quality_score": 6
 }
 ```
+
+## 评估标准
+- **quality_score**: 1-10分的质量评分
+  - 8-10分：优秀，几乎没有问题
+  - 6-7分：良好，有小问题但不影响整体效果
+  - 4-5分：一般，有明显问题需要改进
+  - 1-3分：较差，存在严重问题
 
 请仅返回JSON格式结果，不要包含其他解释。""" 
