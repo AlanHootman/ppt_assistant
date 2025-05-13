@@ -40,78 +40,44 @@ TEMPLATE_ANALYSIS_PROMPT = """
    - 对于文本块(textBlock)，请分析有几个段落及其结构特点
 7. 对于图片元素，请添加图片内容描述(caption)，详细说明图片中展示的内容
 8. 提供幻灯片布局分组和汇总，说明哪几页使用类似布局，哪页是开篇/结束页
+9. 对每个幻灯片分析其内容语义类型、关系类型和可视化类型
 
 返回格式示例:
 {
   "templateName": "模板名称",
   "style": "整体风格描述",
-  "visualFeatures": {
-    "colorScheme": "颜色方案详细描述",
-    "designStyle": "设计风格详细描述",
-    "layoutComplexity": "布局复杂度评估",
-    "textDensity": "文本密度评估"
-  },
   "slideLayouts": [
     {
       "slide_index": 0,
       "type": "封面页/标题页", 
-      "purpose": "演示开始页面",
-      "structure": {
-        "titleLocation": "页面顶部居中",
-        "subtitleLocation": "页面中部",
-        "logoPosition": "右下角",
-        "backgroundFeature": "渐变蓝色背景"
-      },
-      "elements": [
-        {
-          "type": "titleText",
-          "position": "上部居中",
-        },
-        {
-          "type": "subtitleText",
-          "position": "中部居中",
-        },
-        {
-          "type": "logoImage",
-          "position": "右下角",
-          "caption": "公司徽标，蓝色和绿色渐变设计"
-        }
-      ],
-      "suitableContent": ["演示标题", "副标题", "公司名称或标志"],
-      "bestPractices": "标题简洁明了，副标题可提供更多上下文"
+      "semantic_type": "introduction",
+      "relation_type": "none",
+      "visualization": "text_only",
+      "layout_description": "页面上部居中有标题文本区域，中部有副标题文本区域，右下角有徽标图片位置。整体采用简洁大方的排版，突出标题，背景使用渐变色彩。"
     },
     {
       "slide_index": 1,
       "type": "内容页", 
-      "purpose": "展示具体内容",
-      "structure": "左侧标题，右侧内容区块",
-      "elements": [
-        {
-          "type": "titleText",
-          "position": "左侧栏",
-        },
-        {
-          "type": "bulletPoints",
-          "position": "右侧主区域",
-          "size": "占右侧80%空间",
-          "bulletCount": 4,
-          "bulletSymbol": "绿色圆点",
-          "bulletDescription": "每个要点前有明显的绿色圆点符号标识，部分要点内容较长需要换行显示"
-        },
-        {
-          "type": "textBlock",
-          "position": "底部",
-          "paragraphCount": 2,
-          "paragraphDescription": "第一段为简短介绍，第二段为详细说明"
-        },
-        {
-          "type": "image",
-          "position": "右上角",
-          "caption": "产品示意图，展示了主要功能界面"
-        }
-      ],
-      "suitableContent": ["关键要点", "产品特性", "服务说明"],
-      "bestPractices": "每页限制4-6个要点，保持简洁"
+      "semantic_type": "feature_list",
+      "relation_type": "bullet_list",
+      "visualization": "bullet_points",
+      "layout_description": "左侧有标题区域，右侧主区域（占80%空间）包含项目符号列表，有4个项目点，每个点前有绿色圆点符号。底部有两段文本：简短介绍段落和详细说明段落。右上角有一个产品示意图，展示了主要功能界面。"
+    },
+    {
+      "slide_index": 2,
+      "type": "过程页", 
+      "semantic_type": "process_description",
+      "relation_type": "timeline",
+      "visualization": "process_diagram",
+      "layout_description": "顶部居中有标题文本区域，中央区域为四步流程图，四个连续箭头连接的流程步骤，每个步骤有标题和简要描述。整体呈现水平方向的流程走向，使用箭头清晰指示流程方向。"
+    },
+    {
+      "slide_index": 3,
+      "type": "对比页", 
+      "semantic_type": "comparison",
+      "relation_type": "compare_contrast",
+      "visualization": "side_by_side",
+      "layout_description": "顶部居中有标题文本区域，中央区域是一个3行2列的对比表格，左侧为'优点'，右侧为'局限性'。两侧内容量保持平衡，使用颜色区分两列，表格线条简洁。"
     }
   ],
   "layoutGroups": [
@@ -150,12 +116,60 @@ TEMPLATE_ANALYSIS_PROMPT = """
   }
 }
 
+## 内容语义类型(semantic_type)说明
+请为每个幻灯片布局分配适当的语义类型，常见类型包括：
+1. introduction - 介绍性内容，如标题页、简介页
+2. toc - 目录页
+3. section_header - 章节标题页
+4. bullet_list - 要点列表
+5. process_description - 过程或步骤描述
+6. data_presentation - 数据展示
+7. comparison - 对比内容
+8. feature_list - 特性列表
+9. summary - 总结内容
+10. conclusion - 结论
+11. thank_you - 感谢/结束页
+
+## 内容关系类型(relation_type)说明
+请分析幻灯片内容元素之间的关系类型，常见类型包括：
+1. none - 无特定关系
+2. sequence - 顺序关系
+3. timeline - 时间线/时序关系
+4. hierarchy - 层级关系
+5. bullet_list - 并列列表关系
+6. compare_contrast - 对比关系
+7. cause_effect - 因果关系
+8. problem_solution - 问题解决关系
+9. spatial - 空间关系
+
+## 可视化类型(visualization)说明
+请指明幻灯片主要使用的可视化方式，常见类型包括：
+1. text_only - 纯文本
+2. bullet_points - 项目符号列表
+3. image_with_text - 图文结合
+4. chart - 图表(请具体说明是柱状图、饼图等)
+5. diagram - 图解
+6. table - 表格
+7. process_diagram - 流程图
+8. timeline - 时间线图
+9. side_by_side - 并排对比
+10. grid_layout - 网格布局
+11. icon_based - 基于图标的可视化
+
+## 布局描述(layout_description)说明
+请用一段简明扼要的文字描述幻灯片的布局结构，包含以下内容：
+1. 各元素的位置和大小特征（如"左侧标题区，右侧内容区"）
+2. 文本区域的数量和用途（如"顶部标题，底部3段文本"）
+3. 项目符号列表的数量和特点（如"右侧5个带圆点的项目符号"）
+4. 图片区域的位置和内容描述（如"右下角产品图片"）
+5. 整体布局风格（如"对称布局"、"不对称布局"）
+
 请确保为每个幻灯片布局的分析都提供以下详细信息：
-1. 幻灯片在原始PPT中的索引(slideIndex)
-2. 详细的结构和元素布局描述
-3. 项目符号列表的具体数量、使用的符号类型及特点
-4. 文本块的段落数量和结构
-5. 图片的内容描述(caption)
+1. 幻灯片在原始PPT中的索引(slide_index)
+2. 内容语义类型(semantic_type)
+3. 内容关系类型(relation_type) 
+4. 可视化类型(visualization)
+5. 布局描述(layout_description)
 6. 幻灯片布局分组和汇总信息
 
 只返回JSON数据，不要有其他回复。
