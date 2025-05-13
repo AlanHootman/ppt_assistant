@@ -66,8 +66,8 @@ class PPTFinalizerAgent(BaseAgent):
             generated_slides = getattr(state, "generated_slides", [])
             
             # 删除未使用的幻灯片（只保留generated_slides中记录的幻灯片）
-            logger.info("删除未使用的模板幻灯片")
-            self._delete_unused_slides(presentation, generated_slides)
+            # logger.info("删除未使用的模板幻灯片")
+            # self._delete_unused_slides(presentation, generated_slides)
             
             # 获取或创建输出目录
             output_dir = getattr(state, "output_dir", "workspace/output")
