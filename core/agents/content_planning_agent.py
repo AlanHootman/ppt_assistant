@@ -74,16 +74,18 @@ class ContentPlanningAgent(BaseAgent):
             subtitle = state.content_structure.get("subtitle", "")
             available_layouts = state.layout_features.get("slideLayouts", [])
             
-            if not available_layouts and state.layout_features.get("layouts"):
-                # 兼容旧版API
-                available_layouts = state.layout_features.get("layouts", [])
+            # 检查是否有PPT模板路径
+            ppt_template_path = state.ppt_template_path
+            if not ppt_template_path:
+                logger.warning("没有提供PPT模板路径，将不使用presentation信息")
                 
             # 使用LLM生成完整PPT内容规划（包括开篇页、内容页和结束页）
             content_plan = await self._generate_content_plan(
                 sections, 
                 available_layouts, 
                 title,
-                subtitle
+                subtitle,
+                ppt_template_path
             )
             
             # 规划slide_index
@@ -120,7 +122,8 @@ class ContentPlanningAgent(BaseAgent):
         sections: List[Dict[str, Any]], 
         available_layouts: List[Dict[str, Any]],
         title: str,
-        subtitle: str
+        subtitle: str,
+        ppt_template_path: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         生成完整的内容规划，包括开篇页、内容页和结束页
@@ -130,12 +133,36 @@ class ContentPlanningAgent(BaseAgent):
             available_layouts: 可用布局列表
             title: 文档标题
             subtitle: 文档副标题
+            ppt_template_path: PPT模板文件路径
             
         Returns:
             完整的内容规划
         """
+        # 获取presentation信息
+        presentation_json = None
+        if ppt_template_path:
+            try:
+                # 导入PPT管理器
+                from libs.ppt_manager.interfaces.ppt_api import PPTManager
+                
+                # 创建PPT管理器实例
+                ppt_manager = PPTManager()
+                
+                # 加载PPT文件
+                presentation = ppt_manager.load_presentation(ppt_template_path)
+                
+                # 获取PPT文件的详细信息
+                presentation_json = ppt_manager.get_presentation_json(presentation, include_details=True)
+                
+                # 加载成功日志
+                logger.info(f"成功加载PPT模板文件: {ppt_template_path}")
+                
+            except Exception as e:
+                logger.error(f"加载PPT模板文件失败: {str(e)}")
+                presentation_json = None
+        
         # 构建提示词
-        prompt = self._build_planning_prompt(sections, available_layouts, title, subtitle)
+        prompt = self._build_planning_prompt(sections, available_layouts, title, subtitle, presentation_json)
         
         try:
             # 调用LLM获取规划结果
@@ -162,7 +189,8 @@ class ContentPlanningAgent(BaseAgent):
         sections: List[Dict[str, Any]], 
         layouts: List[Dict[str, Any]],
         title: str,
-        subtitle: str
+        subtitle: str,
+        presentation_json: Optional[Dict[str, Any]] = None
     ) -> str:
         """
         构建用于内容规划的提示词
@@ -172,6 +200,7 @@ class ContentPlanningAgent(BaseAgent):
             layouts: 可用布局列表
             title: 文档标题
             subtitle: 文档副标题
+            presentation_json: 演示文稿详细信息（可选）
             
         Returns:
             提示词
@@ -179,11 +208,12 @@ class ContentPlanningAgent(BaseAgent):
         # 将sections和layouts转换为格式化的JSON字符串
         sections_json = json.dumps(sections, ensure_ascii=False, indent=2)
         layouts_json = json.dumps(layouts, ensure_ascii=False, indent=2)
-        
+        presentation_json_str = json.dumps(presentation_json, ensure_ascii=False, indent=2)
         # 使用Jinja2模板渲染
         context = {
             "sections_json": sections_json,
             "layouts_json": layouts_json,
+            "presentation_json": presentation_json_str,
             "title": title,
             "subtitle": subtitle
         }
