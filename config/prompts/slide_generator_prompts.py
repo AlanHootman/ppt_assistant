@@ -21,50 +21,83 @@ LLM_PPT_ELEMENT_MATCHING_PROMPT = """你是专业的PPT生成AI助手，需要�
 
 ## 任务说明
 分析对比幻灯片元素结构与待放置内容，为每个内容选择最合适的元素生成操作指令。你的职责是：
-1. 仔细分析slide_elements_json中所有可用元素
+1. 仔细分析slide_elements_json中所有可用元素，理解元素的层级关系和语义含义
 2. 根据content_json的内容选择最合适的元素进行匹配
 3. 生成准确的操作指令，将内容放置到对应元素中
 
 ## 重要约束
 1. **元素ID必须严格来自slide_elements_json提供的element_id**，不能凭空创建ID
-2. 对于group类型元素，应优先选择其中的text类型子元素进行文本替换
-3. 标题内容应放在title类型元素中，列表内容应放在content/body类型元素中
+2. 可用于文本替换的元素类型包括"text"和"shape"
+3. 必须理解并尊重幻灯片元素的语义和层级关系
 4. 内容过长时，可考虑调整字体大小，但不要随意截断内容
+
+## 复杂元素结构处理
+
+### 嵌套Group结构理解
+1. **识别语义组**：幻灯片中的group元素通常有特定的语义关系，例如：
+   - 序号 + 标题组合（如：01 + "年度工作概述"）
+   - 标题 + 内容组合（如：标题文本 + 正文文本）
+   - 分组内容项（如：多个相关的内容项被组合在一起）
+
+2. **标识元素的作用**：
+   - 短数字（如"01"、"02"）通常是序号标识，不应被主要内容替换
+   - 单行简短文本通常是标题或小标题
+   - 较长多行文本通常是内容描述或正文
+   - 包含"占位"、"点击添加"等字样的文本应被替换为实际内容
+
+3. **处理目录类内容时**：
+   - 识别目录项结构（如序号+文本的组合）
+   - 确保目录项的序号（如"01"、"02"）保持不变
+   - 只替换目录项中的描述文本部分
 
 ## 支持的操作类型
 
 ### 1. update_element_content - 替换文本内容
-- **element_id**: 必须来自slide_elements_json中的元素ID
+- **element_id**: 必须是直接text或shape元素的ID，不能是group元素的ID
 - **content**: 新的文本内容(字符串)
 
 ### 2. adjust_text_font_size - 调整字体大小
-- **element_id**: 必须来自slide_elements_json中的元素ID
+- **element_id**: 必须是直接text或shape元素的ID，不能是group元素的ID
 - **content**: 新的字体大小(整数，单位为磅pt)
 
 ## 元素选择策略
-1. **对于标题内容**：查找name或type包含"title"的元素
-2. **对于正文内容**：查找name或type包含"content"、"text"、"body"的元素
-3. **对于group元素**：检查其children属性，优先选择其中的text类型元素
-4. **多个可选元素时**：根据元素位置、大小和预期用途选择最合适的
+
+### 1. 语义匹配
+- **对于标题内容**：查找name或type包含"title"的元素或位于上方的简短文本元素
+- **对于正文内容**：查找name或type包含"content"、"text"、"body"的元素或较大文本框
+- **对于目录项**：在目录结构中查找适合目录项的文本元素，通常是序号旁边的文本元素
+- **对于占位文本**：查找包含"占位"、"点击添加"等字样的文本元素
+
+### 2. 递归处理Group
+- 对于group元素，必须分析其内部结构，理解子元素之间的关系
+- 对于多层嵌套的group，需要逐层深入分析其子元素
+- 当group包含数字标识（如"01"）和文本时，通常只应替换文本部分，保留数字标识
+
+### 3. 目录项处理特殊策略
+当处理内容为目录（items列表）时，执行以下策略：
+1. 识别幻灯片中的所有可能目录项位置，通常是多个结构相似的group
+2. 分析这些group的内部结构，区分序号元素和标题元素
+3. 为每个目录项找到正确的标题元素，保留序号元素不变
+4. 确保不将目录项内容错误地替换到序号元素（如"01"、"02"）上
 
 ## 输出格式
 ```json
 {
   "operations": [
     {
-      "element_id": "title_1",
+      "element_id": "0e80fd5d-d56c-4509-9403-14226b2fe892",
       "operation": "update_element_content", 
-      "content": "项目进展报告"
+      "content": "一、目标与任务导学设计"
     },
     {
-      "element_id": "content_1",
+      "element_id": "99a4f936-7e4a-4c22-90ee-9eb81227c2ee",
       "operation": "update_element_content",
       "content": "• 第一阶段已完成\n• 第二阶段正在进行\n• 第三阶段计划下月启动"
     },
     {
-      "element_id": "subtitle_1",
-      "operation": "adjust_text_font_size",
-      "content": 24
+      "element_id": "6cc70d71-f7dc-4429-9b90-d9218fa1dd56",
+      "operation": "update_element_content",
+      "content": "二、知识与能力导学设计"
     }
   ]
 }
@@ -72,10 +105,11 @@ LLM_PPT_ELEMENT_MATCHING_PROMPT = """你是专业的PPT生成AI助手，需要�
 
 ## 检查清单
 - 确认所有element_id均来自slide_elements_json
-- 检查group元素是否正确处理，尤其是text子元素
-- 验证操作类型与参数格式是否正确
-- 确保标题、正文等内容放置在合适的元素中
+- 检查是否正确理解了group的语义结构，尤其是序号+标题的组合
+- 验证未将目录项错误地替换到序号元素
+- 确保找到了所有内容对应的最合适元素
 - 检查是否有需要调整字体大小的长文本
+- 验证所有占位文本是否已被适当替换
 
 只返回JSON格式的操作指令，不要包含其他解释。"""
 
@@ -122,20 +156,48 @@ SLIDE_SELF_VALIDATION_PROMPT = """你是一位专业PPT质量检查与修改专�
 - 评估文本与背景的对比是否清晰
 - 确认文本格式是否规范一致
 
+### 6. 占位文本处理
+- 识别并清除含有"占位显示"、"预设"、"点击添加"等字样的文本
+- 检查是否存在模板自带的示例文本未被替换
+- 确保所有占位文本都被适当内容替换或清空
+
+### 7. 元素语义匹配
+- 检查文本内容是否放置在语义正确的元素中
+- 验证序号元素（如"01"、"02"）是否仍保持原样，未被错误替换
+- 评估目录项是否正确放置在相应位置，而非序号元素中
+
+## 元素层级处理规则
+
+### 嵌套元素处理
+1. **始终直接操作text/shape元素**：检查发现问题时，必须直接操作最终的text或shape元素，而非其父级group元素
+2. **嵌套group结构**：幻灯片元素可能存在多层嵌套，特别注意处理形如：group → group → text的结构
+3. **元素类型判断**：操作前必须判断element_type，对于text或shape元素直接操作，对于group元素必须深入查找其中的子元素
+
+### 正确定位text/shape元素
+1. 遍历元素的element_type，只有element_type为"text"或"shape"的元素才能被update_element_content操作
+2. 对于group元素，必须查找其elements数组中的子元素，可能需要递归查找多层
+3. 即使问题出现在group层面，操作仍应针对text/shape元素的element_id
+
+### 语义元素识别
+1. 区分序号元素和内容元素（如"01 + 标题"结构中，"01"是序号元素，不应被替换）
+2. 识别目录结构中的项目元素，确保内容放在正确的元素中
+3. 避免将完整目录项错误地放入序号元素中
+
 ## 操作类型说明
 
 ### 1. update_element_content - 更新文本内容
-- **element_id**: 需要更新的元素ID
+- **element_id**: 必须是直接text或shape元素的ID，不能是group元素的ID
 - **content**: 新的文本内容(字符串)
 - 适用于：修正文本内容、调整文字表述、简化过长内容
+- **特别说明**: 对于包含"占位显示"、"预设"、"点击添加"等字样的文本，应将其替换为空格" "
 
 ### 2. adjust_text_font_size - 调整字体大小
-- **element_id**: 需要调整字体的元素ID
+- **element_id**: 必须是直接text或shape元素的ID，不能是group元素的ID
 - **content**: 新的字体大小(整数，单位为磅pt)
 - 适用于：解决文本溢出、提高可读性
 
 ### 3. adjust_element_position - 调整元素位置和大小
-- **element_id**: 需要调整的元素ID
+- **element_id**: 可以是text或group元素的ID，取决于需要调整的实际元素
 - **content**: 位置参数对象，可包含以下字段：
   - left: 左侧位置(数值)
   - top: 顶部位置(数值)
@@ -153,38 +215,117 @@ SLIDE_SELF_VALIDATION_PROMPT = """你是一位专业PPT质量检查与修改专�
     "内容未完整呈现：缺少核心要点X和Y",
     "右侧文本框文字溢出",
     "布局不平衡：左侧空白过多",
-    "内容过于拥挤"
-  ],
-  "suggestions": [
-    "调整右侧文本框大小或减少文字量",
-    "重新排列元素以平衡布局",
-    "考虑将部分内容移至新页面"
+    "内容过于拥挤",
+    "存在未替换的占位文本"
   ],
   "operations": [
     {
-      "element_id": "text_box_3",
+      "element_id": "59a6f089-1f1f-49ef-88bc-d533d700edfc",
       "operation": "update_element_content",
       "content": "简化后的内容",
       "reason": "原文本过长导致溢出"
     },
     {
-      "element_id": "title_1",
+      "element_id": "1909eb3a-336f-45c0-b310-b3137879107b",
       "operation": "adjust_text_font_size",
       "content": 28,
       "reason": "增大字号提高可读性"
     },
     {
-      "element_id": "content_area",
+      "element_id": "0ddae9c7-293c-459b-a185-91cbfb7556ba",
       "operation": "adjust_element_position",
       "content": {
         "width": 450,
         "height": 320
       },
       "reason": "扩大内容区域以容纳全部文本"
+    },
+    {
+      "element_id": "59a6f089-1f1f-49ef-88bc-d533d700edfc",
+      "operation": "update_element_content",
+      "content": " ",
+      "reason": "清除占位文本"
     }
   ],
   "quality_score": 6
 }
+```
+
+## 处理示例
+以下是处理嵌套元素和识别目录结构的示例：
+
+```
+对于目录结构：
+{
+  "element_id": "root_group",
+  "element_type": "group",
+  "elements": [
+    {
+      "element_id": "item1_group",
+      "element_type": "group",
+      "elements": [
+        {
+          "element_id": "number1",
+          "element_type": "text",
+          "text": "01"
+        },
+        {
+          "element_id": "title1",
+          "element_type": "text",
+          "text": "年度工作概述" 
+        }
+      ]
+    },
+    {
+      "element_id": "item2_group",
+      "element_type": "group",
+      "elements": [
+        {
+          "element_id": "number2",
+          "element_type": "text",
+          "text": "02"
+        },
+        {
+          "element_id": "title2",
+          "element_type": "text",
+          "text": "工作完成情况" 
+        }
+      ]
+    }
+  ]
+}
+```
+
+目录项内容为: ["一、目标与任务导学设计", "二、知识与能力导学设计"]
+
+正确的操作是：
+```json
+[
+  {
+    "element_id": "title1",
+    "operation": "update_element_content",
+    "content": "一、目标与任务导学设计",
+    "reason": "更新第一个目录项标题" 
+  },
+  {
+    "element_id": "title2",
+    "operation": "update_element_content",
+    "content": "二、知识与能力导学设计",
+    "reason": "更新第二个目录项标题"
+  }
+]
+```
+
+错误的操作是：
+```json
+[
+  {
+    "element_id": "number1",
+    "operation": "update_element_content",
+    "content": "一、目标与任务导学设计",
+    "reason": "错误：替换了序号元素"
+  }
+]
 ```
 
 ## 评估标准
