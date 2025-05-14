@@ -62,9 +62,16 @@ class Settings:
         # 幻灯片生成配置
         self.MAX_SLIDE_ITERATIONS = int(os.environ.get("MAX_SLIDE_ITERATIONS", "1"))
         
-        # ppt_cache目录
+        # 缓存配置
+        self.USE_CACHE = os.environ.get("USE_CACHE", "true").lower() in ("true", "1", "yes")
+        
+        # 缓存目录
         self.PPT_CACHE_DIR = self.WORKSPACE_DIR / "ppt_cache"
         self.PPT_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        self.MD_CACHE_DIR = self.WORKSPACE_DIR / "md_cache"
+        self.MD_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        self.PLANNER_CACHE_DIR = self.WORKSPACE_DIR / "planner_cache"
+        self.PLANNER_CACHE_DIR.mkdir(parents=True, exist_ok=True)
         
         # 模型默认参数配置 - 统一管理所有Agent使用的默认值
         self.MODEL_DEFAULTS = {

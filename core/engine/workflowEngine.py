@@ -10,6 +10,7 @@ import asyncio
 from datetime import datetime
 import uuid
 import traceback
+import hashlib
 
 from langgraph.graph import StateGraph, END
 # 修复: LangGraph API变更，确保使用最新API
@@ -547,13 +548,50 @@ class WorkflowEngine:
 
     async def _execute_markdown_parser(self, state: AgentState) -> None:
         """
-        使用真实的MarkdownAgent解析Markdown内容
+        使用真实的MarkdownAgent解析Markdown内容，支持从缓存加载
         
         Args:
             state: 代理状态
         """
         try:
-            logger.info("执行真实的MarkdownAgent处理")
+            # 检查是否有Markdown文本
+            if not state.raw_md:
+                error_msg = "没有提供Markdown文本"
+                logger.error(error_msg)
+                state.record_failure(error_msg)
+                return
+            
+            # 检查是否启用缓存
+            use_cache = settings.USE_CACHE if hasattr(settings, 'USE_CACHE') else False
+            
+            # 如果启用了缓存，尝试从缓存加载
+            if use_cache:
+                try:
+                    # 生成缓存文件路径 (基于Markdown内容的哈希值)
+                    md_hash = hashlib.md5(state.raw_md.encode('utf-8')).hexdigest()
+                    cache_dir = settings.MD_CACHE_DIR
+                    cache_file = cache_dir / f"{md_hash}_content_structure.json"
+                    
+                    # 检查缓存文件是否存在
+                    if cache_file.exists():
+                        logger.info(f"发现Markdown缓存文件: {cache_file}")
+                        
+                        # 从缓存加载
+                        with open(cache_file, 'r', encoding='utf-8') as f:
+                            content_structure = json.load(f)
+                        
+                        # 更新状态
+                        state.content_structure = content_structure
+                        logger.info(f"从缓存加载Markdown解析结果，标题: {content_structure.get('title', '未知')}")
+                        
+                        # 添加检查点
+                        state.add_checkpoint("markdown_parser_completed")
+                        
+                        return
+                except Exception as e:
+                    logger.warning(f"尝试从缓存加载Markdown解析结果失败: {str(e)}，将执行完整解析")
+            
+            logger.info("执行完整的MarkdownAgent解析")
             
             # 从配置中获取markdown_parser节点的配置
             node_config = None
@@ -576,6 +614,25 @@ class WorkflowEngine:
             state.content_structure = updated_state.content_structure
             
             logger.info(f"MarkdownAgent执行完成，内容结构: {state.content_structure is not None}")
+            
+            # 如果启用了缓存并且解析成功，保存到缓存
+            if use_cache and state.content_structure:
+                try:
+                    # 确保缓存目录存在
+                    cache_dir = settings.MD_CACHE_DIR
+                    cache_dir.mkdir(parents=True, exist_ok=True)
+                    
+                    # 生成缓存文件路径
+                    md_hash = hashlib.md5(state.raw_md.encode('utf-8')).hexdigest()
+                    cache_file = cache_dir / f"{md_hash}_content_structure.json"
+                    
+                    # 保存到缓存
+                    with open(cache_file, 'w', encoding='utf-8') as f:
+                        json.dump(state.content_structure, f, ensure_ascii=False, indent=2)
+                    
+                    logger.info(f"Markdown解析结果已保存到缓存: {cache_file}")
+                except Exception as e:
+                    logger.warning(f"保存Markdown解析结果到缓存失败: {str(e)}")
             
         except Exception as e:
             logger.error(f"执行MarkdownAgent失败: {str(e)}")
@@ -708,31 +765,35 @@ class WorkflowEngine:
             state.record_failure(error_msg)
             return
         
-        # 尝试从缓存加载
-        try:
-            # 生成缓存文件路径
-            template_name = template_path.stem
-            cache_dir = settings.WORKSPACE_DIR / "ppt_cache"
-            cache_file = cache_dir / f"{template_name}_layout_features.json"
-            
-            # 检查缓存文件是否存在
-            if cache_file.exists():
-                logger.info(f"发现PPT模板缓存文件: {cache_file}")
+        # 检查是否启用缓存
+        use_cache = settings.USE_CACHE if hasattr(settings, 'USE_CACHE') else False
+        
+        # 如果启用了缓存，尝试从缓存加载
+        if use_cache:
+            try:
+                # 生成缓存文件路径
+                template_name = template_path.stem
+                cache_dir = settings.PPT_CACHE_DIR
+                cache_file = cache_dir / f"{template_name}_layout_features.json"
                 
-                # 从缓存加载
-                with open(cache_file, 'r', encoding='utf-8') as f:
-                    layout_features = json.load(f)
-                
-                # 更新状态
-                state.layout_features = layout_features
-                logger.info(f"从缓存加载PPT模板分析结果，模板名称: {layout_features.get('templateName', '未知')}")
-                
-                # 添加检查点
-                state.add_checkpoint("ppt_analyzer_completed")
-                
-                return
-        except Exception as e:
-            logger.warning(f"尝试从缓存加载PPT分析结果失败: {str(e)}，将执行完整分析")
+                # 检查缓存文件是否存在
+                if cache_file.exists():
+                    logger.info(f"发现PPT模板缓存文件: {cache_file}")
+                    
+                    # 从缓存加载
+                    with open(cache_file, 'r', encoding='utf-8') as f:
+                        layout_features = json.load(f)
+                    
+                    # 更新状态
+                    state.layout_features = layout_features
+                    logger.info(f"从缓存加载PPT模板分析结果，模板名称: {layout_features.get('templateName', '未知')}")
+                    
+                    # 添加检查点
+                    state.add_checkpoint("ppt_analyzer_completed")
+                    
+                    return
+            except Exception as e:
+                logger.warning(f"尝试从缓存加载PPT分析结果失败: {str(e)}，将执行完整分析")
         
         # 如果没有缓存或加载失败，执行完整分析
         logger.info("开始分析PPT模板")
@@ -755,10 +816,11 @@ class WorkflowEngine:
         # 执行分析
         await agent.run(state)
         
-        # 检查分析结果，如果成功则保存到缓存
-        if state.layout_features:
+        # 检查分析结果，如果成功且启用了缓存则保存到缓存
+        if state.layout_features and use_cache:
             try:
                 # 确保缓存目录存在
+                cache_dir = settings.PPT_CACHE_DIR
                 cache_dir.mkdir(parents=True, exist_ok=True)
                 
                 # 保存到缓存
@@ -769,16 +831,68 @@ class WorkflowEngine:
             except Exception as e:
                 logger.warning(f"保存PPT分析结果到缓存失败: {str(e)}")
         else:
-            logger.warning("PPT模板分析未生成有效结果，无法保存到缓存")
+            if not state.layout_features:
+                logger.warning("PPT模板分析未生成有效结果，无法保存到缓存")
+            elif not use_cache:
+                logger.info("缓存功能已禁用，不保存PPT分析结果")
     
     async def _execute_content_planner(self, state: AgentState) -> None:
         """
-        使用真实的ContentPlanningAgent执行内容规划
+        使用真实的ContentPlanningAgent执行内容规划，支持从缓存加载
         
         Args:
             state: 代理状态
         """
         try:
+            # 检查必要的输入
+            if not state.content_structure:
+                error_msg = "没有提供内容结构"
+                logger.error(error_msg)
+                state.record_failure(error_msg)
+                return
+            
+            if not state.layout_features:
+                error_msg = "没有提供布局特征"
+                logger.error(error_msg)
+                state.record_failure(error_msg)
+                return
+            
+            # 检查是否启用缓存
+            use_cache = settings.USE_CACHE if hasattr(settings, 'USE_CACHE') else False
+            
+            # 如果启用了缓存，尝试从缓存加载
+            if use_cache:
+                try:
+                    # 生成缓存文件路径（基于内容结构和布局特征的组合哈希值）
+                    content_hash = hashlib.md5(json.dumps(state.content_structure, sort_keys=True).encode('utf-8')).hexdigest()
+                    layout_hash = hashlib.md5(json.dumps(state.layout_features, sort_keys=True).encode('utf-8')).hexdigest()
+                    combined_hash = hashlib.md5(f"{content_hash}_{layout_hash}".encode('utf-8')).hexdigest()
+                    
+                    cache_dir = settings.PLANNER_CACHE_DIR
+                    cache_file = cache_dir / f"{combined_hash}_content_plan.json"
+                    
+                    # 检查缓存文件是否存在
+                    if cache_file.exists():
+                        logger.info(f"发现内容规划缓存文件: {cache_file}")
+                        
+                        # 从缓存加载
+                        with open(cache_file, 'r', encoding='utf-8') as f:
+                            cached_data = json.load(f)
+                        
+                        # 更新状态
+                        state.content_plan = cached_data.get("content_plan")
+                        state.decision_result = cached_data.get("decision_result")
+                        state.current_section_index = 0  # 重置为0，准备开始生成
+                        
+                        logger.info(f"从缓存加载内容规划结果，计划幻灯片数: {len(state.content_plan) if state.content_plan else 0}")
+                        
+                        # 添加检查点
+                        state.add_checkpoint("content_planner_completed")
+                        
+                        return
+                except Exception as e:
+                    logger.warning(f"尝试从缓存加载内容规划结果失败: {str(e)}，将执行完整规划")
+            
             logger.info("执行真实的ContentPlanningAgent处理")
             
             # 从配置中获取content_planner节点的配置
@@ -806,11 +920,38 @@ class WorkflowEngine:
                 
                 logger.info(f"ContentPlanningAgent执行完成，计划了 {len(state.content_plan) if state.content_plan else 0} 张幻灯片")
                 
+                # 如果启用了缓存并且规划成功，保存到缓存
+                if use_cache and state.content_plan:
+                    try:
+                        # 确保缓存目录存在
+                        cache_dir = settings.PLANNER_CACHE_DIR
+                        cache_dir.mkdir(parents=True, exist_ok=True)
+                        
+                        # 生成缓存文件路径
+                        content_hash = hashlib.md5(json.dumps(state.content_structure, sort_keys=True).encode('utf-8')).hexdigest()
+                        layout_hash = hashlib.md5(json.dumps(state.layout_features, sort_keys=True).encode('utf-8')).hexdigest()
+                        combined_hash = hashlib.md5(f"{content_hash}_{layout_hash}".encode('utf-8')).hexdigest()
+                        
+                        cache_file = cache_dir / f"{combined_hash}_content_plan.json"
+                        
+                        # 保存内容规划结果和决策结果到缓存
+                        cache_data = {
+                            "content_plan": state.content_plan,
+                            "decision_result": state.decision_result
+                        }
+                        
+                        # 写入缓存文件
+                        with open(cache_file, 'w', encoding='utf-8') as f:
+                            json.dump(cache_data, f, ensure_ascii=False, indent=2)
+                        
+                        logger.info(f"内容规划结果已保存到缓存: {cache_file}")
+                    except Exception as e:
+                        logger.warning(f"保存内容规划结果到缓存失败: {str(e)}")
+                
             except Exception as agent_error:
                 logger.error(f"ContentPlanningAgent执行出错: {str(agent_error)}")
                 logger.error(f"错误详情: {traceback.format_exc()}")
                 state.record_failure(f"执行ContentPlanningAgent失败: {str(agent_error)}")
-                
             
         except Exception as e:
             logger.error(f"初始化或执行ContentPlanningAgent失败: {str(e)}")
@@ -851,68 +992,3 @@ class WorkflowEngine:
             logger.error(error_msg)
             state.record_failure(error_msg)
             raise 
-
-    # async def _execute_slide_validator(self, state: AgentState) -> None:
-    #     """
-    #     执行幻灯片验证
-        
-    #     Args:
-    #         state: 当前状态
-    #     """
-    #     try:
-    #         logger.info("执行真实的SlideValidatorAgent处理")
-            
-    #         # 从配置中获取slide_validator节点的配置
-    #         node_config = None
-    #         for node in self.config.get("workflow", {}).get("nodes", []):
-    #             if node.get("name") == "slide_validator":
-    #                 node_config = node.get("config", {})
-    #                 break
-            
-    #         if not node_config:
-    #             node_config = {"model_type": "vision", "max_retries": "3"}
-    #             logger.warning("未找到slide_validator节点配置，使用默认配置")
-            
-    #         # 创建SlideValidatorAgent实例
-    #         from core.agents.slide_validator_agent import SlideValidatorAgent
-    #         slide_validator_agent = SlideValidatorAgent(node_config)
-            
-    #         # 执行幻灯片验证
-    #         try:
-    #             updated_state = await slide_validator_agent.run(state)
-                
-    #             # 更新状态的关键属性
-    #             state.validation_result = updated_state.validation_result
-    #             if hasattr(updated_state, 'validation_issues'):
-    #                 state.validation_issues = updated_state.validation_issues
-    #             if hasattr(updated_state, 'validation_suggestions'):
-    #                 state.validation_suggestions = updated_state.validation_suggestions
-    #             if hasattr(updated_state, 'current_section_index'):
-    #                 state.current_section_index = updated_state.current_section_index
-    #             if hasattr(updated_state, 'has_more_content'):
-    #                 state.has_more_content = updated_state.has_more_content
-    #             if hasattr(updated_state, 'generated_slides'):
-    #                 state.generated_slides = updated_state.generated_slides
-    #             if hasattr(updated_state, 'current_slide') and updated_state.current_slide:
-    #                 state.current_slide = updated_state.current_slide
-                
-    #             logger.info(f"SlideValidatorAgent执行完成，验证结果: {state.validation_result}")
-                
-    #         except Exception as agent_error:
-    #             logger.error(f"SlideValidatorAgent执行出错: {str(agent_error)}")
-    #             logger.error(f"错误详情: {traceback.format_exc()}")
-    #             state.record_failure(f"执行SlideValidatorAgent失败: {str(agent_error)}")
-    #             # 设置默认的验证结果，确保工作流不会中断
-    #             state.validation_result = False
-    #             state.validation_issues = [str(agent_error)]
-    #             state.validation_suggestions = ["检查验证器错误日志并修复问题"]
-            
-    #     except Exception as e:
-    #         error_msg = f"初始化或执行SlideValidatorAgent失败: {str(e)}"
-    #         logger.error(error_msg)
-    #         logger.error(f"错误详情: {traceback.format_exc()}")
-    #         state.record_failure(error_msg)
-    #         # 设置默认的验证结果，确保工作流不会中断
-    #         state.validation_result = False
-    #         state.validation_issues = [str(e)]
-    #         state.validation_suggestions = ["检查验证器错误日志并修复问题"] 
