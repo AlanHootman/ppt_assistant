@@ -18,6 +18,14 @@ from config.prompts.content_planning_prompts import CONTENT_PLANNING_PROMPT
 
 logger = logging.getLogger(__name__)
 
+# 导入PPT管理器
+try:
+    from interfaces.ppt_api import PPTManager
+except ImportError:
+    logger = logging.getLogger(__name__)
+    logger.error("无法导入PPTManager，请确保ppt_manager库已正确安装")
+    PPTManager = None
+
 class ContentPlanningAgent(BaseAgent):
     """内容规划Agent，负责规划内容与幻灯片模板的匹配"""
     
@@ -41,6 +49,15 @@ class ContentPlanningAgent(BaseAgent):
         # 直接使用模型配置中的值，不再需要类型转换
         self.temperature = model_config.get("temperature")
         self.max_tokens = model_config.get("max_tokens")
+        
+        # 初始化PPTManager
+        try:
+            from interfaces.ppt_api import PPTManager
+            self.ppt_manager = PPTManager()
+            logger.info("成功初始化PPT管理器")
+        except ImportError as e:
+            logger.error(f"无法导入PPTManager: {str(e)}")
+            self.ppt_manager = None
         
         logger.info(f"初始化ContentPlanningAgent，使用模型: {self.llm_model}")
     
@@ -74,10 +91,23 @@ class ContentPlanningAgent(BaseAgent):
             subtitle = state.content_structure.get("subtitle", "")
             available_layouts = state.layout_features.get("slideLayouts", [])
             
-            # 检查是否有PPT模板路径
+            # 获取PPT模板路径
             ppt_template_path = state.ppt_template_path
-            if not ppt_template_path:
-                logger.warning("没有提供PPT模板路径，将不使用presentation信息")
+            
+            # 获取母版布局信息
+            master_layouts = []
+            if self.ppt_manager and ppt_template_path:
+                logger.info(f"正在获取PPT母版布局信息: {ppt_template_path}")
+                try:
+                    # 加载PPT演示文稿
+                    presentation = self.ppt_manager.load_presentation(ppt_template_path)
+                    # 获取母版布局信息
+                    master_layouts = self.ppt_manager.get_layouts_json(presentation)
+                    logger.info(f"成功获取母版布局信息，共 {len(master_layouts)} 个布局")
+                except Exception as e:
+                    logger.warning(f"获取母版布局信息失败: {str(e)}，将使用默认布局")
+            else:
+                logger.warning("未初始化PPTManager或未提供PPT模板路径，将使用默认布局")
                 
             # 使用LLM生成完整PPT内容规划（包括开篇页、内容页和结束页）
             content_plan = await self._generate_content_plan(
@@ -85,10 +115,10 @@ class ContentPlanningAgent(BaseAgent):
                 available_layouts, 
                 title,
                 subtitle,
-                ppt_template_path
+                ppt_template_path,
+                master_layouts
             )
             
-
             slides = content_plan["slides"]
             # 规划slide_index
             for i, slide in enumerate(slides):
@@ -125,24 +155,26 @@ class ContentPlanningAgent(BaseAgent):
         available_layouts: List[Dict[str, Any]],
         title: str,
         subtitle: str,
-        ppt_template_path: Optional[str] = None
-    ) -> List[Dict[str, Any]]:
+        ppt_template_path: Optional[str] = None,
+        master_layouts: Optional[List[Dict[str, Any]]] = None
+    ) -> Dict[str, Any]:
         """
         生成完整的内容规划，包括开篇页、内容页和结束页
         
         Args:
             sections: 内容章节列表
-            available_layouts: 可用布局列表
+            available_layouts: 基于视觉分析的可用布局列表
             title: 文档标题
             subtitle: 文档副标题
             ppt_template_path: PPT模板文件路径
+            master_layouts: 母版布局信息列表
             
         Returns:
             完整的内容规划
         """
         
         # 构建提示词
-        prompt = self._build_planning_prompt(sections, available_layouts, title, subtitle)
+        prompt = self._build_planning_prompt(sections, available_layouts, title, subtitle, master_layouts)
         
         try:
             # 调用LLM获取规划结果
@@ -155,13 +187,14 @@ class ContentPlanningAgent(BaseAgent):
             
             # 解析LLM响应
             content_plan = self._parse_llm_response(response, sections, available_layouts, title, subtitle)
-            logger.info(f"LLM规划完成，总计规划了 {len(content_plan)} 张幻灯片")
+            logger.info(f"LLM规划完成，总计规划了 {len(content_plan['slides']) if isinstance(content_plan, dict) and 'slides' in content_plan else 0} 张幻灯片")
             
             return content_plan
             
         except Exception as e:
             logger.error(f"LLM规划失败: {str(e)}")
-            # 如果LLM规划失败，使用简单规则匹配
+            # 如果LLM规划失败，返回空的内容规划
+            return {"slides": [], "slide_count": 0}
     
     def _build_planning_prompt(
         self, 
@@ -169,15 +202,17 @@ class ContentPlanningAgent(BaseAgent):
         layouts: List[Dict[str, Any]],
         title: str,
         subtitle: str,
+        master_layouts: Optional[List[Dict[str, Any]]] = None
     ) -> str:
         """
         构建用于内容规划的提示词
         
         Args:
             sections: 内容章节列表
-            layouts: 可用布局列表
+            layouts: 可用布局列表（基于视觉分析）
             title: 文档标题
             subtitle: 文档副标题
+            master_layouts: 母版布局信息列表
             
         Returns:
             提示词
@@ -185,13 +220,20 @@ class ContentPlanningAgent(BaseAgent):
         # 将sections和layouts转换为格式化的JSON字符串
         sections_json = json.dumps(sections, ensure_ascii=False, indent=2)
         layouts_json = json.dumps(layouts, ensure_ascii=False, indent=2)
-        # 使用Jinja2模板渲染
+        
+        # 构建上下文
         context = {
             "sections_json": sections_json,
             "layouts_json": layouts_json,
             "title": title,
             "subtitle": subtitle
         }
+        
+        # 如果有母版布局信息，添加到上下文
+        if master_layouts:
+            master_layouts_json = json.dumps(master_layouts, ensure_ascii=False, indent=2)
+            context["master_layouts_json"] = master_layouts_json
+            logger.info("已添加母版布局信息到规划提示词")
         
         # 使用ModelManager的render_template方法渲染模板
         return self.model_manager.render_template(CONTENT_PLANNING_PROMPT, context)
@@ -203,7 +245,7 @@ class ContentPlanningAgent(BaseAgent):
         layouts: List[Dict[str, Any]],
         title: str,
         subtitle: str
-    ) -> List[Dict[str, Any]]:
+    ) -> Dict[str, Any]:
         """
         解析LLM响应，提取内容规划
         
@@ -215,7 +257,7 @@ class ContentPlanningAgent(BaseAgent):
             subtitle: 文档副标题（用于回退）
             
         Returns:
-            内容规划列表
+            内容规划字典
         """
         try:
             # 清理响应中的markdown格式代码块
@@ -233,15 +275,25 @@ class ContentPlanningAgent(BaseAgent):
             
             # 检查内容计划结构
             if isinstance(content_plan, dict) and "slides" in content_plan:
-                logger.info(f"LLM响应解析成功，共生成{len(content_plan['slides'])}张幻灯片")
+                logger.info(f"LLM响应解析成功，共生成 {len(content_plan['slides'])} 张幻灯片")
+                return content_plan
+            elif isinstance(content_plan, list):
+                # 如果返回的是列表，转换为字典格式
+                logger.info(f"LLM返回的是slides列表，共 {len(content_plan)} 张幻灯片，转换为标准格式")
+                return {
+                    "slides": content_plan,
+                    "slide_count": len(content_plan)
+                }
             else:
-                logger.info(f"LLM响应解析成功，共生成{len(content_plan)}张幻灯片")
+                logger.warning("LLM响应格式不符合预期，尝试兼容处理")
+                return {
+                    "slides": content_plan if isinstance(content_plan, list) else [],
+                    "slide_count": len(content_plan) if isinstance(content_plan, list) else 0
+                }
                 
-            return content_plan
-            
         except Exception as e:
             logger.error(f"解析LLM响应失败: {str(e)}")
-            return []
+            return {"slides": [], "slide_count": 0}
     
     def _find_layout_by_type(self, layouts: List[Dict[str, Any]], type_keywords: List[str]) -> Optional[Dict[str, Any]]:
         """
