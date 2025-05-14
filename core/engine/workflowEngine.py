@@ -712,20 +712,20 @@ class WorkflowEngine:
                 if not state.generated_slides:
                     state.generated_slides = []
                 
-                # 检查是否已存在相同ID的幻灯片，如果是则替换
-                slide_id = state.current_slide.get('slide_id')
+                # 检查是否已存在相同slide_index的幻灯片，如果是则替换
+                slide_index = state.current_slide.get('slide_index')
                 existing_index = None
                 for i, slide in enumerate(state.generated_slides):
-                    if slide.get('slide_id') == slide_id:
+                    if slide.get('slide_index') == slide_index:
                         existing_index = i
                         break
                 
                 if existing_index is not None:
+                    logger.info(f"更新已存在的幻灯片，索引: {slide_index}")
                     state.generated_slides[existing_index] = state.current_slide
                 else:
+                    logger.info(f"添加新生成的幻灯片，索引: {slide_index}")
                     state.generated_slides.append(state.current_slide)
-                
-                logger.info(f"添加已验证的幻灯片到生成列表: {slide_id}")
                 
                 # 更新章节索引
                 if state.current_section_index is None:
