@@ -66,7 +66,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
    - 有序列表：适合numbered_list类型布局
    - 过程/步骤内容：适合process_diagram类型布局
    - 时间线内容：适合timeline类型布局（必须匹配relation_type为timeline的内容）
-   - 对比内容：适合compare_contrast类型布局
+   - 对比内容：适合compare_contrast类型布局（必须匹配relation_type为compare_contrast的内容）
 
 3. **内容量估算**：
    - 文字数量：评估每段内容的文字量，避免内容过多导致页面拥挤
@@ -77,7 +77,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
 1. **布局选择优先顺序**：
    - 第一优先级：内容语义类型与布局semantic_type完全匹配
    - 第二优先级：内容关系类型与布局relation_type完全匹配
-   - 第四优先级：内容量与布局容量匹配
+   - 第三优先级：内容量与布局容量匹配
 
 2. **特殊匹配规则**：
    - 时间线内容（relation_type=timeline）必须且只能使用relation_type为timeline的布局
@@ -93,6 +93,9 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
 1. 内容必须细分为多个幻灯片，每张幻灯片不能包含过多内容（避免内容拥挤）
 2. 规划过程中，所有选择均以内容与布局的最佳契合度为首要考虑因素，其次考虑slide_index不重复
 3. 规划的文字内容长度要与布局中原有元素的文字长度尽量接近，避免内容过多或过少
+4. layout的名称必须与layouts_json中提供的layout名称完全一致
+5. 每个slide_index在整个PPT中必须唯一，不能重复使用。如果找不到合适的唯一索引，请将slide_index设置为null
+6. 每个slide必须包含一个唯一的slide_id字段，作为该幻灯片的唯一标识符
 
 # 内容分割规则
 1. 每个主章节（level=2）应至少有一个单独的索引/概述幻灯片，用于展示章节标题和大纲
@@ -126,6 +129,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
   "slides": [
     {
       "page_number": 0,
+      "slide_id": "slide_000001", 
       "slide_type": "opening",
       "section": {
         "title": "文档标题",
@@ -140,6 +144,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
     },
     {
       "page_number": 1,
+      "slide_id": "slide_000002",
       "slide_type": "toc",
       "section": {
         "title": "目录",
@@ -153,6 +158,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
     },
     {
       "page_number": 2,
+      "slide_id": "slide_000003",
       "slide_type": "section_header",
       "section": {
         "title": "章节标题",
@@ -166,6 +172,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
     },
     {
       "page_number": 3,
+      "slide_id": "slide_000004",
       "slide_type": "content",
       "section": {子章节原始内容},
       "template": {
@@ -176,6 +183,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
     },
     {
       "page_number": 4,
+      "slide_id": "slide_000005",
       "slide_type": "content",
       "section": {子子章节原始内容},
       "template": {
@@ -185,7 +193,8 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
       "reasoning": "选择这个布局的理由，包括与内容的匹配情况"
     },
     {
-      "page_number": 5,
+      "page_number": 5, 
+      "slide_id": "slide_000006",
       "slide_type": "content",
       "section": {
         "title": "项目阶段进展",
@@ -201,6 +210,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
     ...,
     {
       "page_number": 6,
+      "slide_id": "slide_000007",
       "slide_type": "closing",
       "section": {
         "title": "谢谢",
@@ -225,13 +235,14 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
 4. 布局选择要考虑内容特性（如文本密度、是否需要展示图片、项目符号数量等）
 5. 对于含有图片元素的布局，必须评估现有图片是否适合章节内容，避免需要替换图片的情况
 6. 确保每张幻灯片内容量适中，不要过于拥挤
-7. template中只需要包含slide_index和layout名称，不需要包含详细内容
+7. template中的layout名称必须与layouts_json中提供的名称完全一致
 8. 对于有items的章节，务必确保所选布局的placeholder数量与items数量尽可能匹配
 9. 内容拆分应尽量细化，确保每个subsection都有独立的幻灯片页面
-10. 确保每个slide_index只使用一次，不能重复
+10. 确保每个slide_index只使用一次，不能重复，如果找不到唯一的slide_index，则设为null
 11. 评估内容长度与元素容量的匹配度，避免内容溢出或过于空白
 12. 严格遵守特殊布局匹配规则：sections_json中的semantic_type和relation_type必须与layouts_json中对应字段完全匹配
 13. 确保每个幻灯片都有正确的page_number（从0开始）
 14. slide_count值必须等于slides数组的长度
+15. 每个slide必须包含一个唯一的slide_id字段，格式为"slide_"后跟6位数字，如"slide_000001"
 
 只返回JSON，不要包含其他解释。""" 
