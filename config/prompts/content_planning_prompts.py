@@ -122,89 +122,99 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
 # 输出格式
 请以JSON格式返回你的规划，格式如下：
 ```json
-[
-  {
-    "slide_type": "opening",
-    "section": {
-      "title": "文档标题",
-      "subtitle": "文档副标题",
-      "type": "title"
+{
+  "slides": [
+    {
+      "page_number": 0,
+      "slide_type": "opening",
+      "section": {
+        "title": "文档标题",
+        "subtitle": "文档副标题",
+        "type": "title"
+      },
+      "template": {
+        "slide_index": 0,
+        "layout": "Title Slide"
+      },
+      "reasoning": "选择这个布局的理由，包括与内容的匹配情况"
     },
-    "template": {
-      "slide_index": 0,
-      "layout": "Title Slide"
+    {
+      "page_number": 1,
+      "slide_type": "toc",
+      "section": {
+        "title": "目录",
+        "items": ["章节1", "章节2", "..."]
+      },
+      "template": {
+        "slide_index": 2,
+        "layout": "Section Header"
+      },
+      "reasoning": "选择这个布局的理由，包括与内容的匹配情况"
     },
-    "reasoning": "选择这个布局的理由，包括与内容的匹配情况"
-  },
-  {
-    "slide_type": "toc",
-    "section": {
-      "title": "目录",
-      "items": ["章节1", "章节2", "..."]
+    {
+      "page_number": 2,
+      "slide_type": "section_header",
+      "section": {
+        "title": "章节标题",
+        "type": "section_index"
+      },
+      "template": {
+        "slide_index": 3,
+        "layout": "Section Header"
+      },
+      "reasoning": "选择这个布局的理由，包括与内容的匹配情况"
     },
-    "template": {
-      "slide_index": 2,
-      "layout": "Section Header"
+    {
+      "page_number": 3,
+      "slide_type": "content",
+      "section": {子章节原始内容},
+      "template": {
+        "slide_index": 5,
+        "layout": "Content with Bullets"
+      },
+      "reasoning": "选择这个布局的理由，包括项目符号数量与内容items的匹配情况以及文本长度的匹配度"
     },
-    "reasoning": "选择这个布局的理由，包括与内容的匹配情况"
-  },
-  {
-    "slide_type": "section_header",
-    "section": {
-      "title": "章节标题",
-      "type": "section_index"
+    {
+      "page_number": 4,
+      "slide_type": "content",
+      "section": {子子章节原始内容},
+      "template": {
+        "slide_index": 8,
+        "layout": "Two Content"
+      },
+      "reasoning": "选择这个布局的理由，包括与内容的匹配情况"
     },
-    "template": {
-      "slide_index": 3,
-      "layout": "Section Header"
+    {
+      "page_number": 5,
+      "slide_type": "content",
+      "section": {
+        "title": "项目阶段进展",
+        "relation_type": "timeline",
+        "items": ["2021年初步规划", "2022年启动实施", "2023年全面铺开", "2024年评估成效"]
+      },
+      "template": {
+        "slide_index": 10,
+        "layout": "Timeline"
+      },
+      "reasoning": "选择时间线布局展示阶段性进展，完美匹配内容的timeline关系类型"
     },
-    "reasoning": "选择这个布局的理由，包括与内容的匹配情况"
-  },
-  {
-    "slide_type": "content",
-    "section": {子章节原始内容},
-    "template": {
-      "slide_index": 5,
-      "layout": "Content with Bullets"
-    },
-    "reasoning": "选择这个布局的理由，包括项目符号数量与内容items的匹配情况以及文本长度的匹配度"
-  },
-  {
-    "slide_type": "content",
-    "section": {子子章节原始内容},
-    "template": {
-      "slide_index": 8,
-      "layout": "Two Content"
-    },
-    "reasoning": "选择这个布局的理由，包括与内容的匹配情况"
-  },
-  {
-    "slide_type": "content",
-    "section": {
-      "title": "项目阶段进展",
-      "relation_type": "timeline",
-      "items": ["2021年初步规划", "2022年启动实施", "2023年全面铺开", "2024年评估成效"]
-    },
-    "template": {
-      "slide_index": 10,
-      "layout": "Timeline"
-    },
-    "reasoning": "选择时间线布局展示阶段性进展，完美匹配内容的timeline关系类型"
-  },
-  ...,
-  {
-    "slide_type": "closing",
-    "section": {
-      "title": "谢谢",
-      "type": "ending"
-    },
-    "template": {
-      "slide_index": 12,
-      "layout": "Thank You"
-    },
-    "reasoning": "选择这个布局的理由"
-  }
-]
+    ...,
+    {
+      "page_number": 6,
+      "slide_type": "closing",
+      "section": {
+        "title": "谢谢",
+        "type": "ending"
+      },
+      "template": {
+        "slide_index": 12,
+        "layout": "Thank You"
+      },
+      "reasoning": "选择这个布局的理由"
+    }
+  ],
+  "slide_count": 7
+}
 ```
 
 # 输出核对清单
@@ -221,5 +231,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
 10. 确保每个slide_index只使用一次，不能重复
 11. 评估内容长度与元素容量的匹配度，避免内容溢出或过于空白
 12. 严格遵守特殊布局匹配规则：sections_json中的semantic_type和relation_type必须与layouts_json中对应字段完全匹配
+13. 确保每个幻灯片都有正确的page_number（从0开始）
+14. slide_count值必须等于slides数组的长度
 
 只返回JSON，不要包含其他解释。""" 

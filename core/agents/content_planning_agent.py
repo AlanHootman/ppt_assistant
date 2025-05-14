@@ -88,24 +88,26 @@ class ContentPlanningAgent(BaseAgent):
                 ppt_template_path
             )
             
+
+            slides = content_plan["slides"]
             # 规划slide_index
-            for i, slide in enumerate(content_plan):
+            for i, slide in enumerate(slides):
                 slide["slide_index"] = i + 1
-            
             # 添加内容计划到状态中
-            state.content_plan = content_plan
-            
+            state.content_plan = slides
+            total_slides = len(slides)
+
             # 设置当前章节索引为0，准备开始逐页生成
             state.current_section_index = 0
             
             # 向后兼容：添加decision_result（旧版本API）
             state.decision_result = {
-                "slides": content_plan,
-                "total_slides": len(content_plan),
+                "slides": state.content_plan,
+                "total_slides": total_slides,
                 "theme": state.layout_features.get("theme", {})
             }
             
-            logger.info(f"内容规划完成，计划生成 {len(content_plan)} 张幻灯片")
+            logger.info(f"内容规划完成，计划生成 {total_slides} 张幻灯片")
             
             # 记录检查点
             self.add_checkpoint(state)
@@ -229,11 +231,17 @@ class ContentPlanningAgent(BaseAgent):
             # 解析JSON
             content_plan = json.loads(json_text)
             
-            logger.info(f"LLM响应解析成功，共生成{len(content_plan)}张幻灯片")
+            # 检查内容计划结构
+            if isinstance(content_plan, dict) and "slides" in content_plan:
+                logger.info(f"LLM响应解析成功，共生成{len(content_plan['slides'])}张幻灯片")
+            else:
+                logger.info(f"LLM响应解析成功，共生成{len(content_plan)}张幻灯片")
+                
             return content_plan
             
         except Exception as e:
             logger.error(f"解析LLM响应失败: {str(e)}")
+            return []
     
     def _find_layout_by_type(self, layouts: List[Dict[str, Any]], type_keywords: List[str]) -> Optional[Dict[str, Any]]:
         """
