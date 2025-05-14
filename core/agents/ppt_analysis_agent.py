@@ -241,8 +241,13 @@ class PPTAnalysisAgent(BaseAgent):
         # 使用配置的批次大小
         batch_size = self.batch_size
         
-        # 准备所有图像索引信息
+        # 获取所有幻灯片的JSON结构
+        all_slides_json = presentation_json.get("slides", [])
+        
+        # 准备所有图像索引信息和对应的幻灯片JSON结构
         all_image_indices = []
+        slides_json_map = {}
+        
         for i, image_path in enumerate(image_paths):
             # 从图像路径中提取文件名
             filename = os.path.basename(image_path)
@@ -260,11 +265,21 @@ class PPTAnalysisAgent(BaseAgent):
                 except ValueError:
                     pass
             
-            all_image_indices.append({
+            # 获取对应的幻灯片JSON结构
+            slide_json = None
+            if 0 <= real_index < len(all_slides_json):
+                slide_json = all_slides_json[real_index]
+            
+            # 构建图像索引信息，包含对应的幻灯片JSON
+            image_info = {
                 "filename": filename,
                 "position": i,  # 在当前分析中的位置
-                "slideIndex": real_index  # 在原始PPT中的索引
-            })
+                "slideIndex": real_index,  # 在原始PPT中的索引
+                "slide_json": slide_json  # 添加幻灯片JSON结构
+            }
+            
+            all_image_indices.append(image_info)
+            slides_json_map[real_index] = slide_json
         
         # 准备模板信息
         template_info = {
@@ -284,6 +299,16 @@ class PPTAnalysisAgent(BaseAgent):
             batch_images = image_paths[start_idx:end_idx]
             batch_indices = all_image_indices[start_idx:end_idx]
             
+            # 提取当前批次对应的幻灯片JSON
+            batch_slides_json = []
+            for image_info in batch_indices:
+                slide_index = image_info["slideIndex"]
+                if slide_index in slides_json_map and slides_json_map[slide_index]:
+                    batch_slides_json.append({
+                        "slide_index": slide_index,
+                        "content": slides_json_map[slide_index]
+                    })
+            
             logger.info(f"处理第 {batch_idx + 1}/{batch_count} 批图像，包含 {len(batch_images)} 张图片")
             
             # 准备模板上下文
@@ -291,6 +316,7 @@ class PPTAnalysisAgent(BaseAgent):
                 "template_info": template_info,
                 "has_images": True,
                 "image_indices": batch_indices,
+                "slides_json": batch_slides_json,  # 添加幻灯片JSON结构
                 "presentation_json": presentation_json,
                 "is_batch": True,
                 "batch_info": {
@@ -340,19 +366,18 @@ class PPTAnalysisAgent(BaseAgent):
                         logger.error(f"解析第 {batch_idx + 1} 批视觉模型响应失败: {str(e)}")
                         # 继续处理下一批，不中断整个过程
                 else:
-                    logger.warning("模型管理器不支持视觉模型调用，使用默认分析结果")
-                    # 添加默认结果
-                    default_result = self._get_default_visual_analysis(template_info, batch_indices)
-                    batched_results.append(default_result)
+                    logger.warning("模型管理器不支持视觉模型调用")
+                    # 返回错误信息
+                    raise ValueError("当前模型管理器不支持视觉模型调用，无法分析幻灯片")
                     
             except Exception as e:
                 logger.error(f"第 {batch_idx + 1} 批视觉模型分析失败: {str(e)}")
                 # 继续处理下一批，不中断整个过程
         
-        # 如果所有批次都失败，返回默认分析结果
+        # 如果所有批次都失败，返回错误信息
         if not batched_results:
-            logger.warning("所有批次分析都失败，返回默认分析结果")
-            return self._get_default_visual_analysis(template_info, all_image_indices)
+            logger.error("所有批次分析都失败")
+            raise ValueError("幻灯片视觉分析失败，无法获取有效的分析结果")
         
         # 合并分析结果
         return self._merge_batch_results(batched_results, template_info)
@@ -369,7 +394,8 @@ class PPTAnalysisAgent(BaseAgent):
             合并后的分析结果
         """
         if not results:
-            return self._get_default_visual_analysis(template_info)
+            logger.error("没有有效的分析结果可合并")
+            raise ValueError("幻灯片分析结果为空，无法合并分析结果")
         
         # 如果只有一个批次，直接返回
         if len(results) == 1:
@@ -439,90 +465,4 @@ class PPTAnalysisAgent(BaseAgent):
         merged_result["slideSummary"] = slide_summary
         
         logger.info(f"成功合并 {len(results)} 批分析结果，共有 {len(all_slide_layouts)} 个幻灯片布局分析")
-        return merged_result
-    
-    def _get_default_visual_analysis(self, template_info: Dict[str, Any], image_indices: List[Dict[str, Any]] = None) -> Dict[str, Any]:
-        """
-        获取默认的视觉分析结果
-        
-        Args:
-            template_info: 模板基本信息
-            image_indices: 图像索引信息
-            
-        Returns:
-            默认的视觉分析结果
-        """
-        template_name = template_info.get("template_name", "未知模板")
-        
-        # 创建默认的幻灯片布局分析
-        default_slide_layouts = []
-        if image_indices:
-            for idx_info in image_indices[:2]:  # 只处理前两个作为示例
-                slide_index = idx_info.get("slideIndex", 0)
-                
-                # 为第一页创建封面页布局
-                if slide_index == 0:
-                    default_slide_layouts.append({
-                        "slideIndex": slide_index,
-                        "type": "封面页/标题页",
-                        "purpose": "演示开始页面",
-                        "structure": {
-                            "titleLocation": "页面顶部居中",
-                            "subtitleLocation": "页面中部",
-                            "logoPosition": "右下角"
-                        },
-                        "elements": [
-                            {
-                                "type": "titleText",
-                                "position": "上部居中",
-                                "size": "大"
-                            },
-                            {
-                                "type": "subtitleText",
-                                "position": "中部居中",
-                                "size": "中"
-                            }
-                        ],
-                        "suitableContent": ["演示标题", "副标题", "公司名称"],
-                        "bestPractices": "标题简洁明了，副标题可提供更多上下文"
-                    })
-                else:
-                    # 为其他页创建内容页布局
-                    default_slide_layouts.append({
-                        "slideIndex": slide_index,
-                        "type": "内容页",
-                        "purpose": "展示具体内容",
-                        "structure": "左侧标题，右侧内容区块",
-                        "elements": [
-                            {
-                                "type": "titleText",
-                                "position": "左侧栏",
-                                "size": "中"
-                            },
-                            {
-                                "type": "bulletPoints",
-                                "position": "右侧主区域",
-                                "size": "占右侧80%空间"
-                            }
-                        ],
-                        "suitableContent": ["关键要点", "产品特性", "服务说明"],
-                        "bestPractices": "每页限制5-7个要点，保持简洁"
-                    })
-        
-        return {
-            "templateName": template_name,
-            "style": "professional",
-            "visualFeatures": {
-                "colorScheme": "balanced",
-                "designStyle": "modern",
-                "layoutComplexity": "medium",
-                "textDensity": "moderate"
-            },
-            "slideLayouts": default_slide_layouts,
-            "recommendations": {
-                "textContent": "适合文字内容较多的演示，每页建议控制在200字以内",
-                "dataVisualization": "提供了良好的图表支持，适合柱状图、饼图和简单表格",
-                "imageContent": "图片展示效果良好，建议使用高质量图片",
-                "presentationFlow": "结构清晰，适合逻辑性强的内容，建议按'介绍-问题-解决方案-结果'顺序组织"
-            }
-        } 
+        return merged_result 
