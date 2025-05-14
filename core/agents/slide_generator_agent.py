@@ -820,6 +820,45 @@ class SlideGeneratorAgent(BaseAgent):
                 logger.info(f"删除临时PPTX文件: {temp_pptx_path}")
                 temp_pptx_path.unlink()
     
+    async def _create_new_slide_with_same_layout(self, presentation: Any, slide_index: int) -> tuple:
+        """
+        根据指定幻灯片的布局创建一个新的幻灯片
+        
+        Args:
+            presentation: 演示文稿对象
+            slide_index: 参考幻灯片索引
+            
+        Returns:
+            tuple: (新幻灯片ID, 更新后的演示文稿对象)
+        """
+        # 获取当前幻灯片的布局信息
+        layout_json = self.ppt_manager.get_slide_layout_json(
+            presentation=presentation,
+            slide_index=slide_index
+        )
+        
+        # 从layout_json中获取layout_name
+        layout_name = layout_json.get("layout_name", "Title and Content")
+        logger.info(f"获取到幻灯片 {slide_index} 的布局名称: {layout_name}")
+        
+        # 创建新幻灯片
+        result = self.ppt_manager.create_slide_with_layout(
+            presentation=presentation,
+            layout_name=layout_name
+        )
+        
+        if result.get("success", False):
+            # 获取新创建的幻灯片ID
+            new_slide_index = result.get("slide_index")
+            logger.info(f"成功创建新幻灯片，ID: {new_slide_index}")
+            # 返回可能更新的presentation对象
+            presentation = result.get("presentation", presentation)
+            return new_slide_index, presentation
+        else:
+            # 创建失败，仍使用原幻灯片
+            logger.warning(f"创建新幻灯片失败: {result.get('message')}，使用原幻灯片")
+            return slide_index, presentation
+
     async def _find_template_slide(self, state: AgentState, presentation: Any, current_section: Dict[str, Any]) -> tuple:
         """
         找到模板幻灯片
@@ -844,27 +883,7 @@ class SlideGeneratorAgent(BaseAgent):
         # 判断幻灯片是否已编辑过
         if slide_index in state.edited_slides:
             logger.info(f"幻灯片 {slide_index} 已被编辑过，创建新幻灯片")
-            
-            # 获取模板布局信息
-            layout_name = template_info.get("layout_name", "Title and Content")
-            
-            # 创建新幻灯片
-            result = self.ppt_manager.create_slide_with_layout(
-                presentation=presentation,
-                layout_name=layout_name
-            )
-            
-            if result.get("success", False):
-                # 获取新创建的幻灯片ID
-                new_slide_id = result.get("slide_id")
-                logger.info(f"成功创建新幻灯片，ID: {new_slide_id}")
-                # 返回可能更新的presentation对象
-                presentation = result.get("presentation", presentation)
-                return new_slide_id, presentation
-            else:
-                # 创建失败，仍使用原幻灯片
-                logger.warning(f"创建新幻灯片失败: {result.get('message')}，使用原幻灯片")
-                return slide_index, presentation
+            return await self._create_new_slide_with_same_layout(presentation, slide_index)
         else:
             # 将当前幻灯片ID添加到已编辑列表
             state.edited_slides.add(slide_index)
