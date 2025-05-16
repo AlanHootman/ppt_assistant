@@ -485,10 +485,27 @@ class WorkflowEngine:
             
             # 3. 执行内容规划节点
             error_response = await self._execute_and_validate_node(
-                "content_planner", state
+                "content_planner", state,
+                "content_plan", "内容规划失败，无法获取内容规划结果"
             )
             if error_response:
                 return error_response
+            
+            # 检查内容规划是否明确标记为失败
+            if state.planning_failed:
+                error_msg = "内容规划失败，终止工作流"
+                logger.error(error_msg)
+                state.record_failure(error_msg)
+                
+                # 结束MLflow跟踪，标记为失败
+                if self.enable_tracking and self.tracker:
+                    self.tracker.end_workflow_run("FAILED")
+                    
+                return {
+                    "error": error_msg,
+                    "session_id": state.session_id,
+                    "timestamp": datetime.now().isoformat()
+                }
             
             # 初始化幻灯片生成状态
             if state.current_section_index is None:

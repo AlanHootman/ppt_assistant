@@ -51,6 +51,7 @@ class AgentState:
         # 内容规划结果
         self.content_plan = None  # 完整的内容规划（包括开篇页、内容页和结束页）
         self.decision_result = None  # 内容-布局匹配结果（向后兼容）
+        self.planning_failed = False  # 标记内容规划是否失败
         
         # 幻灯片生成状态
         self.current_section_index = None  # 当前处理的章节索引
@@ -152,6 +153,7 @@ class AgentState:
             # 内容规划结果
             "content_plan": self.content_plan,
             "decision_result": self.decision_result,
+            "planning_failed": self.planning_failed,
             
             # 幻灯片生成状态
             "current_section_index": self.current_section_index,
@@ -235,9 +237,10 @@ class AgentState:
         state.checkpoints = data.get("checkpoints", [])
         state.failures = data.get("failures", [])
         
-        # 内容规划结果
+        # 规划结果
         state.content_plan = data.get("content_plan")
         state.decision_result = data.get("decision_result")
+        state.planning_failed = data.get("planning_failed", False)
         
         # 分析结果
         state.layout_features = data.get("layout_features")
