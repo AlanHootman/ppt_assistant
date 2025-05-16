@@ -8,7 +8,7 @@
             "program": "${workspaceFolder}/run_workflow.py",
             "args": [
                 "--md_file", "tests/testfiles/技术思维五导教学内容.md",
-                "--ppt_template", "tests/testfiles/蓝绿色商务简约年终工作总结汇报PPT模板.pptx",
+                "--ppt_template", "tests/testfiles/黄色小清新文艺工作总结ppt模板.pptx",
                 "--output_dir", "workspace/output",
                 "--trace"
             ],
@@ -41,7 +41,7 @@
             "program": "${workspaceFolder}/scripts/ppt_analyzer_offline.py",
             "args": [
                 "analyze",
-                "tests/testfiles/蓝绿色商务简约年终工作总结汇报PPT模板.pptx",
+                "tests/testfiles/黄色小清新文艺工作总结ppt模板.pptx",
                 "-o", "workspace/ppt_cache",
                 "-f"
             ],
