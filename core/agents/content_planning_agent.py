@@ -9,7 +9,9 @@
 
 import logging
 import json
+import re
 from typing import Dict, Any, List, Optional
+import traceback
 
 from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
@@ -50,6 +52,9 @@ class ContentPlanningAgent(BaseAgent):
         self.temperature = model_config.get("temperature")
         self.max_tokens = model_config.get("max_tokens")
         
+        # 获取最大重试次数，如果配置中没有，默认为3次
+        self.max_retries = int(config.get("max_retries", 3))
+        
         # 初始化PPTManager
         try:
             from interfaces.ppt_api import PPTManager
@@ -59,7 +64,7 @@ class ContentPlanningAgent(BaseAgent):
             logger.error(f"无法导入PPTManager: {str(e)}")
             self.ppt_manager = None
         
-        logger.info(f"初始化ContentPlanningAgent，使用模型: {self.llm_model}")
+        logger.info(f"初始化ContentPlanningAgent，使用模型: {self.llm_model}, 最大重试次数: {self.max_retries}")
     
     async def run(self, state: AgentState) -> AgentState:
         """
@@ -119,10 +124,16 @@ class ContentPlanningAgent(BaseAgent):
                 master_layouts
             )
             
+            # 检查内容计划是否为空或无效
+            if not content_plan or not content_plan.get("slides"):
+                error_msg = "内容规划失败，无法获取有效的幻灯片规划"
+                self.record_failure(state, error_msg)
+                logger.error(error_msg)
+                state.planning_failed = True
+                return state
+            
             slides = content_plan["slides"]
-            # 规划slide_index
-            for i, slide in enumerate(slides):
-                slide["slide_index"] = i + 1
+
             # 添加内容计划到状态中
             state.content_plan = slides
             total_slides = len(slides)
@@ -146,6 +157,7 @@ class ContentPlanningAgent(BaseAgent):
             error_msg = f"内容规划失败: {str(e)}"
             self.record_failure(state, error_msg)
             logger.exception("内容规划过程中发生异常")
+            state.planning_failed = True
         
         return state
     
@@ -176,25 +188,48 @@ class ContentPlanningAgent(BaseAgent):
         # 构建提示词
         prompt = self._build_planning_prompt(sections, available_layouts, title, subtitle, master_layouts)
         
-        try:
-            # 调用LLM获取规划结果
-            response = await self.model_manager.generate_text(
-                model=self.llm_model,
-                prompt=prompt,
-                temperature=self.temperature,
-                max_tokens=self.max_tokens
-            )
-            
-            # 解析LLM响应
-            content_plan = self._parse_llm_response(response, sections, available_layouts, title, subtitle)
-            logger.info(f"LLM规划完成，总计规划了 {len(content_plan['slides']) if isinstance(content_plan, dict) and 'slides' in content_plan else 0} 张幻灯片")
-            
-            return content_plan
-            
-        except Exception as e:
-            logger.error(f"LLM规划失败: {str(e)}")
-            # 如果LLM规划失败，返回空的内容规划
-            return {"slides": [], "slide_count": 0}
+        # 实现重试机制
+        retry_count = 0
+        empty_plan = {"slides": [], "slide_count": 0}
+        
+        while retry_count < self.max_retries:
+            try:
+                # 调用LLM获取规划结果
+                logger.info(f"开始生成内容规划，尝试次数: {retry_count + 1}/{self.max_retries}")
+                response = await self.model_manager.generate_text(
+                    model=self.llm_model,
+                    prompt=prompt,
+                    temperature=self.temperature,
+                    max_tokens=self.max_tokens
+                )
+                
+                # 解析LLM响应
+                content_plan = self._parse_llm_response(response, sections, available_layouts, title, subtitle)
+                
+                # 检查规划结果是否有效
+                slides_count = len(content_plan.get('slides', []))
+                logger.info(f"LLM规划完成，总计规划了 {slides_count} 张幻灯片")
+                
+                # 如果成功获取到有效的规划结果，直接返回
+                if slides_count > 0:
+                    return content_plan
+                else:
+                    logger.warning(f"LLM返回了空的规划结果，将重试 (尝试 {retry_count + 1}/{self.max_retries})")
+                    retry_count += 1
+                
+            except Exception as e:
+                logger.error(f"LLM规划失败 (尝试 {retry_count + 1}/{self.max_retries}): {str(e)}")
+                logger.error(f"错误详情: {traceback.format_exc()}")
+                retry_count += 1
+                
+                # 如果已达到最大重试次数，抛出异常
+                if retry_count >= self.max_retries:
+                    logger.error(f"内容规划失败，已达到最大重试次数 ({self.max_retries})")
+                    raise ValueError(f"内容规划失败，已重试{self.max_retries}次: {str(e)}")
+        
+        # 如果所有重试都失败，返回空计划
+        logger.error(f"所有重试尝试均失败，返回空计划")
+        return empty_plan
     
     def _build_planning_prompt(
         self, 
@@ -262,20 +297,24 @@ class ContentPlanningAgent(BaseAgent):
         try:
             # 清理响应中的markdown格式代码块
             json_text = response
-            if "```json" in response:
+            if "```" in response:
                 # 提取JSON代码块
-                import re
                 pattern = r"```(?:json)?\s*([\s\S]*?)```"
                 matches = re.findall(pattern, response)
                 if matches:
-                    json_text = matches[0]
+                    json_text = matches[0].strip()
+                    logger.debug(f"提取到JSON代码块: {json_text[:100]}...")
+            
+            # 解析前检查并修复常见JSON错误
+            json_text = self._clean_json_text(json_text)
             
             # 解析JSON
             content_plan = json.loads(json_text)
             
             # 检查内容计划结构
             if isinstance(content_plan, dict) and "slides" in content_plan:
-                logger.info(f"LLM响应解析成功，共生成 {len(content_plan['slides'])} 张幻灯片")
+                slides_count = len(content_plan["slides"])
+                logger.info(f"LLM响应解析成功，共生成 {slides_count} 张幻灯片")
                 return content_plan
             elif isinstance(content_plan, list):
                 # 如果返回的是列表，转换为字典格式
@@ -293,7 +332,35 @@ class ContentPlanningAgent(BaseAgent):
                 
         except Exception as e:
             logger.error(f"解析LLM响应失败: {str(e)}")
+            logger.error(f"响应内容前100字符: {response[:100]}")
+            logger.error(f"错误详情: {traceback.format_exc()}")
+            # 返回空的内容规划
             return {"slides": [], "slide_count": 0}
+    
+    def _clean_json_text(self, json_text: str) -> str:
+        """
+        清理并修复常见的JSON语法错误
+        
+        Args:
+            json_text: 原始JSON文本
+            
+        Returns:
+            清理后的JSON文本
+        """
+        # 删除注释
+        json_text = re.sub(r'//.*?\n', '\n', json_text)
+        json_text = re.sub(r'/\*.*?\*/', '', json_text, flags=re.DOTALL)
+        
+        # 修复尾部逗号
+        json_text = re.sub(r',(\s*[\]}])', r'\1', json_text)
+        
+        # 修复缺少引号的键名
+        json_text = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', json_text)
+        
+        # 修复单引号
+        json_text = re.sub(r"'(.*?)'", r'"\1"', json_text)
+        
+        return json_text
     
     def _find_layout_by_type(self, layouts: List[Dict[str, Any]], type_keywords: List[str]) -> Optional[Dict[str, Any]]:
         """
@@ -328,4 +395,25 @@ class ContentPlanningAgent(BaseAgent):
                 return layout
                 
         # 如果都没找到，返回None
-        return None 
+        return None
+    
+    def add_checkpoint(self, state: AgentState) -> None:
+        """
+        添加工作流检查点
+        
+        Args:
+            state: 工作流状态
+        """
+        state.add_checkpoint("content_planner_completed")
+        logger.info("添加检查点: content_planner_completed")
+    
+    def record_failure(self, state: AgentState, error: str) -> None:
+        """
+        记录失败信息
+        
+        Args:
+            state: 工作流状态
+            error: 错误信息
+        """
+        state.record_failure(error)
+        logger.error(f"记录失败: {error}") 
