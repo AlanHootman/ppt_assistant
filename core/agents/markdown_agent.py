@@ -202,10 +202,6 @@ class MarkdownAgent(BaseAgent):
         if "relation_type" not in section:
             section["relation_type"] = "hierarchical"
         
-        # 确保可视化建议字段存在
-        if "visualization_suggestion" not in section:
-            section["visualization_suggestion"] = "bullet_points"
-        
         # 递归处理子章节
         if "subsections" in section and isinstance(section["subsections"], list):
             for subsection in section["subsections"]:
@@ -311,6 +307,8 @@ class MarkdownAgent(BaseAgent):
         
         # 清理HTML标签
         text = re.sub(r'<[^>]*>', '', text)
+        
+        # 注意：保留所有换行符(\n)，不做任何处理
         
         return text
     

@@ -62,6 +62,7 @@ Markdown文本:
    - 原始markdown中的内容要完整保留，不要丢失或合并
    - 保持内容的原始格式和层次关系
    - 不要对特定类型的内容进行特殊处理或重新格式化
+   - 必须保留所有标题文本，不要省略任何标题文本
 
 5. **分隔与跳过**：
    - 识别并跳过分隔线(---, ***, ___)，不要将它们解析为内容
@@ -154,6 +155,7 @@ Markdown文本:
    - content数组中的所有文本条目都必须去除Markdown标记
    - 列表项中的文本也要清除所有Markdown格式符号
    - 保留文本的语义和内容，只去除格式符号
+   - 必须保留原始文本中的换行符(\n)，不要将多行文本合并为单行
 
 # 4. 语义分析规则
 
@@ -189,10 +191,16 @@ Markdown文本:
    - 含有数字序号或时间顺序的通常是sequence类型
    - 含有分类或层级结构的通常是hierarchical类型
    - 含有3-4个并列要点或概念的通常是grid类型
+   - 当内容包含多个部分且这些部分明显构成对比关系时，应设置为comparison关系类型
 
 3. 特殊内容类型关系判断:
    - 有序列表(numbered_list)通常具有sequence关系类型
    - 并列的3-4个概念或特性通常具有grid关系类型，适合用feature_grid展示
+
+4. 对于复杂结构的章节：
+   - 当一个章节包含多个小节(如"成功案例"和"失败案例")时，应确保上层章节的relation_type反映出这种结构关系
+   - 例如包含"成功案例"和"失败案例"的章节，其relation_type应设为comparison
+   - 上层章节的relation_type应能明确表示其下属子章节之间的关系
 
 # 5. 输出结构规范
 
@@ -204,10 +212,6 @@ Markdown文本:
   "level": 1,
   "subtitle": "文档副标题精简版（超过8个中文字符或15个英文字符时必须提供）",
   "original_subtitle": "文档原始完整副标题(如有)",
-  "document_stats": {
-    "section_count": 章节数量,
-    "total_word_count": 文档总字数
-  },
   "sections": [
     {
       "title": "目标与任务导学设计",
@@ -229,7 +233,7 @@ Markdown文本:
           "content": [
             {
               "type": "paragraph",
-              "content": "引导词：看一看\n 设疑问题：北京的暴雨淹没街道、新疆的葡萄因冰雹绝收…这些极端天气背后，藏着亚洲怎样的地理密码？\n 回答：（留白）",
+              "content": "引导词：看一看\n设疑问题：北京的暴雨淹没街道、新疆的葡萄因冰雹绝收…这些极端天气背后，藏着亚洲怎样的地理密码？\n回答：（留白）",
               "word_count": 100
             }
           ],
@@ -240,6 +244,83 @@ Markdown文本:
           },
           "semantic_type": "instruction",
           "relation_type": "problem_solution"
+        },
+        {
+          "title": "名人与案例",
+          "original_title": "名人与案例",
+          "level": 3,
+          "content": [
+            {
+              "type": "paragraph",
+              "content": "引导语：\n2015年尼泊尔地震时，中国科学家用无人机测绘5小时生成加德满都废墟3D模型！当传统测绘还在爬山时，地理信息技术已让救援效率提升300%。",
+              "word_count": 72
+            }
+          ],
+          "content_stats": {
+            "total_word_count": 72,
+            "element_count": 1,
+            "content_types": ["paragraph"]
+          },
+          "semantic_type": "case_study",
+          "relation_type": "comparison",
+          "subsections": [
+            {
+              "title": "成功案例",
+              "original_title": "成功案例",
+              "level": 4,
+              "content": [
+                {
+                  "type": "numbered_list",
+                  "items": [
+                    {"content": "青藏铁路：工程师用热棒技术冻结冻土层，成为世界铁路建筑奇迹！", "word_count": 28},
+                    {"content": "日本海啸预警：通过海底地震仪网络，让仙台居民提前20分钟逃生！", "word_count": 30}
+                  ],
+                  "item_count": 2,
+                  "total_word_count": 58
+                },
+                {
+                  "type": "paragraph",
+                  "content": "总结：如果让你升级南亚海啸预警系统，会加入哪些地理黑科技？",
+                  "word_count": 28
+                }
+              ],
+              "content_stats": {
+                "total_word_count": 86,
+                "element_count": 2,
+                "content_types": ["numbered_list", "paragraph"]
+              },
+              "semantic_type": "case_study",
+              "relation_type": "sequence"
+            },
+            {
+              "title": "失败案例",
+              "original_title": "失败案例",
+              "level": 4,
+              "content": [
+                {
+                  "type": "numbered_list",
+                  "items": [
+                    {"content": "咸海消失事件：苏联盲目引水种棉，卫星显示咸海面积缩小90%！", "word_count": 28},
+                    {"content": "湄公河大坝争议：未考虑鱼类洄游路线，东南亚四国渔民集体抗议。", "word_count": 30}
+                  ],
+                  "item_count": 2,
+                  "total_word_count": 58
+                },
+                {
+                  "type": "paragraph",
+                  "content": "总结：你若成为湄公河开发顾问，如何在谷歌地球画出生态与经济双赢线？",
+                  "word_count": 31
+                }
+              ],
+              "content_stats": {
+                "total_word_count": 89,
+                "element_count": 2,
+                "content_types": ["numbered_list", "paragraph"]
+              },
+              "semantic_type": "case_study",
+              "relation_type": "sequence"
+            }
+          ]
         },
         {
           "title": "学习目标",
@@ -382,8 +463,7 @@ Markdown文本:
 3. 章节层级结构必须严格保持，主章节下的subsections不能丢失或错误归类
 4. 列表项中的每个item必须包含word_count
 5. 每个章节和子章节必须包含content_stats统计信息，包括total_word_count、element_count和content_types
-6. 文档根级必须包含document_stats统计信息，包含section_count和total_word_count
-7. 原始markdown内容要完整保留，保持其原有结构
-8. 确保所有计数准确无误
+6. 原始markdown内容要完整保留，保持其原有结构
+7. 确保所有计数准确无误
 
 请仅返回JSON数据，不要有任何其他回复。你的输出将直接用于PPT内容生成。"""
