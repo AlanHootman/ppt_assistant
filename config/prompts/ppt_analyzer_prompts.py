@@ -6,44 +6,165 @@ PPT分析器Agent提示词配置
 """
 
 TEMPLATE_ANALYSIS_PROMPT = """
-分析以下PPT模板的布局和设计特点。请识别：
-1. 模板整体风格
-2. 可用的布局类型及其特点
-3. 每种布局适合的内容类型
-4. 设计元素和颜色方案
+你是专业的PPT模板分析专家，需要分析以下PPT模板的布局和设计特点，从而帮助内容规划模块更好地匹配内容与布局。
 
+# 1. 分析目标：
+1. 识别模板整体风格特点
+2. 分析每种布局的类型、结构和用途
+3. 确定每种布局适合呈现的内容类型
+4. 识别布局中可编辑的内容区域及其组织结构
+5. 提供足够的元素详细信息以支持布局决策
+
+# 2. 输入信息与分析策略
 {% if template_info %}
-模板信息:
+## 2.1 模板信息
 {{ template_info | tojson(indent=2) }}
 {% endif %}
 
 {% if has_images %}
-下面是模板中的几页幻灯片图像及其对应的JSON结构，请仔细分析每一页的布局和设计特点。
-每张图像都对应模板中的一个幻灯片，图像文件名包含它在原始PPT中的索引信息。
-请同时参考图像和对应的JSON结构，进行全面分析。
+## 2.2 幻灯片图像信息
+下面是模板中的几页幻灯片图像及其对应的JSON结构。每张图像对应模板中的一个幻灯片，图像文件名包含它在原始PPT中的索引信息。
+- **图像分析策略**：通过视觉分析图像获取布局的整体结构、风格特点和用途描述(layout_description)
+- **JSON分析策略**：通过解析JSON数据获取元素的详细信息，包括元素类型、数量和层次结构
 {% endif %}
 
 {% if image_indices %}
-图像索引和对应的幻灯片JSON结构:
+## 2.3 幻灯片JSON结构数据
 {{ image_indices | tojson(indent=2) }}
 {% endif %}
 
-{% if slides_json %}
-对应的幻灯片JSON结构:
-{{ slides_json | tojson(indent=2) }}
-{% endif %}
+# 3. 分析流程
+## 3.1 整体风格分析（基于图像）
+   - 分析模板的整体设计风格、色彩方案和排版特点
+   - 识别主要设计元素和视觉语言
+   - 确定模板的主题和适用场景
 
-请按以下要求详细分析并以JSON格式返回分析结果:
+## 3.2 布局分类与类型识别（基于图像）
+   - 识别每页幻灯片的用途类型(如封面页、目录页、内容页等)，用途类型可以是多选，比如"目录页|内容页"代表该页幻灯片既可以作为目录页，也可以作为内容页
+   - 确定每页的内容语义类型semantic_type(如introduction、toc、feature_list等)
+   - 识别内容元素之间的关系类型relation_type(如sequence、hierarchical、comparison、cause_effect、problem_solution等)
 
-1. 明确识别每一页幻灯片的类型和用途(如封面页、目录页、章节页、内容页、结束页等)
-2. 对每一页幻灯片进行详细分析，包括布局结构、元素分布和设计特点
-3. 具体指出每个布局中文本框、图片框、表格区域的位置和大小特征
-4. 分析每种布局适合展示的内容类型和信息量
-5. 对于图片元素，请添加图片内容描述(caption)，详细说明图片中展示的内容
-6. 提供幻灯片布局分组和汇总，说明哪几页使用类似布局，哪页是开篇/结束页
-7. 对每个幻灯片分析其内容语义类型、关系类型和可视化类型
+## 3.3 内容区域与结构分析（综合图像与JSON）
+   - 根据图像分析布局中各区域的整体结构和用途，编写简洁的布局描述
+   - 识别和统计可编辑的文本区域（包括纯文本框和带文本的形状）
+   - 记录每个可编辑区域的当前文本内容、位置和文字数量
+   - 确定文本区域之间的组织结构（如流程图、列表、网格等）
+   - 分析组合元素的内部结构和关系
+   - 评估布局适合表达的逻辑关系（如顺序关系、对比关系、层级关系等）
+   - 识别主要内容区域与装饰元素
 
-返回格式示例:
+## 3.4 布局分组与汇总
+   - 将类似布局的幻灯片归为一组
+   - 标记开篇页、内容页和结束页
+   - 总结每组布局的共同特点和适用内容类型
+
+# 4. 分析规则与分类标准
+## 4.1 内容分类标准
+### 4.1.1 内容语义类型(semantic_type)
+- introduction: 介绍性内容，如标题页、简介页
+- toc: 目录页
+- section_header: 章节标题页
+- bullet_list: 要点列表
+- process_description: 过程或步骤描述
+- data_presentation: 数据展示
+- comparison: 对比内容
+- feature_list: 特性列表
+- summary: 总结内容
+- conclusion: 结论
+- thank_you: 感谢/结束页
+- concept: 概念性内容
+- instruction: 指导性内容
+- task: 任务描述内容
+- question_answer: 问答式内容
+
+### 4.1.2 内容关系类型(relation_type)
+- none: 无特定关系
+- sequence: 顺序关系
+- timeline: 时间线/时序关系
+- hierarchy: 层级关系
+- bullet_list: 并列列表关系
+- compare_contrast: 对比关系
+- cause_effect: 因果关系
+- problem_solution: 问题解决关系
+- grid: 网格排列关系
+
+### 4.1.3 可视化类型(visualization)
+- text_only: 纯文本
+- bullet_points: 项目符号列表
+- image_with_text: 图文结合
+- chart: 图表(柱状图、饼图等)
+- diagram: 图解
+- table: 表格
+- process_diagram: 流程图
+- timeline: 时间线图
+- side_by_side: 并排对比
+- grid_layout: 网格布局
+- section_divider: 章节分隔页
+- question_answer: 问答式布局
+
+## 4.2 内容区域分析规则
+
+### 4.2.1 内容区域识别与统计
+- 仔细识别每个可编辑的文本区域，包括：
+  * 纯文本框元素(element_type="text")
+  * 带有文本内容的形状元素(element_type="shape"且包含text_content属性)
+- 识别每个文本区域的主要用途：
+  * 标题区域：通常位于幻灯片上部，字体较大
+  * 正文区域：通常包含详细内容，可能有项目符号
+  * 注释/说明区域：通常字体较小，位于边缘位置
+  * 带文本的形状区域：形状元素中包含的可编辑文字区域
+
+### 4.2.2 内容区域组织结构识别
+- title_content: 标题+正文结构（最基本的布局）
+- bullet_list: 项目符号列表结构
+- numbered_list: 编号列表结构
+- process_flow: 流程图结构（有明确的步骤顺序和连接）
+- comparison_table: 对比表格结构
+- grid_layout: 网格布局结构（项目以网格方式排列）
+- image_text_pair: 图文对结构（图片+对应说明文字）
+- central_focus: 中心辐射结构（中心概念+周边说明）
+- timeline: 时间线结构
+- free_form: 自由排布结构（无明确组织模式）
+
+### 4.2.3 组合元素识别和分析
+- 分析组合元素（如group）的内部结构和组成
+- 确定组合内部元素之间的关系模式：
+  * 顺序型：元素按特定顺序排列（如流程步骤）
+  * 网格型：元素以网格方式排列
+  * 嵌套型：元素间有包含关系
+  * 对称型：元素呈对称排列
+- 记录组合中各元素的类型、位置和功能
+- 分析组合元素的整体用途
+
+### 4.2.4 元素详细信息记录
+对每个可编辑文字区域记录以下信息：
+- 元素类型（标题文本、正文文本、带文本的形状）
+- 位置描述（页面上部、左侧等）
+- 当前文本内容
+- 文字数量
+- 元素用途
+- 是否包含项目符号
+- 与其他元素的组合关系
+
+## 4.3 元素计数规则
+
+### 4.3.1 可编辑文本区域计数
+- title_elements: 标题文本区域数量（包括主标题和副标题）
+- body_text_elements: 正文文本区域数量（包括正文和列表）
+- shape_text_elements: 带文本的形状元素数量（原始JSON中element_type="shape"且包含text_content属性的元素）
+- total_editable_text_areas: 所有可编辑文本区域总数 = title_elements + body_text_elements + shape_text_elements
+
+### 4.3.2 内容结构特殊区域计数
+- process_steps: 流程图的步骤数量
+- comparison_items: 对比项数量
+- grid_cells: 网格单元格数量
+- timeline_points: 时间线上的点数量
+
+# 5. 输出格式
+
+请以JSON格式返回分析结果，包含以下字段：
+
+```json
 {
   "style": "整体风格描述",
   "slideLayouts": [
@@ -53,31 +174,193 @@ TEMPLATE_ANALYSIS_PROMPT = """
       "semantic_type": "introduction",
       "relation_type": "none",
       "visualization": "text_only",
-      "layout_description": "页面上部居中有一个title元素(最多支持20-30个字符)，中部有subtitle元素(支持40-60个字符)，右下角有一个image元素(建议尺寸120x60像素)。整体采用简洁大方的排版，突出标题，背景使用渐变色彩。共有2个text元素，1个image元素。主标题文本容量约20字，副标题文本容量约40字。"
+      "layout_description": "页面上部有主标题区域，中部有副标题区域，右下角有品牌标识。",
+      "content_structure": "title_content",
+      "editable_areas": {
+        "title_elements": 1,
+        "body_text_elements": 1,
+        "shape_text_elements": 0,
+        "total_editable_text_areas": 2
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面上部居中",
+          "current_text": "演示文稿标题",
+          "word_count": 5,
+          "purpose": "主标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "body_text",
+          "position": "页面中部",
+          "current_text": "项目副标题文本",
+          "word_count": 6,
+          "purpose": "副标题",
+          "has_bullets": false
+        }
+      ],
+      "logical_relationships": ["hierarchy"],
+      "suitable_content_types": ["introduction", "section_header"]
     },
     {
       "slide_index": 1,
-      "type": "内容页", 
-      "semantic_type": "feature_list",
-      "relation_type": "bullet_list",
-      "visualization": "bullet_points",
-      "layout_description": "左侧有title元素(支持15-20个字符)，右侧主区域(占80%空间)包含带有bullet_points的text元素，有4个项目点，每个项目点支持30-40个字符，每个点前有绿色圆点符号。底部有两个单独的text元素：简短介绍段落(30-40字)和详细说明段落(60-80字)。右上角有一个image元素(建议尺寸200x150像素)。共有3个text元素(1个标题，1个带bullet_points的列表包含4个项目，1个底部说明)，以及1个image元素。"
-    },
-    {
-      "slide_index": 2,
-      "type": "过程页", 
+      "type": "流程图页", 
       "semantic_type": "process_description",
-      "relation_type": "timeline",
+      "relation_type": "sequence",
       "visualization": "process_diagram",
-      "layout_description": "顶部居中有title元素(最多25个字符)，中央区域为由4个group元素组成的流程图，每个group包含一个shape元素(箭头)和两个text元素(步骤标题和描述)。每个group内部结构统一：上部为步骤标题text元素(10-15字)，下部为描述text元素(20-30字)，箭头shape元素连接各个group。整体呈现水平方向的流程走向。共包含9个元素：1个主标题text元素、4个group元素(每个包含2个text元素和1个shape元素)。每个步骤支持标题约10个字，描述约25个字。"
+      "layout_description": "页面以四步流程图为主，每个步骤包含标题和描述，步骤之间用箭头连接，顶部有页面标题。",
+      "content_structure": "process_flow",
+      "editable_areas": {
+        "title_elements": 1,
+        "body_text_elements": 4,
+        "shape_text_elements": 0,
+        "total_editable_text_areas": 5,
+        "process_steps": 4
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面顶部居中",
+          "current_text": "流程标题",
+          "word_count": 4,
+          "purpose": "流程图标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "body_text",
+          "position": "流程第一步",
+          "current_text": "第一步内容",
+          "word_count": 4,
+          "purpose": "流程步骤1",
+          "has_bullets": false
+        },
+        {
+          "element_type": "body_text",
+          "position": "流程第二步",
+          "current_text": "第二步内容",
+          "word_count": 4,
+          "purpose": "流程步骤2",
+          "has_bullets": false
+        },
+        {
+          "element_type": "body_text",
+          "position": "流程第三步",
+          "current_text": "第三步内容",
+          "word_count": 4,
+          "purpose": "流程步骤3",
+          "has_bullets": false
+        },
+        {
+          "element_type": "body_text",
+          "position": "流程第四步",
+          "current_text": "第四步内容",
+          "word_count": 4,
+          "purpose": "流程步骤4",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": [
+        {
+          "group_type": "process_flow",
+          "elements_count": 4,
+          "arrangement": "顺序排列",
+          "connection_type": "箭头连接"
+        }
+      ],
+      "logical_relationships": ["sequence", "cause_effect"],
+      "suitable_content_types": ["process_description", "timeline"]
     },
     {
-      "slide_index": 3,
-      "type": "目录页", 
-      "semantic_type": "toc",
-      "relation_type": "hierarchy",
-      "visualization": "bullet_points",
-      "layout_description": "顶部居中有title元素(15-20字符)，主体区域包含多个编号目录项，每个目录项由一个group元素组成，内部包含两个text元素：序号元素(显示如'01'、'02'的编号)和标题元素(25-35字符)。共有1个title元素和5个group元素(每个group包含2个text元素，总共有11个元素)。目录项之间有统一的间距，布局整齐有序。编号使用强调色，目录标题使用主要文本色。整体设计简洁明了，方便快速浏览章节结构。"
+      "slide_index": 5,
+      "type": "内容页",
+      "semantic_type": "feature_list",
+      "relation_type": "grid",
+      "visualization": "image_with_text",
+      "layout_description": "页面左侧为文本说明，右侧为图片展示，底部有多个文本框。",
+      "content_structure": "grid_layout",
+      "editable_areas": {
+        "title_elements": 1,
+        "body_text_elements": 3,
+        "shape_text_elements": 4,
+        "total_editable_text_areas": 8
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面顶部",
+          "current_text": "特性列表标题",
+          "word_count": 5,
+          "purpose": "页面标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "body_text",
+          "position": "页面左侧上部",
+          "current_text": "添加标题\n请您单击此处输入文本内容，可根据需要适当地调整文字的颜色，祝您使用愉快！",
+          "word_count": 24,
+          "purpose": "文本说明",
+          "has_bullets": false
+        },
+        {
+          "element_type": "body_text",
+          "position": "页面左侧中部",
+          "current_text": "添加标题\n请您单击此处输入文本内容，可根据需要适当地调整文字的颜色，祝您使用愉快！",
+          "word_count": 24,
+          "purpose": "文本说明",
+          "has_bullets": false
+        },
+        {
+          "element_type": "body_text",
+          "position": "页面左侧下部",
+          "current_text": "添加标题\n请您单击此处输入文本内容，可根据需要适当地调整文字的颜色，祝您使用愉快！",
+          "word_count": 24,
+          "purpose": "文本说明",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_text",
+          "position": "底部第一个",
+          "current_text": "输入标题\n请在此添加文字说明",
+          "word_count": 10,
+          "purpose": "特性说明",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_text",
+          "position": "底部第二个",
+          "current_text": "输入标题\n请在此添加文字说明",
+          "word_count": 10,
+          "purpose": "特性说明",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_text",
+          "position": "底部第三个",
+          "current_text": "输入标题\n请在此添加文字说明",
+          "word_count": 10,
+          "purpose": "特性说明",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_text",
+          "position": "底部第四个",
+          "current_text": "输入标题\n请在此添加文字说明",
+          "word_count": 10,
+          "purpose": "特性说明",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": [
+        {
+          "group_type": "grid_layout",
+          "elements_count": 4,
+          "arrangement": "底部排列",
+          "description": "底部四个文本框以网格方式排列"
+        }
+      ],
+      "logical_relationships": ["bullet_list", "grid"],
+      "suitable_content_types": ["feature_list", "comparison"]
     }
   ],
   "layoutGroups": [
@@ -87,112 +370,22 @@ TEMPLATE_ANALYSIS_PROMPT = """
       "commonFeatures": "醒目标题，副标题位置，品牌元素"
     },
     {
-      "groupName": "图文混排内容页组",
-      "slideIndices": [2, 3, 4, 5],
-      "commonFeatures": "顶部图片，底部文字说明"
-    },
-    {
-      "groupName": "项目符号内容页组",
-      "slideIndices": [1, 6, 7],
-      "commonFeatures": "左侧标题，项目符号列表"
-    },
-    {
-      "groupName": "结束页组",
-      "slideIndices": [8],
-      "commonFeatures": "感谢信息，联系方式"
+      "groupName": "流程图页组",
+      "slideIndices": [1],
+      "commonFeatures": "四步流程图，带箭头连接，每步有标题和描述"
     }
-  ],
-  "slideSummary": {
-    "openingSlides": [0],
-    "contentSlides": [1, 2, 3, 4, 5, 6, 7],
-    "closingSlides": [8],
-    "presentationFlow": "从产品概述开始，展示设计特点，然后介绍功能和特性，最后以联系信息结束"
-  },
-  "recommendations": {
-    "textContent": "文本内容适用性描述，包括字数限制和格式建议",
-    "dataVisualization": "数据可视化适用性详细描述，适合哪些类型的图表",
-    "imageContent": "图片内容展示适用性详述，哪些页面适合大图片",
-    "presentationFlow": "演示流程建议，如何组织各种布局的幻灯片形成流畅叙事"
-  }
+  ]
 }
+```
 
-## 内容语义类型(semantic_type)说明
-请为每个幻灯片布局分配适当的语义类型，常见类型包括：
-1. introduction - 介绍性内容，如标题页、简介页
-2. toc - 目录页
-3. section_header - 章节标题页
-4. bullet_list - 要点列表
-5. process_description - 过程或步骤描述
-6. data_presentation - 数据展示
-7. comparison - 对比内容
-8. feature_list - 特性列表
-9. summary - 总结内容
-10. conclusion - 结论
-11. thank_you - 感谢/结束页
+分析关键点：
+1. 准确识别和统计每个幻灯片中可编辑的文本区域数量
+2. 只在content_elements中包含可编辑文字区域的组件，不包含图片等非文本元素
+3. 使用shape_text_elements替代label_elements，明确表示这是带有可编辑文字的形状元素
+4. 确定文本区域组成的结构类型（如流程图、列表、网格等）
+5. 判断这些区域最适合表达的逻辑关系
+6. 确保editable_areas中的数字准确且total_editable_text_areas是所有文本区域的总和
 
-## 内容关系类型(relation_type)说明
-请分析幻灯片内容元素之间的关系类型，常见类型包括：
-1. none - 无特定关系
-2. sequence - 顺序关系
-3. timeline - 时间线/时序关系
-4. hierarchy - 层级关系
-5. bullet_list - 并列列表关系
-6. compare_contrast - 对比关系
-7. cause_effect - 因果关系
-8. problem_solution - 问题解决关系
-9. spatial - 空间关系
-
-## 可视化类型(visualization)说明
-请指明幻灯片主要使用的可视化方式，常见类型包括：
-1. text_only - 纯文本
-2. bullet_points - 项目符号列表
-3. image_with_text - 图文结合
-4. chart - 图表(请具体说明是柱状图、饼图等)
-5. diagram - 图解
-6. table - 表格
-7. process_diagram - 流程图
-8. timeline - 时间线图
-9. side_by_side - 并排对比
-10. grid_layout - 网格布局
-11. icon_based - 基于图标的可视化
-
-## PPT元素专业术语(element_type)说明
-描述布局时请使用以下专业术语：
-1. text - 文本元素，可以是标题、正文、注脚等
-2. image - 图片元素
-3. shape - 形状元素，如矩形、圆形、箭头等
-4. group - 组合元素，由多个子元素组成的集合
-5. chart - 图表元素，如柱状图、饼图、折线图等
-6. table - 表格元素
-7. video - 视频元素
-8. audio - 音频元素
-
-## 特殊元素结构说明
-1. bullet_points - 带有项目符号的文本列表，通常是text元素的一种特殊形式
-2. group元素 - 由多个子元素组成的组合，需说明其内部结构和组织方式
-   - 例如："目录项group包含序号text元素和标题text元素，两者水平排列"
-   - 例如："流程图由4个step-group组成，每个step-group包含图标shape元素和描述text元素"
-
-## 布局描述(layout_description)说明
-请用一段简明扼要但详细的文字描述幻灯片的布局结构，必须包含以下内容：
-1. 各元素的位置和大小特征，使用专业元素术语（如"左侧title元素，右侧text元素"）
-2. 详细说明各种元素类型及其数量（如"1个title元素，4个带bullet_points的text元素"）
-3. 如果有group元素，详细描述其内部结构（如"每个step-group包含1个icon和2个text元素"）
-4. 元素之间的组织关系（如"4个相同结构的group水平排列，通过箭头shape连接"）
-5. 文本计数，明确给出当前文本区域现有的文字个数，依次预估可以容纳的大致字数
-6. 对于带bullet_points的text元素，准确说明当前bullet_points数量
-7. 对于image元素，建议的图片尺寸和比例
-8. 对于shape元素，说明其用途（如"用于分隔的线条shape"，"表示流程的箭头shape"）
-9. 总结整体布局特点和视觉层次结构
-
-请确保为每个幻灯片布局的分析都提供以下详细信息：
-1. 幻灯片在原始PPT中的索引(slide_index)
-2. 内容语义类型(semantic_type)
-3. 内容关系类型(relation_type) 
-4. 可视化类型(visualization)
-5. 详尽的布局描述(layout_description)，使用专业元素术语描述所有元素类型、数量、位置和容量
-6. 幻灯片布局分组和汇总信息
-
-只返回JSON数据，不要有其他回复。
+请确保为每个幻灯片布局提供所有必要的分析字段。只返回JSON数据，不要有其他回复。
 """
 
