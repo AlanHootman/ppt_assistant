@@ -53,7 +53,7 @@ class PPTAnalysisAgent(BaseAgent):
         self.max_tokens = model_config.get("max_tokens")
         
         # 图片分析批次大小配置
-        self.batch_size = config.get("batch_size", 3)
+        self.batch_size = config.get("batch_size", 1)
         
         # 初始化PPT管理器
         self.ppt_manager = PPTManager()
