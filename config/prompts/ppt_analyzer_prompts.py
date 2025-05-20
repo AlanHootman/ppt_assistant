@@ -14,6 +14,7 @@ TEMPLATE_ANALYSIS_PROMPT = """
 3. 确定每种布局适合呈现的内容类型
 4. 识别布局中可编辑的内容区域及其组织结构
 5. 提供足够的元素详细信息以支持布局决策
+6. 确保可编辑区域数量的准确性
 
 # 2. 输入信息与分析策略
 {% if template_info %}
@@ -45,18 +46,26 @@ TEMPLATE_ANALYSIS_PROMPT = """
    - 识别内容元素之间的关系类型relation_type(如sequence、hierarchical、comparison、cause_effect、problem_solution等)
 
 ## 3.3 内容区域与结构分析（综合图像与JSON）
-   - 根据图像分析布局中各区域的整体结构和用途，编写简洁的布局描述
+   - 根据图像分析布局中各区域的整体结构和用途，编写布局描述，描述中需要包含布局的结构、构成的元素及元素类型、位置等
    - 识别和统计可编辑的文本区域（包括纯文本框和带文本的形状）
    - 记录每个可编辑区域的当前文本内容、位置和文字数量
-   - 确定文本区域之间的组织结构（如流程图、列表、网格等）
+   - 确定文本区域之间的组织结构（如process_flow、grid_layout、title_content、bullet_list、comparison_table、central_focus、timeline、title_image_pair、free_form等）
    - 分析组合元素的内部结构和关系
-   - 评估布局适合表达的逻辑关系（如顺序关系、对比关系、层级关系等）
+   - 评估布局适合表达的逻辑关系（如"sequence", "cause_effect", "problem_solution", "hierarchical"等）
    - 识别主要内容区域与装饰元素
 
 ## 3.4 布局分组与汇总
    - 将类似布局的幻灯片归为一组
    - 标记开篇页、内容页和结束页
    - 总结每组布局的共同特点和适用内容类型
+
+## 3.5 数量校验与核对（确保准确性）
+   - 精确统计原始JSON中的text元素和带text_content的shape元素数量
+   - 确保content_elements中的元素数量与原始JSON中的可编辑元素数量一致
+   - 核对editable_areas中的各类元素数量之和等于total_editable_text_areas
+   - 验证total_editable_text_areas等于content_elements数组的长度
+   - 针对组合元素(group)内的可编辑元素进行单独计数和核对
+   - 对比原始JSON与最终输出的元素数量，确保无遗漏和多余
 
 # 4. 分析规则与分类标准
 ## 4.1 内容分类标准
@@ -107,12 +116,30 @@ TEMPLATE_ANALYSIS_PROMPT = """
 ### 4.2.1 内容区域识别与统计
 - 仔细识别每个可编辑的文本区域，包括：
   * 纯文本框元素(element_type="text")
-  * 带有文本内容的形状元素(element_type="shape"且包含text_content属性)
+  * 带有文本内容的形状元素(element_type="shape"且包含text_content属性的元素)
 - 识别每个文本区域的主要用途：
   * 标题区域：通常位于幻灯片上部，字体较大
   * 正文区域：通常包含详细内容，可能有项目符号
   * 注释/说明区域：通常字体较小，位于边缘位置
   * 带文本的形状区域：形状元素中包含的可编辑文字区域
+
+### 4.2.1.1 带文本形状元素的特别说明
+- 带文本形状元素(shape_text_elements)是JSON中满足以下条件的元素：
+  * element_type="shape" 
+  * 包含非空的text_content属性
+  * 可能作为按钮、标记、图例或装饰性带文本区域
+- 常见的带文本形状特征：
+  * 通常有明确的形状轮廓(如矩形、圆形、气泡等)
+  * 文本往往较短，用于强调或标记
+  * 可能带有填充色或特殊边框
+  * 在原始PPT中可以直接编辑其中的文本
+- 与普通文本框区分：
+  * 带文本形状强调形状与文本的结合
+  * 纯文本框主要强调文本内容本身
+- 不要将以下元素误判为shape_text_elements：
+  * 纯装饰性形状(无text_content)
+  * 没有可编辑文本的形状元素
+  * 图片或其他媒体元素
 
 ### 4.2.2 内容区域组织结构识别
 - title_content: 标题+正文结构（最基本的布局）
@@ -135,6 +162,35 @@ TEMPLATE_ANALYSIS_PROMPT = """
   * 对称型：元素呈对称排列
 - 记录组合中各元素的类型、位置和功能
 - 分析组合元素的整体用途
+
+### 4.2.3.1 组合元素内可编辑元素的识别与统计
+- 组合元素处理步骤：
+  1. 识别原始JSON中的group类型元素
+  2. 遍历组合元素的内部结构(通常在"elements"或"children"字段)
+  3. 在遍历过程中识别所有可编辑文本元素：
+     * 直接子元素中的text元素
+     * 直接子元素中带text_content的shape元素
+     * 嵌套子组合中的可编辑元素(递归分析)
+  4. 将识别到的所有可编辑元素计入对应类别的计数
+  5. 在group_structures中记录组合的结构信息和内部可编辑元素数量
+  
+- 示例JSON中的组合元素处理：
+```json
+{
+  "element_type": "group",
+  "elements": [
+    {"element_type": "shape", "text_content": "步骤1"},
+    {"element_type": "text", "text_content": "说明文字"},
+    {
+      "element_type": "group",
+      "elements": [
+        {"element_type": "shape", "text_content": "子步骤"}
+      ]
+    }
+  ]
+}
+```
+在这个示例中，应该计数：1个shape_text_element + 1个body_text_element + 嵌套组合中的1个shape_text_element，总共3个可编辑元素。
 
 ### 4.2.4 元素详细信息记录
 对每个可编辑文字区域记录以下信息：
@@ -159,6 +215,56 @@ TEMPLATE_ANALYSIS_PROMPT = """
 - comparison_items: 对比项数量
 - grid_cells: 网格单元格数量
 - timeline_points: 时间线上的点数量
+
+## 4.4 数量校验规则
+1. 原始JSON元素与输出元素数量校验：
+   - 统计原始JSON中所有element_type="text"的元素数量
+   - 统计原始JSON中所有element_type="shape"且有text_content属性的元素数量
+   - 确保上述数量之和等于content_elements数组的长度
+   - 特别注意组合元素(group)内的可编辑元素，需单独计数不要漏掉或重复计算
+
+2. 输出JSON内部数量一致性校验：
+   - 确保title_elements+body_text_elements+shape_text_elements=total_editable_text_areas
+   - 确保content_elements数组长度等于total_editable_text_areas
+   - 确保每个元素类型在editable_areas中的数量与content_elements中对应类型元素的数量一致
+
+3. 组合元素(group)内元素校验：
+   - 对每个组合元素单独进行分析，识别其内部的可编辑文本元素
+   - 验证组合元素内的每个可编辑元素都已正确计入总数
+   - 检查group_structures中的elements_count与实际内部可编辑元素数量是否一致
+   - 确保组合内的层次结构被准确表达，特别是嵌套组合的情况
+
+4. 检查常见错误：
+   - 是否将装饰性元素误认为可编辑元素
+   - 是否遗漏了某些可编辑元素
+   - 是否重复计算了某些元素
+   - 对于重叠或嵌套的元素，是否正确计数
+   - 检查组合元素(group)中的可编辑元素是否正确识别与计数
+
+## 4.5 元素计数核对示例
+
+以下是一个简单的元素计数核对示例，展示如何正确进行元素统计和校验：
+
+原始JSON包含：
+- 2个element_type="text"的元素
+- 3个element_type="shape"且带有text_content的元素
+- 1个组合元素(group)，内含1个带文本的形状元素
+
+正确计数应该是：
+- title_elements: 1 (标题文本)
+- body_text_elements: 1 (正文文本)
+- shape_text_elements: 3 (包括独立的带文本形状以及组内的带文本形状)
+- total_editable_text_areas: 5 (1+1+3=5)
+
+输出的content_elements数组应包含5个元素，分别对应这5个可编辑文本区域。
+
+常见错误：
+1. 遗漏统计组合元素内的可编辑元素
+2. 将纯装饰形状误判为带文本形状元素
+3. 在shape_text_elements和body_text_elements中重复计算同一元素
+4. total_editable_text_areas计算错误
+
+确保在实际分析中严格遵循这些计数规则，并多次核对以保证准确性。
 
 # 5. 输出格式
 
@@ -282,14 +388,14 @@ TEMPLATE_ANALYSIS_PROMPT = """
       "editable_areas": {
         "title_elements": 1,
         "body_text_elements": 3,
-        "shape_text_elements": 4,
-        "total_editable_text_areas": 8
+        "shape_text_elements": 3,
+        "total_editable_text_areas": 7
       },
       "content_elements": [
         {
           "element_type": "title",
           "position": "页面顶部",
-          "current_text": "特性列表标题",
+          "current_text": "工作内容概述",
           "word_count": 5,
           "purpose": "页面标题",
           "has_bullets": false
@@ -341,22 +447,14 @@ TEMPLATE_ANALYSIS_PROMPT = """
           "word_count": 10,
           "purpose": "特性说明",
           "has_bullets": false
-        },
-        {
-          "element_type": "shape_text",
-          "position": "底部第四个",
-          "current_text": "输入标题\n请在此添加文字说明",
-          "word_count": 10,
-          "purpose": "特性说明",
-          "has_bullets": false
         }
       ],
       "group_structures": [
         {
           "group_type": "grid_layout",
-          "elements_count": 4,
+          "elements_count": 3,
           "arrangement": "底部排列",
-          "description": "底部四个文本框以网格方式排列"
+          "description": "底部三个文本框以网格方式排列"
         }
       ],
       "logical_relationships": ["bullet_list", "grid"],
@@ -385,6 +483,8 @@ TEMPLATE_ANALYSIS_PROMPT = """
 4. 确定文本区域组成的结构类型（如流程图、列表、网格等）
 5. 判断这些区域最适合表达的逻辑关系
 6. 确保editable_areas中的数字准确且total_editable_text_areas是所有文本区域的总和
+7. 进行数量校验，确保content_elements的长度与editable_areas中的total_editable_text_areas一致
+8. 仔细检查原始JSON中的text元素和带text_content的shape元素数量，确保与输出结果一致
 
 请确保为每个幻灯片布局提供所有必要的分析字段。只返回JSON数据，不要有其他回复。
 """
