@@ -216,6 +216,57 @@ TEMPLATE_ANALYSIS_PROMPT = """
 - grid_cells: 网格单元格数量
 - timeline_points: 时间线上的点数量
 
+## 4.4 数量校验规则
+1. 原始JSON元素与输出元素数量校验：
+   - 统计原始JSON中所有element_type="text"的元素数量
+   - 统计原始JSON中所有element_type="shape"且有text_content属性的元素数量
+   - 确保上述数量之和等于content_elements数组的长度
+   - 特别注意组合元素(group)内的可编辑元素，需单独计数不要漏掉或重复计算
+
+2. 输出JSON内部数量一致性校验：
+   - 确保title_elements+body_text_elements+shape_text_elements=total_editable_text_areas
+   - 确保content_elements数组长度等于total_editable_text_areas
+   - 确保每个元素类型在editable_areas中的数量与content_elements中对应类型元素的数量一致
+
+3. 组合元素(group)内元素校验：
+   - 对每个组合元素单独进行分析，识别其内部的可编辑文本元素
+   - 验证组合元素内的每个可编辑元素都已正确计入总数
+   - 检查group_structures中的elements_count与实际内部可编辑元素数量是否一致
+   - 确保组合内的层次结构被准确表达，特别是嵌套组合的情况
+
+4. 检查常见错误：
+   - 是否将装饰性元素误认为可编辑元素
+   - 是否遗漏了某些可编辑元素
+   - 是否重复计算了某些元素
+   - 对于重叠或嵌套的元素，是否正确计数
+   - 检查组合元素(group)中的可编辑元素是否正确识别与计数
+
+## 4.5 元素计数核对示例
+
+以下是一个简单的元素计数核对示例，展示如何正确进行元素统计和校验：
+
+原始JSON包含：
+- 2个element_type="text"的元素
+- 3个element_type="shape"且带有text_content的元素
+- 1个组合元素(group)，内含1个带文本的形状元素
+
+正确计数应该是：
+- title_elements: 1 (标题文本)
+- body_text_elements: 1 (正文文本)
+- shape_text_elements: 3 (包括独立的带文本形状以及组内的带文本形状)
+- total_editable_text_areas: 5 (1+1+3=5)
+
+输出的content_elements数组应包含5个元素，分别对应这5个可编辑文本区域。
+
+常见错误：
+1. 遗漏统计组合元素内的可编辑元素
+2. 将纯装饰形状误判为带文本形状元素
+3. 在shape_text_elements和body_text_elements中重复计算同一元素
+4. total_editable_text_areas计算错误
+
+确保在实际分析中严格遵循这些计数规则，并多次核对以保证准确性。
+
+
 # 5. 输出格式
 
 请以JSON格式返回分析结果，包含以下字段：
