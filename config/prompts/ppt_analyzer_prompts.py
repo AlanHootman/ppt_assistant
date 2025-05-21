@@ -295,13 +295,12 @@ TEMPLATE_ANALYSIS_PROMPT = """
           "has_bullets": false
         }
       ],
-      "logical_relationships": ["hierarchy"],
-      "suitable_content_types": ["introduction", "section_header"]
+      "group_structures": []
     },
     {
       "slide_index": 1,
       "type": "流程图页", 
-      "semantic_type": "process_description",
+      "semantic_type": "process_description|timeline",
       "relation_type": "sequence",
       "visualization": "process_diagram",
       "layout_description": "页面以四步流程图为主，每个步骤包含标题和描述，步骤之间用箭头连接，顶部有页面标题。",
@@ -362,14 +361,12 @@ TEMPLATE_ANALYSIS_PROMPT = """
           "arrangement": "顺序排列",
           "connection_type": "箭头连接"
         }
-      ],
-      "logical_relationships": ["sequence", "cause_effect"],
-      "suitable_content_types": ["process_description", "timeline"]
+      ]
     },
     {
       "slide_index": 5,
       "type": "内容页",
-      "semantic_type": "feature_list",
+      "semantic_type": "feature_list|comparison|grid",
       "relation_type": "grid",
       "visualization": "image_with_text",
       "layout_description": "页面左侧为文本说明，右侧为图片展示，底部有多个文本框。",
@@ -443,11 +440,10 @@ TEMPLATE_ANALYSIS_PROMPT = """
           "group_type": "grid_layout",
           "elements_count": 3,
           "arrangement": "底部排列",
-          "description": "底部三个文本框以网格方式排列"
+          "description": "底部三个文本框以网格方式排列",
+          "groups_relation": "parallel"
         }
-      ],
-      "logical_relationships": ["bullet_list", "grid"],
-      "suitable_content_types": ["feature_list", "comparison"]
+      ]
     }
   ],
   "layoutGroups": [
@@ -470,10 +466,11 @@ TEMPLATE_ANALYSIS_PROMPT = """
 2. 只在content_elements中包含可编辑文字区域的组件，不包含图片等非文本元素
 3. 使用shape_text_elements替代label_elements，明确表示这是带有可编辑文字的形状元素
 4. 确定文本区域组成的结构类型（如流程图、列表、网格等）
-5. 判断这些区域最适合表达的逻辑关系
-6. 确保editable_areas中的数字准确且total_editable_text_areas是所有文本区域的总和
-7. 进行数量校验，确保content_elements的长度与editable_areas中的total_editable_text_areas一致
-8. 仔细检查原始JSON中的text元素和带text_content的shape元素数量，确保与输出结果一致
+5. 确保editable_areas中的数字准确且total_editable_text_areas是所有文本区域的总和
+6. 进行数量校验，确保content_elements的长度与editable_areas中的total_editable_text_areas一致
+7. 仔细检查原始JSON中的text元素和带text_content的shape元素数量，确保与输出结果一致
+8. semantic_type可以是多个类型（最多3个）组成的列表，最匹配的放在最左边，用"|"分隔
+9. 在group_structures中添加groups_relation字段，描述组之间的关系类型
 
 请确保为每个幻灯片布局提供所有必要的分析字段。只返回JSON数据，不要有其他回复。
 """
