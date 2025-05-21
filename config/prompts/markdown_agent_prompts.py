@@ -193,10 +193,6 @@ Markdown文本:
    - 例如包含"成功案例"和"失败案例"的章节，其relation_type应设为comparison
    - 上层章节的relation_type应能明确表示其下属子章节之间的关系
 
-4. 多重语义情况处理:
-   - 当内容可能符合多个semantic_type时，选择最主要的1-3个类型
-   - 最符合的类型应放在最左侧，如"concept|instruction|task"
-   - semantic_type限制最多3个类型，用"|"符号分隔
 
 # 5. 输出结构规范
 
