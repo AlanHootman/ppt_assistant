@@ -63,7 +63,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
 3. **布局结构特征**：
    - 识别布局的content_structure：title_content、bullet_list、process_flow等
    - 分析布局中的group_structures，了解元素的组织方式
-   - 识别布局适合的内容类型(suitable_content_types)
+   - 识别布局适合的内容类型
 
 # 3. 内容与布局匹配的核心优先级
 
