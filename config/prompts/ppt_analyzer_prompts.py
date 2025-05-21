@@ -43,16 +43,14 @@ TEMPLATE_ANALYSIS_PROMPT = """
 ## 3.2 布局分类与类型识别（基于图像）
    - 识别每页幻灯片的用途类型(如封面页、目录页、内容页等)，用途类型可以是多选，比如"目录页|内容页"代表该页幻灯片既可以作为目录页，也可以作为内容页
    - 确定每页的内容语义类型semantic_type(如introduction、toc、feature_list等)
-   - 识别内容元素之间的关系类型relation_type(如sequence、hierarchical、comparison、cause_effect、problem_solution等)
+   - 识别内容元素之间的关系类型relation_type(如sequence、hierarchical、comparison、cause_effect等)
 
 ## 3.3 内容区域与结构分析（综合图像与JSON）
    - 根据图像分析布局中各区域的整体结构和用途，编写布局描述，描述中需要包含布局的结构、构成的元素及元素类型、位置等
    - 识别和统计可编辑的文本区域（包括纯文本框和带文本的形状）
    - 记录每个可编辑区域的当前文本内容、位置和文字数量
-   - 确定文本区域之间的组织结构（如process_flow、grid_layout、title_content、bullet_list、comparison_table、central_focus、timeline、title_image_pair、image_text_pair、free_form等）
-   - 分析组合元素的内部结构和关系
-   - 评估布局适合表达的逻辑关系（如"sequence", "cause_effect", "problem_solution", "hierarchical"等）
-   - 识别主要内容区域与装饰元素
+   - 确定文本区域之间的组织结构
+   - 确定文本之间的逻辑关系(relation_type)
 
 ## 3.4 布局分组与汇总
    - 将类似布局的幻灯片归为一组
@@ -85,31 +83,21 @@ TEMPLATE_ANALYSIS_PROMPT = """
 - instruction: 指导性内容
 - task: 任务描述内容
 - question_answer: 问答式内容
+- example_list: 示例列表
 
 ### 4.1.2 内容关系类型(relation_type)
 - none: 无特定关系
 - sequence: 顺序关系
 - timeline: 时间线/时序关系
 - hierarchy: 层级关系
-- bullet_list: 并列列表关系
 - compare_contrast: 对比关系
 - cause_effect: 因果关系
-- problem_solution: 问题解决关系
 - grid: 网格排列关系
 
 ### 4.1.3 可视化类型(visualization)
 - text_only: 纯文本
-- bullet_points: 项目符号列表
-- image_with_text: 图文结合
-- chart: 图表(柱状图、饼图等)
-- diagram: 图解
-- table: 表格
-- process_diagram: 流程图
-- timeline: 时间线图
-- side_by_side: 并排对比
-- grid_layout: 网格布局
-- section_divider: 章节分隔页
-- question_answer: 问答式布局
+- title+content: 标题+正文结构
+- title+image_pair: 标题+图片结构
 
 ## 4.2 内容区域分析规则
 
