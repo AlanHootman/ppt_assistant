@@ -50,7 +50,7 @@ TEMPLATE_ANALYSIS_PROMPT = """
 
 ## 3.2 布局分类与类型识别（基于图像）
    - 识别每页幻灯片的用途类型(如封面页、目录页、内容页等)，用途类型可以是多选，比如"目录页|内容页"代表该页幻灯片既可以作为目录页，也可以作为内容页
-   - 确定每页的内容语义类型semantic_type(如introduction、toc、feature_list等)，可以是多选，最多3个，最匹配的放在最左侧
+   - 确定每页的内容语义类型semantic_type(如introduction、toc、feature_list等)
    - 识别内容元素之间的关系类型relation_type(如sequence、hierarchical、comparison、cause_effect等)
    - 对于组合元素，确定组内元素间的关系类型groups_relation(如sequence、parallel、hierarchical等)，这有助于内容规划时正确匹配内容关系
 
@@ -261,7 +261,6 @@ TEMPLATE_ANALYSIS_PROMPT = """
       "type": "封面页/标题页", 
       "semantic_type": "introduction",
       "relation_type": "none",
-      "visualization": "text_only",
       "layout_description": "页面上部有主标题区域，中部有副标题区域，右下角有品牌标识。",
       "content_structure": "title_content",
       "editable_areas": {
@@ -293,9 +292,8 @@ TEMPLATE_ANALYSIS_PROMPT = """
     {
       "slide_index": 1,
       "type": "流程图页", 
-      "semantic_type": "process_description|timeline",
+      "semantic_type": "process_description",
       "relation_type": "sequence",
-      "visualization": "process_diagram",
       "layout_description": "页面以四步流程图为主，每个步骤包含标题和描述，步骤之间用箭头连接，顶部有页面标题。",
       "content_structure": "process_flow",
       "editable_areas": {
@@ -360,9 +358,8 @@ TEMPLATE_ANALYSIS_PROMPT = """
     {
       "slide_index": 5,
       "type": "内容页",
-      "semantic_type": "feature_list|comparison|grid",
+      "semantic_type": "feature_list",
       "relation_type": "grid",
-      "visualization": "image_with_text",
       "layout_description": "页面左侧为文本说明，右侧为图片展示，底部有多个文本框。",
       "content_structure": "grid_layout",
       "editable_areas": {
@@ -463,7 +460,6 @@ TEMPLATE_ANALYSIS_PROMPT = """
 5. 确保editable_areas中的数字准确且total_editable_text_areas是所有文本区域的总和
 6. 进行数量校验，确保content_elements的长度与editable_areas中的total_editable_text_areas一致
 7. 仔细检查原始JSON中的text元素和带text_content的shape元素数量，确保与输出结果一致
-8. semantic_type可以是多个类型（最多3个）组成的列表，最匹配的放在最左边，用"|"分隔
 9. 在group_structures中添加groups_relation字段，描述组之间的关系类型
 
 请确保为每个幻灯片布局提供所有必要的分析字段。只返回JSON数据，不要有其他回复。
