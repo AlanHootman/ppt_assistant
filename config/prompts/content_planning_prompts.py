@@ -70,57 +70,34 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
 ## 3.1 匹配优先级明确顺序
 按照以下优先级顺序进行内容与布局的匹配决策：
 
-1. **第一优先级：布局索引唯一性(slide_index不重复)**
-   - slide_index在整个PPT中必须是唯一的，不允许重复使用
-   - 已选择的slide_index会从可用池中移除，后续幻灯片不能再使用相同的slide_index
-   - 当需要为新页面选择布局时，首先检查该布局的slide_index是否已被使用
-   - 如果slide_index已被使用，即使该布局在其他方面完美匹配，也必须选择其他未使用的布局
-   - 维护一个已使用的slide_index列表(used_slide_indices)，每次选择布局前先检查此列表
-
-2. **第二优先级：语义类型与结构匹配**
-   - 比较内容的semantic_type与布局的semantic_type
-   - 比较内容的relation_type与布局的relation_type
+1. **第一优先级：语义类型与结构匹配**
+   - 比较layouts_json中每个布局的semantic_type与sections_json中每个section的semantic_type
+   - 比较layouts_json中每个布局的relation_type与sections_json中每个section的relation_type
    - 优先选择语义类型和结构特征与内容匹配度高的布局
    - 如无法找到semantic_type完全匹配的布局，退化为使用通用的title_content结构布局作为保底选择
 
-3. **第三优先级：可编辑区域数量匹配(必须大于内容item数量)**
-   - 比较内容content_stats中的element_count个数与布局的total_editable_text_areas个数
-   - 布局的可编辑区域数量必须大于或等于内容的item数量，这是硬性条件
+2. **第二优先级：可编辑区域数量匹配**
+   - 比较layouts_json中每个布局的total_editable_text_areas个数与sections_json中每个section的element_count个数
+   - 布局的可编辑区域total_editable_text_areas数量必须大于或等于sections_json中每个section的element_count个数，这是硬性条件
    - 计算内容所需区域数量的方法：
      * 标题文本：通常需要1个title_element
-     * 段落内容(paragraph)：每个paragraph需要1个带has_bullets=true的body_text_element，这是强制要求
-     * 列表内容：每个bullet_list或numbered_list需要1个带has_bullets=true的body_text_element
+     * 段落内容(paragraph)：每个paragraph需要1个has_bullets=true的body_text_element，这是强制要求
+     * 列表内容：每个bullet_list或numbered_list需要1个带has_bullets=true的body_text_element，这是强制要求
      * 特性内容：如包含3-4个并列概念，每个概念通常需要1个shape_text_element
-   - 优先选择total_editable_text_areas大于但接近内容所需区域数量的布局
+   - 优先选择total_editable_text_areas大于但接近sections_json中每个section的element_count个数的布局
    - 对于paragraph类型的内容，必须确保布局中有足够的has_bullets=true的body_text_element，否则排除该布局
 
-4. **第四优先级：文字容量匹配**
-   - 比较内容的word_count与布局元素的word_count
+3. **第三优先级：文字容量匹配**
+   - 比较layouts_json中每个布局的title_elements、body_text_elements、shape_text_elements的word_count与sections_json中每个section的word_count
    - 对不同类型元素分别进行匹配：
      * 标题文字量与title元素的word_count匹配
-     * 段落文字量与body_text元素的word_count匹配（必须有：内容段落word_count <= 布局body_text元素word_count）
+     * 段落文字量与body_text元素的word_count匹配
      * 列表总文字量(total_word_count)与布局支持的列表区域word_count匹配
-     * 特性项文字量与shape_text元素的word_count匹配（必须有：内容特性项word_count <= 布局shape_text元素word_count）
+     * 特性项文字量与shape_text元素的word_count匹配
    - 在满足"内容文字量 <= 布局元素文字量"的前提下，内容文字量与布局元素文字量差异应在±20%范围内为最佳匹配
    - 当有多个布局都满足"内容文字量 <= 布局元素文字量"条件时，优先选择文字容量最接近的布局，避免浪费过多空间
 
 ## 3.2 匹配计算详细规则
-
-### 3.2.0 布局索引唯一性检查
-1. **已使用slide_index记录**：
-   - 从已规划的幻灯片中提取所有已使用的slide_index值
-   - 将这些值保存在used_slide_indices数组中
-   - 每次选择新布局前，确保其slide_index不在used_slide_indices中
-
-2. **布局选择流程**：
-   - 首先筛选出slide_index未被使用的布局候选集
-   - 然后再在这个候选集中应用其他优先级规则进行选择
-   - 如果没有可用的未使用slide_index布局，则将slide_index设为null，待后续手动分配
-
-3. **优先级执行**：
-   - 布局索引唯一性是绝对优先的，如果违反则直接排除该布局
-   - 只有在保证slide_index不重复的前提下，才考虑语义类型匹配等其他优先级
-
 ### 3.2.1 语义类型与结构匹配计算
 1. **语义类型对应关系**：
    - "concept" → 文本展示型布局(paragraph)
@@ -142,29 +119,6 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
    - 完美匹配：内容的semantic_type和relation_type都与布局匹配
    - 部分匹配：内容的semantic_type或relation_type之一与布局匹配
    - 无匹配：使用通用的title_content布局作为保底
-
-### 3.2.2 可编辑区域数量匹配计算
-1. **可编辑区域数量比较规则**：
-   - 必须满足：内容item数量 <= 布局total_editable_text_areas
-   - 这是一条硬性规则，不满足则直接排除该布局
-   - 计算匹配度：1 - |布局total_editable_text_areas - 内容item数量| / 布局total_editable_text_areas
-   - 匹配度越高（越接近1）表示内容与布局可编辑区域越接近
-
-2. **特定内容类型匹配规则**：
-   - 对于paragraph类型的内容，必须与has_bullets=true的body_text_element进行匹配
-   - 计算布局中has_bullets=true的body_text_element数量
-   - 确保paragraph的数量 <= has_bullets=true的body_text_element数量
-   - 如果没有足够的has_bullets=true元素，则该布局不满足要求，必须排除
-
-3. **多元素可编辑区域验证**：
-   - 对标题、正文、列表、特性项等每种元素类型分别验证
-   - 每种元素类型都必须满足数量要求（内容item数量 <= 布局total_editable_text_areas）
-   - 如有任何一种元素类型不满足要求，则整个布局不满足要求
-
-4. **优先级处理**：
-   - 当多个布局都满足数量要求时，选择匹配度最高的布局
-   - 优先考虑数量接近但略大于内容的布局，避免文本显得过于拥挤
-   - 避免选择数量远大于内容需求的布局，以防文本在幻灯片中显得稀疏
 
 # 4. 内容分割与布局应用规则
 
@@ -221,7 +175,6 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
         "layout": "Title Slide"
       },
       "reasoning": "选择这个布局的理由，包括与内容的匹配情况",
-      "content_match_score": 0.95,
       "content_match_details": {
         "editable_areas_match": "布局有title_elements=1, body_text_elements=1, total=2; 内容需要1个标题和1个副标题，总计2个元素，完美匹配",
         "word_count_match": "布局title元素word_count为10，内容标题word_count为8（满足容量要求：8 <= 10）; 布局body_text元素word_count为15，内容副标题word_count为12（满足容量要求：12 <= 15）",
@@ -251,13 +204,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
         "slide_index": 1,
         "layout": "Section Header"
       },
-      "reasoning": "选择这个布局的理由，包括与内容的匹配情况",
-      "content_match_score": 0.92,
-      "content_match_details": {
-        "editable_areas_match": "布局有title_elements=1, body_text_elements=5, total=6; 内容需要1个标题和3个列表项，总计4个元素，匹配度良好",
-        "word_count_match": "布局title元素word_count为5，内容标题word_count为4（满足容量要求：4 <= 5）; 布局body_text元素word_count总和为60，内容列表项word_count总和为45（满足容量要求：45 <= 60），匹配度良好",
-        "semantic_type_match": "布局semantic_type为toc与内容的目录页完全匹配"
-      }
+      "reasoning": "选择这个布局的理由，包括与内容的匹配情况"
     },
     {
       "page_number": 2,
@@ -272,13 +219,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
         "slide_index": 6,
         "layout": "Section Header 2"
       },
-      "reasoning": "选择这个布局的理由，包括与内容的匹配情况",
-      "content_match_score": 0.88,
-      "content_match_details": {
-        "editable_areas_match": "布局有title_elements=1, total=1; 内容需要1个标题，总计1个元素，完美匹配",
-        "word_count_match": "布局title元素word_count为6，内容标题word_count为4（满足容量要求：4 <= 6），匹配度良好",
-        "semantic_type_match": "布局semantic_type为section_header与内容的section_header完全匹配"
-      }
+      "reasoning": "选择这个布局的理由，包括与内容的匹配情况"
     },
     {
       "page_number": 3,
@@ -307,14 +248,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
         "slide_index": 5,
         "layout": "Content with Bullets"
       },
-      "reasoning": "选择这个布局的理由，包括项目符号数量与内容items的匹配情况",
-      "content_match_score": 0.90,
-      "content_match_details": {
-        "editable_areas_match": "布局有title_elements=1, body_text_elements=4, total=5; 内容需要1个标题和2个列表项，总计3个元素，匹配度良好",
-        "word_count_match": "布局title元素word_count为6，内容标题word_count为5（满足容量要求：5 <= 6）；布局body_text元素word_count总和为70，内容列表项和段落word_count总和为28（满足容量要求：28 <= 70），匹配度良好",
-        "semantic_type_match": "布局适合bullet_list与内容的列表类型匹配",
-        "paragraph_match": "布局中有4个body_text元素，其中2个具有has_bullets=true属性，内容中有1个paragraph类型，满足paragraph必须匹配has_bullets=true的要求"
-      }
+      "reasoning": "选择这个布局的理由，包括项目符号数量与内容items的匹配情况"
     },
     {
       "page_number": 4,
@@ -340,13 +274,7 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
         "slide_index": 4,
         "layout": "Feature Grid"
       },
-      "reasoning": "选择这个布局的理由，内容包含4个平行概念/特性，适合使用网格布局展示",
-      "content_match_score": 0.96,
-      "content_match_details": {
-        "editable_areas_match": "布局有title_elements=1, shape_text_elements=4, total=5; 内容需要1个标题和4个特性项，总计5个元素，完美匹配",
-        "word_count_match": "布局title元素word_count为5，内容标题word_count为4（满足容量要求：4 <= 5），完美匹配；布局shape_text元素平均word_count为15，内容特性项平均word_count为12（满足容量要求：12 <= 15），匹配度良好",
-        "semantic_type_match": "布局semantic_type为feature_list与内容的feature_list完全匹配"
-      }
+      "reasoning": "选择这个布局的理由，内容包含4个平行概念/特性，适合使用网格布局展示"
     }
   ],
   "slide_count": 5,
