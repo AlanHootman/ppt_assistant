@@ -5,6 +5,14 @@
 PPT分析器Agent提示词配置
 """
 
+from config.prompts.content_types import (
+    SEMANTIC_TYPES,
+    RELATION_TYPES,
+    CONTENT_STRUCTURES,
+    SEMANTIC_TYPE_GUIDELINES,
+    RELATION_TYPE_GUIDELINES
+)
+
 TEMPLATE_ANALYSIS_PROMPT = """
 你是专业的PPT模板分析专家，需要分析以下PPT模板的布局和设计特点，从而帮助内容规划模块更好地匹配内容与布局。
 
@@ -42,8 +50,9 @@ TEMPLATE_ANALYSIS_PROMPT = """
 
 ## 3.2 布局分类与类型识别（基于图像）
    - 识别每页幻灯片的用途类型(如封面页、目录页、内容页等)，用途类型可以是多选，比如"目录页|内容页"代表该页幻灯片既可以作为目录页，也可以作为内容页
-   - 确定每页的内容语义类型semantic_type(如introduction、toc、feature_list等)
+   - 确定每页的内容语义类型semantic_type(如introduction、toc、feature_list等)，可以是多选，最多3个，最匹配的放在最左侧
    - 识别内容元素之间的关系类型relation_type(如sequence、hierarchical、comparison、cause_effect等)
+   - 对于组合元素，确定组内元素间的关系类型groups_relation(如sequence、parallel、hierarchical等)，这有助于内容规划时正确匹配内容关系
 
 ## 3.3 内容区域与结构分析（综合图像与JSON）
    - 根据图像分析布局中各区域的整体结构和用途，编写布局描述，描述中需要包含布局的结构、构成的元素及元素类型、位置等
@@ -68,36 +77,13 @@ TEMPLATE_ANALYSIS_PROMPT = """
 # 4. 分析规则与分类标准
 ## 4.1 内容分类标准
 ### 4.1.1 内容语义类型(semantic_type)
-- introduction: 介绍性内容，如标题页、简介页
-- toc: 目录页
-- section_header: 章节标题页
-- bullet_list: 要点列表
-- process_description: 过程或步骤描述
-- data_presentation: 数据展示
-- comparison: 对比内容
-- feature_list: 特性列表
-- summary: 总结内容
-- conclusion: 结论
-- thank_you: 感谢/结束页
-- concept: 概念性内容
-- instruction: 指导性内容
-- task: 任务描述内容
-- question_answer: 问答式内容
-- example_list: 示例列表
+{{ SEMANTIC_TYPES }}
 
 ### 4.1.2 内容关系类型(relation_type)
-- none: 无特定关系
-- sequence: 顺序关系
-- timeline: 时间线/时序关系
-- hierarchy: 层级关系
-- compare_contrast: 对比关系
-- cause_effect: 因果关系
-- grid: 网格排列关系
+{{ RELATION_TYPES }}
 
-### 4.1.3 可视化类型(visualization)
-- text_only: 纯文本
-- title+content: 标题+正文结构
-- title+image_pair: 标题+图片结构
+### 4.1.3 内容区域组织结构
+{{ CONTENT_STRUCTURES }}
 
 ## 4.2 内容区域分析规则
 
@@ -150,6 +136,13 @@ TEMPLATE_ANALYSIS_PROMPT = """
   * 对称型：元素呈对称排列
 - 记录组合中各元素的类型、位置和功能
 - 分析组合元素的整体用途
+- 添加groups_relation字段描述组内元素间的关系类型：
+  * sequence: 元素之间有明确的顺序或步骤关系
+  * parallel: 元素之间是并列、平等的关系
+  * hierarchical: 元素之间有层级或从属关系
+  * comparison: 元素之间有对比或对照关系
+  * grid: 元素以网格方式均匀排列的关系
+  * cyclical: 元素呈环形或循环排列的关系
 
 ### 4.2.3.1 组合元素内可编辑元素的识别与统计
 - 组合元素处理步骤：
@@ -359,7 +352,8 @@ TEMPLATE_ANALYSIS_PROMPT = """
           "group_type": "process_flow",
           "elements_count": 4,
           "arrangement": "顺序排列",
-          "connection_type": "箭头连接"
+          "connection_type": "箭头连接",
+          "groups_relation": "sequence"
         }
       ]
     },

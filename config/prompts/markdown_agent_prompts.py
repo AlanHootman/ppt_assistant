@@ -5,11 +5,18 @@
 Markdown Agent提示词配置
 """
 
+from config.prompts.content_types import (
+    SEMANTIC_TYPES,
+    RELATION_TYPES,
+    SEMANTIC_TYPE_GUIDELINES,
+    RELATION_TYPE_GUIDELINES
+)
+
 ANALYSIS_PROMPT = """
 你是一个专业的PPT内容分析专家。请直接分析以下Markdown文本，生成适合PPT制作的完整结构化JSON，无需依赖任何已有的基础解析结果。
 每个部分都需添加以下分析信息：
-1. "semantic_type": 内容的语义类型，如"concept", "process", "comparison", "list", "timeline", "data", "case_study"等
-2. "relation_type": 内容之间的关系类型，如"sequence", "cause_effect", "problem_solution", "hierarchical"等
+1. "semantic_type": 内容的语义类型（见下方详细定义）
+2. "relation_type": 内容之间的关系类型（见下方详细定义）
 
 {% if markdown_text %}
 Markdown文本:
@@ -159,48 +166,37 @@ Markdown文本:
 
 # 4. 语义分析规则
 
-## 4.1 语义类型判断
+## 4.1 内容语义类型(semantic_type)与关系类型(relation_type)定义
+
+{{ SEMANTIC_TYPES }}
+
+{{ RELATION_TYPES }}
+
+## 4.2 语义类型判断
+
+{{ SEMANTIC_TYPE_GUIDELINES }}
+
+## 4.3 关系类型判断
+
+{{ RELATION_TYPE_GUIDELINES }}
+
+## 4.4 类型标注综合规则
+
 1. 对于只有标题而没有实际内容的章节(content为空数组且紧跟着下级标题)：
    - 应设置semantic_type为"section_header"
    - 这些章节通常适合作为PPT中的章节分隔页或分组标题
 
-2. 对于有实际内容的章节，根据内容特点确定语义类型:
-   - 纯文本描述性内容：semantic_type为"concept"
-   - 有序步骤或流程：semantic_type为"process"
-   - 列表内容：semantic_type为"list"
-   - 比较内容：semantic_type为"comparison"
-   - 时间相关的内容：semantic_type为"timeline"
-   - 数据展示相关的内容：semantic_type为"data"
-   - 案例分析：semantic_type为"case_study"
+2. 语义类型和关系类型必须反映内容的实际特征，不要为空内容随意赋予语义特征
 
-
-3. 语义类型和关系类型必须反映内容的实际特征，不要为空内容随意赋予语义特征
-
-## 4.2 关系类型判断
-1. 识别内容之间的关系模式：
-   - 顺序关系(sequence)：步骤、阶段、时间顺序等
-   - 因果关系(cause_effect)：原因与结果、影响与后果
-   - 问题解决(problem_solution)：问题与解决方案、挑战与应对、设疑问题与回答
-   - 层级关系(hierarchical)：分类、从属、组织结构等
-   - 对比关系(comparison)：对比、比较、成功与失败等
-   - 网格关系(grid)：多个平行概念或特性的并列展示
-
-2. 基于关键词和内容结构判断关系类型：
-   - 含有"问题"、"解决"等词汇的通常是problem_solution类型
-   - 含有"原因"、"导致"、"结果"等词汇的通常是cause_effect类型
-   - 含有数字序号或时间顺序的通常是sequence类型
-   - 含有分类或层级结构的通常是hierarchical类型
-   - 含有3-4个并列要点或概念的通常是grid类型
-   - 当内容包含多个部分且这些部分明显构成对比关系时，应设置为comparison关系类型
-
-3. 特殊内容类型关系判断:
-   - 有序列表(numbered_list)通常具有sequence关系类型
-   - 并列的3-4个概念或特性通常具有grid关系类型，适合用feature_grid展示
-
-4. 对于复杂结构的章节：
+3. 对于复杂结构的章节：
    - 当一个章节包含多个小节(如"成功案例"和"失败案例")时，应确保上层章节的relation_type反映出这种结构关系
    - 例如包含"成功案例"和"失败案例"的章节，其relation_type应设为comparison
    - 上层章节的relation_type应能明确表示其下属子章节之间的关系
+
+4. 多重语义情况处理:
+   - 当内容可能符合多个semantic_type时，选择最主要的1-3个类型
+   - 最符合的类型应放在最左侧，如"concept|instruction|task"
+   - semantic_type限制最多3个类型，用"|"符号分隔
 
 # 5. 输出结构规范
 
