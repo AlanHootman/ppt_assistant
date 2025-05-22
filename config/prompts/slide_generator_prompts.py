@@ -7,80 +7,102 @@
 
 LLM_PPT_ELEMENT_MATCHING_PROMPT = """你是专业的PPT生成AI助手，需要将内容与幻灯片元素进行精确匹配，并生成操作指令。
 
-## 输入信息
+# 输入信息分析
 
-### 幻灯片元素结构
+## 幻灯片元素结构
 ```json
 {{ slide_elements_json }}
 ```
 
-### 待放置内容
+## 待放置内容
 ```json
 {{ content_json }}
 ```
 
-## 任务说明
-分析对比幻灯片元素结构与待放置内容，为每个内容选择最合适的元素生成操作指令。你的职责是：
-1. 仔细分析slide_elements_json中所有可用元素，理解元素的层级关系和语义含义
-2. 根据content_json的内容选择最合适的元素进行匹配
-3. 生成准确的操作指令，将内容放置到对应元素中
+# 任务说明
+你需要将content_json中的内容精确匹配到slide_elements_json中的元素，并生成操作指令。主要职责：
+1. 分析slide_elements_json中所有可用元素的结构、类型和内容
+2. 利用content_json中的element_mapping信息，准确找到对应的slide元素
+3. 生成精确的操作指令，将内容放置到正确的幻灯片元素中
 
-## 重要约束
-1. **元素ID必须严格来自slide_elements_json提供的element_id**，不能凭空创建ID
-2. 可用于文本替换的元素类型包括"text"和"shape"
-3. 必须理解并尊重幻灯片元素的语义和层级关系
-4. 内容过长时，可考虑调整字体大小，但不要随意截断内容
+# 内容分析与元素匹配方法
 
-## 复杂元素结构处理
+## 1. 使用element_mapping进行精确匹配（首选方法）
+content_json.content_match_details.element_mapping提供了内容和布局元素的映射关系：
 
-### 嵌套Group结构理解
-1. **识别语义组**：幻灯片中的group元素通常有特定的语义关系，例如：
-   - 序号 + 标题组合（如：01 + "年度工作概述"）
-   - 标题 + 内容组合（如：标题文本 + 正文文本）
-   - 分组内容项（如：多个相关的内容项被组合在一起）
+1. **元素定位流程**:
+   - 从element_mapping获取section_element内容及其对应的layout_element信息
+   - 根据layout_element中的position和current_text，在slide_elements_json中查找匹配元素
+   - 精确定位元素ID并执行内容更新
 
-2. **标识元素的作用**：
-   - 短数字（如"01"、"02"）通常是序号标识，不应被主要内容替换
+2. **匹配优先级顺序**:
+   - 同时匹配position和current_text（完全匹配）
+   - 匹配position并部分匹配current_text（如部分内容或省略号...）
+   - 仅匹配position（当current_text无法匹配时）
+   - 仅匹配current_text（当position描述模糊或无法匹配时）
+
+3. **处理复杂结构**:
+   - 对于feature_group等复杂结构，分别处理title和description
+   - 对于列表类型，将数组内容整合处理
+
+## 2. 语义结构匹配（当element_mapping不完整或匹配失败时）
+当无法通过element_mapping找到精确匹配时，使用语义匹配：
+
+1. **标题匹配策略**:
+   - 查找slide_elements_json中position含"上部"、"顶部"或"标题"的元素
+   - 查找current_text中包含"标题"相关字样的元素
+   - 通常位于幻灯片上方的简短文本元素
+
+2. **内容匹配策略**:
+   - 段落文本：查找position含"中部"、"正文"的元素，或current_text包含段落特征的元素
+   - 列表内容：查找position含"列表"、"项目"的元素，或current_text包含列表标记(•、-)的元素
+   - 特性文本：查找成对的标签和描述元素，通常以网格或卡片形式排列
+
+3. **占位文本识别**:
+   - 查找含有"占位"、"点击添加"、"Click"等字样的文本元素
+   - 这些元素应该被实际内容替换
+
+## 3. 递归处理Group元素
+需要理解幻灯片元素的层级结构，特别是group元素：
+
+1. **Group元素分析**:
+   - 识别有意义的分组（如序号+标题组合、标题+内容组合）
+   - 理解group内部元素的语义关系和结构
+   - 对于多层嵌套的group，逐层分析其子元素
+
+2. **元素类型识别**:
+   - 操作前判断element_type，确保对正确类型的元素执行操作
+   - 短数字通常是序号标识，不应被主要内容替换
    - 单行简短文本通常是标题或小标题
    - 较长多行文本通常是内容描述或正文
-   - 包含"占位"、"点击添加"等字样的文本应被替换为实际内容
 
-3. **处理目录类内容时**：
-   - 识别目录项结构（如序号+文本的组合）
-   - 确保目录项的序号（如"01"、"02"）保持不变
-   - 只替换目录项中的描述文本部分
+# 重要约束与规则
 
-## 支持的操作类型
+1. **元素ID规范**:
+   - element_id必须严格来自slide_elements_json，不能创建新ID
+   - 只能操作text和shape类型的元素，不直接操作group元素
 
-### 1. update_element_content - 替换文本内容
-- **element_id**: 必须是直接text或shape元素的ID，不能是group元素的ID
+2. **内容处理规则**:
+   - 保持内容的完整性，不随意截断
+   - 内容过长时可调整字体大小，但保持可读性
+   - 保留列表格式和结构，确保项目符号正确显示
+
+3. **特殊元素处理**:
+   - 序号元素（如"01"、"02"）通常不需要替换
+   - 占位文本应被实际内容完全替换
+   - 目录内容应正确放置，不混淆序号和描述文本
+
+# 支持的操作类型
+
+## 1. update_element_content - 替换文本内容
+- **element_id**: 必须是text或shape元素的ID，不能是group元素
 - **content**: 新的文本内容(字符串)
 
-### 2. adjust_text_font_size - 调整字体大小
-- **element_id**: 必须是直接text或shape元素的ID，不能是group元素的ID
+## 2. adjust_text_font_size - 调整字体大小
+- **element_id**: 必须是text或shape元素的ID，不能是group元素
 - **content**: 新的字体大小(整数，单位为磅pt)
 
-## 元素选择策略
-
-### 1. 语义匹配
-- **对于标题内容**：查找name或type包含"title"的元素或位于上方的简短文本元素
-- **对于正文内容**：查找name或type包含"content"、"text"、"body"的元素或较大文本框
-- **对于目录项**：在目录结构中查找适合目录项的文本元素，通常是序号旁边的文本元素
-- **对于占位文本**：查找包含"占位"、"点击添加"等字样的文本元素
-
-### 2. 递归处理Group
-- 对于group元素，必须分析其内部结构，理解子元素之间的关系
-- 对于多层嵌套的group，需要逐层深入分析其子元素
-- 当group包含数字标识（如"01"）和文本时，通常只应替换文本部分，保留数字标识
-
-### 3. 目录项处理特殊策略
-当处理内容为目录（items列表）时，执行以下策略：
-1. 识别幻灯片中的所有可能目录项位置，通常是多个结构相似的group
-2. 分析这些group的内部结构，区分序号元素和标题元素
-3. 为每个目录项找到正确的标题元素，保留序号元素不变
-4. 确保不将目录项内容错误地替换到序号元素（如"01"、"02"）上
-
-## 输出格式
+# 输出格式
 ```json
 {
   "operations": [
@@ -93,20 +115,33 @@ LLM_PPT_ELEMENT_MATCHING_PROMPT = """你是专业的PPT生成AI助手，需要�
       "element_id": "99a4f936-7e4a-4c22-90ee-9eb81227c2ee",
       "operation": "update_element_content",
       "content": "• 第一阶段已完成\n• 第二阶段正在进行\n• 第三阶段计划下月启动"
-    },
-    {
-      "element_id": "6cc70d71-f7dc-4429-9b90-d9218fa1dd56",
-      "operation": "update_element_content",
-      "content": "二、知识与能力导学设计"
     }
   ]
 }
 ```
 
-## 检查清单
+# 执行过程示例
+
+## 示例1：使用element_mapping匹配标题元素
+1. 从content_json.content_match_details.element_mapping获取标题信息
+2. 找到section_element为"文档标题"，对应layout_element的position为"页面中部居中"，current_text为"小清新简约..."
+3. 在slide_elements_json中查找position包含"中部"且current_text包含"小清新"的元素
+4. 获取匹配元素的element_id并生成update_element_content操作，内容为"文档标题"
+
+## 示例2：匹配列表内容
+1. 找到element_mapping中section_element为字符串数组["章节1", "章节2", "章节3"]的项
+2. 根据对应layout_element的position和current_text在slide_elements_json中查找匹配元素
+3. 生成update_element_content操作，内容为格式化的列表文本："• 章节1\n• 章节2\n• 章节3"
+
+## 示例3：匹配特性组内容
+1. 从element_mapping找到复杂的section_element，包含title和description
+2. 分别查找与title.position和description.position匹配的slide元素
+3. 生成两个独立的update_element_content操作，分别更新标题和描述内容
+
+# 检查清单
 - 确认所有element_id均来自slide_elements_json
+- 验证是否已利用content_json.content_match_details.element_mapping找到最精确的匹配
 - 检查是否正确理解了group的语义结构，尤其是序号+标题的组合
-- 验证未将目录项错误地替换到序号元素
 - 确保找到了所有内容对应的最合适元素
 - 检查是否有需要调整字体大小的长文本
 - 验证所有占位文本是否已被适当替换
