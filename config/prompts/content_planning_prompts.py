@@ -168,18 +168,19 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
 2. 规划过程中，以内容与布局的最佳契合度为首要考虑因素
 3. 对于paragraph类型的内容，必须匹配has_bullets=false的paragraph_single，这是硬性约束
 4. layout名称必须与master_layouts_json提供的布局名称完全一致
-6. 每个slide必须包含唯一的slide_id字段，格式为"slide_"后跟6位数字，如"slide_000001"
-7. 每个slide_index必须在整个PPT中唯一，不允许重复使用
-8. 布局选择必须充分利用所有可用的布局，确保布局多样性，避免集中使用少数几个布局
-9. 必须保留原始章节内容的JSON结构，不要将结构化内容简化为字符串数组
-10. 在比较布局元素和内容word_count时，确认每种元素类型（标题、正文、列表、特性项）都满足容量要求，任何一种不满足都应排除该布局
-11. **不允许将一个内容元素拆分到多个布局元素中展示，每个内容必须完整放入对应的布局元素**
-12. **content_match_details.element_mapping必须详细记录section中每个元素与layout中content_elements的精确对应关系：**
+5. 每个slide必须包含唯一的slide_id字段，格式为"slide_"后跟6位数字，如"slide_000001"
+6. 布局选择必须充分利用所有可用的布局，确保布局多样性，避免集中使用少数几个布局
+7. 必须保留原始章节内容的JSON结构，不要将结构化内容简化为字符串数组
+8. 在比较布局元素和内容word_count时，确认每种元素类型（标题、正文、列表、特性项）都满足容量要求，任何一种不满足都应排除该布局
+9. **不允许将一个内容元素拆分到多个布局元素中展示，每个内容必须完整放入对应的布局元素**
+10. **所有幻灯片（包括第一页封面）必须包含完整的content_match_details字段，且其中必须包含element_mapping**
+11. **content_match_details.element_mapping必须详细记录section中每个元素与layout中content_elements的精确对应关系：**
     - 每个映射项包含section_element（内容元素）和layout_element（布局元素）两部分
     - section_element对于简单元素只需保留content内容(字符串)，对于复杂元素(如feature_group)可保留必要结构(如title和description)
     - layout_element只需包含position和current_text两个关键属性，current_text超过10个字则省略内容
-    - 对于特殊结构（如feature_group），需要将每个子项映射到对应的布局元素组合（如title_element和description_element）
+    - 对于特殊结构（如feature_group），需要将每个子项映射到对应的布局元素组合（如title和description）
     - 映射关系必须一一对应，确保每个内容元素都有对应的布局元素，反之亦然
+12. **第一页幻灯片（封面页）的element_mapping必须包含标题、副标题及其他封面元素（如有）的映射关系**
 
 # 6. 输出格式
 必须按以下JSON格式返回你的规划：
@@ -217,6 +218,27 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
             "layout_element": {
               "position": "页面上部居中",
               "current_text": "工作总结/工..."
+            }
+          },
+          {
+            "section_element": "说明文字",
+            "layout_element": {
+              "position": "页面中部主标题下方",
+              "current_text": "Click ente..."
+            }
+          },
+          {
+            "section_element": "汇报人",
+            "layout_element": {
+              "position": "页面下方左侧",
+              "current_text": "汇报人：千..."
+            }
+          },
+          {
+            "section_element": "汇报日期",
+            "layout_element": {
+              "position": "页面下方右侧",
+              "current_text": "汇报日期：..."
             }
           }
         ]
@@ -472,14 +494,15 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
 4. ✓ page_number从0开始，顺序递增
 5. ✓ slide_count等于slides数组的长度
 6. ✓ 每个slide包含唯一slide_id（格式为"slide_"后跟6位数字）
-7. ✓ 每个slide的slide_index在整个PPT中唯一，不存在重复
-8. ✓ 布局选择充分利用所有可用布局，避免集中使用前几页布局
-9. ✓ 相似内容类型分配不同的布局样式，增加视觉多样性
-10. ✓ 确保total_editable_text_areas与内容元素数量匹配
-11. ✓ 确保标题、正文和带文本形状元素的数量分别与内容需求匹配
-12. ✓ 保留原始章节内容的JSON结构，不要将结构化内容简化为字符串数组
-13. ✓ 严格检查每个元素的word_count容量是否满足内容需求，且不超过+20%范围
-14. ✓ 确保未将一个内容元素拆分到多个布局元素中展示
-15. ✓ 每个slide的content_match_details中包含element_mapping，清晰记录section元素与布局元素的精确对应关系
+7. ✓ 布局选择充分利用所有可用布局，避免集中使用前几页布局
+8. ✓ 相似内容类型分配不同的布局样式，增加视觉多样性
+9. ✓ 确保total_editable_text_areas与内容元素数量匹配
+10. ✓ 确保标题、正文和带文本形状元素的数量分别与内容需求匹配
+11. ✓ 保留原始章节内容的JSON结构，不要将结构化内容简化为字符串数组
+12. ✓ 严格检查每个元素的word_count容量是否满足内容需求，且不超过+20%范围
+13. ✓ 确保未将一个内容元素拆分到多个布局元素中展示
+14. ✓ 每个slide的content_match_details中包含element_mapping，清晰记录section元素与布局元素的精确对应关系
+15. ✓ 第一页封面幻灯片必须包含完整的content_match_details.element_mapping，包括标题、副标题、说明文字等所有元素
+16. ✓ 确保每个元素的layout_element都包含正确的position和current_text描述，便于后续精确定位
 
 只返回JSON，不要包含其他解释或评论。"""
