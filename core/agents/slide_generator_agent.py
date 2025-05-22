@@ -271,7 +271,7 @@ class SlideGeneratorAgent(BaseAgent):
         response = await self.model_manager.generate_text(
             model=self.llm_model,
             prompt=prompt,
-            temperature=0.2,  # 使用较低的温度以获得更确定的结果
+            temperature=self.temperature,  # 使用较低的温度以获得更确定的结果
             max_tokens=self.max_tokens
         )
         
