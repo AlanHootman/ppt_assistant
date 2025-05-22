@@ -65,6 +65,7 @@ RELATION_TYPES = """
 CONTENT_STRUCTURES = """
 ### 内容区域组织结构(content_structure)
 - title_content: 标题+正文结构（最基本的布局）
+- detail_content: 详细内容结构（包含多个详细说明的文本块）
 - bullet_list: 项目符号列表结构
 - numbered_list: 编号列表结构
 - process_flow: 流程图结构（有明确的步骤顺序和连接）
@@ -109,6 +110,7 @@ SEMANTIC_TYPE_GUIDELINES = """
    - 方法论或系统方法 → methodology
    - 技术操作指南 → technical_guide
    - 未来展望或预测 → future_outlook
+   - 需要大段文字说明的详细内容 → content_rich
 
 2. 多重语义类型情况:
    - 当内容符合多个语义类型时，应选择最能代表内容核心特征的1-3个类型
@@ -121,6 +123,10 @@ SEMANTIC_TYPE_GUIDELINES = """
    - 包含案例和经验分享的内容 → case_study|example_list
    - 描述技术思维建构步骤的内容 → process_description|methodology
    - 价值与意义相关的内容 → values_presentation|concept
+
+4. 文字容量分类判断:
+   - 需要展示大量文字内容（超过100字）→ content_rich|text_heavy
+
 """
 
 # 关系类型判断指南
