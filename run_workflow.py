@@ -47,8 +47,8 @@ def start_mlflow_server(port=5000, host="127.0.0.1"):
 async def main():
     """主函数 - 处理命令行参数并执行工作流"""
     parser = argparse.ArgumentParser(description='运行PPT生成工作流')
-    parser.add_argument('--md_file', type=str, required=True, help='输入的Markdown文件路径')
-    parser.add_argument('--ppt_template', type=str, required=True, help='PPT模板文件路径')
+    parser.add_argument('--markdown', type=str, required=True, help='输入的Markdown文件路径')
+    parser.add_argument('--template', type=str, required=True, help='PPT模板文件路径')
     parser.add_argument('--output_dir', type=str, default='workspace/output', help='输出目录')
     parser.add_argument('--trace', action='store_true', help='启用MLflow跟踪')
     
@@ -61,19 +61,19 @@ async def main():
         args.trace = False
     
     # 检查输入文件
-    if not os.path.exists(args.md_file):
-        logger.error(f"找不到Markdown文件: {args.md_file}")
+    if not os.path.exists(args.markdown):
+        logger.error(f"找不到Markdown文件: {args.markdown}")
         return 1
         
-    if not os.path.exists(args.ppt_template):
-        logger.error(f"找不到PPT模板文件: {args.ppt_template}")
+    if not os.path.exists(args.template):
+        logger.error(f"找不到PPT模板文件: {args.template}")
         return 1
         
     # 确保输出目录存在
     os.makedirs(args.output_dir, exist_ok=True)
     
     # 读取Markdown文件内容
-    with open(args.md_file, 'r', encoding='utf-8') as file:
+    with open(args.markdown, 'r', encoding='utf-8') as file:
         md_content = file.read()
     
     try:
@@ -83,12 +83,12 @@ async def main():
         # 执行工作流
         result = await engine.run_async(
             raw_md=md_content,
-            ppt_template_path=args.ppt_template,
+            ppt_template_path=args.template,
             output_dir=args.output_dir
         )
         
         # 输出结果
-        output_path = result.get('output_ppt_path', '')
+        output_path = getattr(result, 'output_ppt_path', '')
         if output_path and os.path.exists(output_path):
             logger.info(f"PPT生成成功: {output_path}")
             print(f"\nPPT文件已生成: {output_path}")

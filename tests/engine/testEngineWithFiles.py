@@ -67,8 +67,8 @@ class TestEngineWithFiles:
         assert len(result.content_plan) > 0
         
         # 验证输出文件
-        if result.ppt_file_path:
-            json_file = Path(result.ppt_file_path).with_suffix(".json")
+        if result.output_ppt_path:
+            json_file = Path(result.output_ppt_path).with_suffix(".json")
             assert json_file.exists()
             
             # 读取JSON文件验证内容

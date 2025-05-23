@@ -37,7 +37,7 @@ class TestMarkdownParser:
         }
         
         # 运行工作流
-        result = await engine.run(input_data=input_data)
+        result = await engine.run_async(**input_data)
         
         # 验证基本处理过程
         assert result.raw_md == self.test_md_content

@@ -20,25 +20,13 @@ from typing import Dict, Any, List, Optional, Tuple
 from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
+from core.utils.model_helper import ModelHelper
+from core.utils.ppt_agent_helper import PPTAgentHelper, EnumEncoder
 from core.utils.ppt_operations import PPTOperationExecutor
 from config.prompts.slide_validation_prompts import SLIDE_SELF_VALIDATION_PROMPT
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
-
-# 导入PPT管理器
-try:
-    from interfaces.ppt_api import PPTManager
-except ImportError:
-    logger = logging.getLogger(__name__)
-    logger.error("无法导入PPTManager，请确保ppt_manager库已正确安装")
-    PPTManager = None
-
-class EnumEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, enum.Enum):
-            return obj.value if hasattr(obj, 'value') else str(obj)
-        return super().default(obj)
 
 class PPTFinalizerAgent(BaseAgent):
     """PPT清理与保存Agent，负责最终PPT的处理与输出"""
@@ -52,14 +40,12 @@ class PPTFinalizerAgent(BaseAgent):
         """
         super().__init__(config)
         
-        # 初始化模型管理器
+        # 初始化模型管理器和模型辅助工具
         self.model_manager = ModelManager()
+        self.model_helper = ModelHelper(self.model_manager)
         
-        # 从配置获取模型类型和名称
-        self.model_type = config.get("model_type", "vision")
-        
-        # 初始化模型属性
-        model_config = self.model_manager.get_model_config(self.model_type)
+        # 获取模型配置
+        model_config = self.model_helper.get_model_config(config, "vision")
         self.vision_model = model_config.get("model")
         self.temperature = model_config.get("temperature")
         self.max_tokens = model_config.get("max_tokens")
@@ -70,23 +56,16 @@ class PPTFinalizerAgent(BaseAgent):
         # 视觉模型重试相关配置
         self.max_vision_retries = int(config.get("max_vision_retries", settings.MAX_VISION_RETRIES))
         
-        # 初始化PPTManager
-        try:
-            from interfaces.ppt_api import PPTManager
-            self.ppt_manager = PPTManager()
-            logger.info("成功初始化PPT管理器")
-        except ImportError as e:
-            logger.error(f"无法导入PPTManager: {str(e)}")
-            self.ppt_manager = None
+        # 初始化PPT管理器
+        self.ppt_manager = PPTAgentHelper.init_ppt_manager()
+        if not self.ppt_manager:
+            raise ImportError("无法初始化PPT管理器，请确保PPT Manager已正确安装")
         
         # 初始化PPT操作执行器
-        if self.ppt_manager:
-            self.ppt_operation_executor = PPTOperationExecutor(
-                ppt_manager=self.ppt_manager,
-                agent_name="PPTFinalizerAgent"
-            )
-        else:
-            self.ppt_operation_executor = None
+        self.ppt_operation_executor = PPTOperationExecutor(
+            ppt_manager=self.ppt_manager,
+            agent_name="PPTFinalizerAgent"
+        )
         
         # 创建验证日志目录
         self.validation_logs_dir = settings.LOG_DIR / "slide_validation"
@@ -721,85 +700,70 @@ class PPTFinalizerAgent(BaseAgent):
     
     async def _render_all_slides_to_images(self, state: AgentState, presentation: Any, slide_indices: List[int]) -> Dict[int, str]:
         """
-        一次性渲染所有幻灯片为图片
+        渲染多张幻灯片为图像
         
         Args:
-            state: 当前状态
+            state: 工作流状态
             presentation: 演示文稿对象
-            slide_indices: 要渲染的幻灯片索引列表（当前演示文稿中的位置索引）
+            slide_indices: 要渲染的幻灯片索引列表
             
         Returns:
-            幻灯片索引到图片路径的映射字典
+            幻灯片索引到图像路径的映射
         """
-        # 创建临时目录用于存储渲染的幻灯片图像和临时PPTX文件
-        session_dir = Path(f"workspace/sessions/{state.session_id}/validator_images")
-        session_dir.mkdir(parents=True, exist_ok=True)
+        # 创建临时目录
+        session_dir = PPTAgentHelper.setup_temp_session_dir(state.session_id, "validation_images")
         
-        # 创建唯一的临时文件名
-        temp_pptx_filename = f"temp_{uuid.uuid4().hex}.pptx"
+        # 临时保存PPT文件
+        temp_pptx_filename = PPTAgentHelper.create_temp_filename("temp_for_validation")
         temp_pptx_path = session_dir / temp_pptx_filename
         
-        # 存储索引到图片路径的映射
+        logger.info(f"临时保存演示文稿到: {temp_pptx_path}")
+        self.ppt_manager.save_presentation(presentation, str(temp_pptx_path))
+        
+        # 渲染所有指定幻灯片
+        logger.info(f"渲染 {len(slide_indices)} 张幻灯片为图像")
         slide_image_map = {}
         
         try:
-            # 临时保存修改后的presentation对象为PPTX文件
-            logger.info(f"临时保存演示文稿到临时文件: {temp_pptx_path}")
-            self.ppt_manager.save_presentation(presentation, str(temp_pptx_path))
-            
-            logger.info(f"准备渲染 {len(slide_indices)} 张幻灯片，索引: {slide_indices}")
-            
             # 一次性渲染所有幻灯片
-            all_image_paths = self.ppt_manager.render_pptx_file(
+            image_paths = self.ppt_manager.render_pptx_file(
                 pptx_path=str(temp_pptx_path),
                 output_dir=str(session_dir)
             )
             
-            logger.info(f"渲染完成，获得 {len(all_image_paths)} 张图片")
+            # 构建幻灯片索引到图像的映射
+            if image_paths:
+                for slide_index in slide_indices:
+                    if 0 <= slide_index < len(image_paths):
+                        slide_image_map[slide_index] = image_paths[slide_index]
+                        logger.info(f"幻灯片 {slide_index} 已渲染为图像: {image_paths[slide_index]}")
+                    else:
+                        logger.warning(f"幻灯片索引超出范围: {slide_index}, 总幻灯片数: {len(image_paths)}")
             
-            # 直接按位置索引建立映射
-            for slide_index in slide_indices:
-                if slide_index < len(all_image_paths):
-                    slide_image_map[slide_index] = all_image_paths[slide_index]
-                    logger.info(f"幻灯片位置索引 {slide_index} 渲染成功: {all_image_paths[slide_index]}")
-                else:
-                    logger.warning(f"幻灯片索引 {slide_index} 超出渲染范围（总共 {len(all_image_paths)} 张图片）")
-            
-            logger.info(f"成功建立 {len(slide_image_map)}/{len(slide_indices)} 张幻灯片的图片映射")
-            return slide_image_map
+            logger.info(f"成功渲染 {len(slide_image_map)}/{len(slide_indices)} 张幻灯片为图像")
             
         except Exception as e:
-            logger.error(f"渲染幻灯片时出错: {str(e)}")
-            return slide_image_map
-            
+            logger.error(f"渲染幻灯片为图像时出错: {str(e)}")
         finally:
-            # 无论渲染成功与否，都删除临时PPTX文件
+            # 删除临时PPTX文件
             if temp_pptx_path.exists():
-                logger.info(f"删除临时PPTX文件: {temp_pptx_path}")
                 temp_pptx_path.unlink()
+                
+        return slide_image_map
     
     async def _analyze_with_vision_model(self, image_path: str, slide_elements: List[Dict[str, Any]], 
-                                       section_content: Dict[str, Any]) -> Dict[str, Any]:
+                                   section_content: Dict[str, Any]) -> Dict[str, Any]:
         """
-        使用多模态视觉模型分析幻灯片图像并提供修改建议
+        使用视觉模型分析幻灯片图像
         
         Args:
             image_path: 幻灯片图像路径
-            slide_elements: 幻灯片元素详细信息
+            slide_elements: 幻灯片元素列表
             section_content: 章节内容
             
         Returns:
-            分析结果，包含问题、建议和操作指令
+            分析结果
         """
-        # 检查图像是否存在
-        if not os.path.exists(image_path):
-            logger.warning(f"图像文件不存在: {image_path}")
-            return {
-                "has_issues": True, 
-                "issues": ["图像文件不存在"], 
-                "suggestions": ["重新生成幻灯片预览"]
-            }
-        
         # 准备上下文数据
         context = {
             "section_json": json.dumps(section_content, ensure_ascii=False, indent=2, cls=EnumEncoder),
@@ -809,8 +773,7 @@ class PPTFinalizerAgent(BaseAgent):
         # 渲染提示词
         prompt = self.model_manager.render_template(SLIDE_SELF_VALIDATION_PROMPT, context)
         
-        # 实现重试机制
-        max_attempts = self.max_vision_retries + 1  # 总尝试次数 = 初始尝试 + 重试次数
+        # 定义分析失败时的默认返回结果
         empty_result = {
             "has_issues": True,
             "issues": ["多模态分析返回空结果"],
@@ -819,133 +782,88 @@ class PPTFinalizerAgent(BaseAgent):
             "quality_score": 0
         }
         
-        # 使用attempt_count表示当前是第几次尝试（包括初始尝试）
-        attempt_count = 1
-        
-        while attempt_count <= max_attempts:
-            try:
-                # 准备并发送分析请求
-                logger.info(f"使用多模态模型分析幻灯片图像: {image_path}，第 {attempt_count}/{max_attempts} 次尝试")
+        try:
+            # 使用视觉模型分析幻灯片，带重试机制
+            logger.info(f"使用视觉模型分析幻灯片图像: {image_path}")
+            response = await self.model_helper.analyze_image_with_retry(
+                model=self.vision_model,
+                prompt=prompt,
+                image_path=image_path,
+                max_retries=self.max_vision_retries
+            )
+            
+            # 解析视觉模型响应
+            analysis_result = self.model_helper.parse_vision_response(response, default_fields=empty_result)
+            
+            if analysis_result:
+                # 确保结果包含必要的字段
+                analysis_result.setdefault("has_issues", False)
+                analysis_result.setdefault("issues", [])
+                analysis_result.setdefault("suggestions", [])
+                analysis_result.setdefault("operations", [])
+                analysis_result.setdefault("quality_score", 0)
                 
-                # 调用多模态视觉模型
-                response = await self.model_manager.analyze_image(
-                    model=self.vision_model,
-                    prompt=prompt,
-                    image_path=image_path
-                )
+                logger.info(f"幻灯片分析结果: 质量分数={analysis_result.get('quality_score')}, 问题数量={len(analysis_result.get('issues'))}")
+                return analysis_result
+            else:
+                logger.error("解析视觉模型响应失败，返回默认分析结果")
+                return empty_result
                 
-                # 解析响应
-                result = self._parse_vision_response(response)
-                
-                # 检查结果是否有效
-                if result and isinstance(result, dict):
-                    # 记录分析结果
-                    issues = result.get("issues", [])
-                    suggestions = result.get("suggestions", [])
-                    operations = result.get("operations", [])
-                    
-                    if issues:
-                        logger.info(f"多模态模型发现问题: {issues}")
-                        logger.info(f"修改建议: {suggestions}")
-                        logger.info(f"修改操作: {len(operations)} 项")
-                    else:
-                        logger.info("多模态模型未发现问题")
-                    
-                    return result
-                else:
-                    logger.warning(f"多模态模型返回空结果，将重试 (第 {attempt_count}/{max_attempts} 次尝试)")
-                    attempt_count += 1
-                    
-            except Exception as e:
-                logger.exception(f"多模态分析过程中出错 (第 {attempt_count}/{max_attempts} 次尝试): {str(e)}")
-                attempt_count += 1
-                
-                # 如果已达到最大尝试次数，返回错误结果
-                if attempt_count > max_attempts:
-                    logger.error(f"多模态分析失败，已达到最大尝试次数 ({max_attempts})")
-                    return {
-                        "has_issues": True,
-                        "issues": [f"多模态分析过程中出错: {str(e)}"],
-                        "suggestions": ["检查日志并修复错误"],
-                        "operations": [],
-                        "quality_score": 0
-                    }
-        
-        # 如果所有尝试都失败，返回空结果
-        logger.error(f"所有尝试均失败，返回空结果")
-        return empty_result
+        except Exception as e:
+            logger.error(f"视觉模型分析失败: {str(e)}")
+            return empty_result
     
     def _parse_vision_response(self, response: str) -> Dict[str, Any]:
         """
-        解析视觉模型响应
+        解析视觉模型的响应
         
         Args:
-            response: 视觉模型响应文本
+            response: 视觉模型的响应文本
             
         Returns:
             解析后的结果字典
         """
-        try:
-            # 提取JSON部分
-            json_text = response
-            if "```json" in response:
-                # 提取JSON代码块
-                pattern = r"```(?:json)?\s*([\s\S]*?)```"
-                matches = re.findall(pattern, response)
-                if matches:
-                    json_text = matches[0]
-            
-            # 解析JSON
-            result = json.loads(json_text)
-            
-            # 确保结果有必要的字段
-            if not isinstance(result, dict):
-                raise ValueError("响应不是有效的JSON对象")
-            
-            # 添加默认字段
-            result.setdefault("has_issues", False)
-            result.setdefault("issues", [])
-            result.setdefault("suggestions", [])
-            result.setdefault("operations", [])
-            result.setdefault("quality_score", 0)
-            
-            return result
-            
-        except Exception as e:
-            logger.error(f"解析视觉模型响应时出错: {str(e)}")
-            return {
-                "has_issues": True,
-                "issues": ["解析响应失败"],
-                "suggestions": ["尝试重新生成"],
-                "operations": [],
-                "quality_score": 0
-            }
+        # 使用ModelHelper处理视觉模型响应
+        default_fields = {
+            "has_issues": False,
+            "issues": [],
+            "suggestions": [],
+            "operations": [],
+            "quality_score": 0
+        }
+        
+        return self.model_helper.parse_vision_response(response, default_fields=default_fields)
     
     async def _execute_operations(self, presentation: Any, slide_index: int, operations: List[Dict[str, Any]]) -> bool:
         """
-        执行幻灯片操作指令
+        执行幻灯片操作
         
         Args:
-            presentation: PPT演示文稿对象
+            presentation: 演示文稿对象
             slide_index: 幻灯片索引
-            operations: 操作指令列表
+            operations: 操作列表
             
         Returns:
-            是否成功执行所有操作
+            操作是否全部成功
         """
-        if not self.ppt_operation_executor:
-            logger.error("PPT操作执行器未初始化")
-            return False
-        
-        # 使用PPT操作执行器执行批量操作
+        if not operations:
+            logger.info("没有需要执行的操作")
+            return True
+            
+        # 使用PPT操作执行器执行操作
         result = await self.ppt_operation_executor.execute_batch_operations(
             presentation=presentation,
             slide_index=slide_index,
             operations=operations
         )
         
-        # 返回是否有任何操作成功
-        return result.get("success", False)
+        success = result.get("success", False)
+        if not success:
+            logger.warning(f"执行幻灯片操作失败: {result.get('message', '未知错误')}")
+        else:
+            logger.info(f"成功执行 {len(operations)} 个幻灯片操作")
+        
+        return success
     
     def _save_validation_logs(self, log_dir: Path, iteration: int, slide_index: int, 
                             slide_elements: List[Dict[str, Any]], section_content: Dict[str, Any],

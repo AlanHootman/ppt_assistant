@@ -11,39 +11,23 @@
 
 import logging
 import json
-import os
 import re
-from typing import Dict, Any, List, Optional
-import enum
-from pathlib import Path
-import uuid
-import tempfile
+from typing import Dict, Any, List, Optional, Tuple
 import datetime
-from config.settings import settings
+from pathlib import Path
 
 from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
+from core.utils.model_helper import ModelHelper
+from core.utils.ppt_agent_helper import PPTAgentHelper, EnumEncoder
 from core.utils.ppt_operations import PPTOperationExecutor
 from config.prompts.slide_generator_prompts import (
     LLM_PPT_ELEMENT_MATCHING_PROMPT
 )
-
-# 导入PPT管理器
-try:
-    from interfaces.ppt_api import PPTManager
-except ImportError:
-    logger = logging.getLogger(__name__)
-    logger.error("无法导入PPTManager，请确保ppt_manager库已正确安装")
-    PPTManager = None
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
-
-class EnumEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, enum.Enum):
-            return obj.value if hasattr(obj, 'value') else str(obj)
-        return super().default(obj)
 
 class SlideGeneratorAgent(BaseAgent):
     """幻灯片生成Agent，负责基于PPT模板生成具体的幻灯片内容，并进行自验证"""
@@ -56,37 +40,29 @@ class SlideGeneratorAgent(BaseAgent):
             config: Agent配置
         """
         super().__init__(config)
-        # 初始化模型管理器
+        # 初始化模型管理器和辅助工具
         self.model_manager = ModelManager()
+        self.model_helper = ModelHelper(self.model_manager)
         
-        # 从配置获取模型类型和名称
-        self.model_type = config.get("model_type", "text")
-        
-        # 初始化模型属性
-        model_config = self.model_manager.get_model_config(self.model_type)
+        # 获取模型配置
+        model_config = self.model_helper.get_model_config(config, "text")
         self.llm_model = model_config.get("model")
         self.temperature = model_config.get("temperature")
         self.max_tokens = model_config.get("max_tokens")
+        self.max_retries = model_config.get("max_retries", 3)
         
-        # 初始化PPTManager
-        try:
-            from interfaces.ppt_api import PPTManager
-            self.ppt_manager = PPTManager()
-            logger.info("成功初始化PPT管理器")
-        except ImportError as e:
-            logger.error(f"无法导入PPTManager: {str(e)}")
-            self.ppt_manager = None
+        # 初始化PPT管理器
+        self.ppt_manager = PPTAgentHelper.init_ppt_manager()
+        if not self.ppt_manager:
+            raise ImportError("无法初始化PPT管理器，请确保PPT Manager已正确安装")
         
         # 初始化PPT操作执行器
-        if self.ppt_manager:
-            self.ppt_operation_executor = PPTOperationExecutor(
-                ppt_manager=self.ppt_manager,
-                agent_name="SlideGeneratorAgent"
-            )
-        else:
-            self.ppt_operation_executor = None
+        self.ppt_operation_executor = PPTOperationExecutor(
+            ppt_manager=self.ppt_manager,
+            agent_name="SlideGeneratorAgent"
+        )
         
-        logger.info(f"初始化SlideGeneratorAgent，使用模型: {self.llm_model}")
+        logger.info(f"初始化SlideGeneratorAgent，使用模型: {self.llm_model}，最大重试次数: {self.max_retries}")
     
     async def run(self, state: AgentState) -> AgentState:
         """
@@ -206,33 +182,6 @@ class SlideGeneratorAgent(BaseAgent):
             presentation = self.ppt_manager.load_presentation(template_path)
         
         return presentation
-
-    # def _get_template_slide_id(self, template_info: Dict[str, Any], ppt_json: Dict[str, Any]) -> str:
-    #     """
-    #     从模板信息中获取幻灯片ID
-        
-    #     Args:
-    #         template_info: 模板信息
-    #         ppt_json: PPT的JSON结构
-            
-    #     Returns:
-    #         幻灯片ID
-    #     """
-    #     if "slideIndex" in template_info:
-    #         slide_index = template_info["slideIndex"]
-    #         slides = ppt_json.get("slides", [])
-            
-    #         # 根据slideIndex(实际是real_index)查找对应的slide_id
-    #         for slide in slides:
-    #             # 检查slide是否包含real_index信息
-    #             if "real_index" in slide and slide["real_index"] == slide_index:
-    #                 return slide.get("real_index")
-            
-    #         # 如果找不到匹配的real_index或index，直接抛出异常
-    #         raise ValueError(f"无法找到real_index或index为{slide_index}的幻灯片，请检查模板配置")
-        
-    #     # 如果template_info中没有slide_id和slideIndex，直接抛出异常
-    #     raise ValueError("template_info中缺少slide_id或slideIndex，无法确定要使用的模板幻灯片")
     
     async def _get_operations_from_llm(self, context: Dict[str, str]) -> List[Dict[str, Any]]:
         """
@@ -247,17 +196,30 @@ class SlideGeneratorAgent(BaseAgent):
         # 渲染提示词
         prompt = self.model_manager.render_template(LLM_PPT_ELEMENT_MATCHING_PROMPT, context)
         
-        # 调用LLM获取匹配结果
-        response = await self.model_manager.generate_text(
-            model=self.llm_model,
-            prompt=prompt,
-            temperature=self.temperature,  # 使用较低的温度以获得更确定的结果
-            max_tokens=self.max_tokens
-        )
-        
-        # 解析LLM响应
-        return self._parse_llm_response(response)
-
+        try:
+            # 调用LLM获取匹配结果，使用重试机制
+            response = await self.model_helper.generate_text_with_retry(
+                model=self.llm_model,
+                prompt=prompt,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                max_retries=self.max_retries
+            )
+            
+            # 解析LLM响应
+            operations = self.model_helper.parse_json_response(response, [])
+            
+            if not operations:
+                logger.warning("LLM未返回有效的操作指令")
+                return []
+            
+            logger.info(f"成功从LLM获取 {len(operations)} 条操作指令")
+            return operations
+            
+        except Exception as e:
+            logger.error(f"从LLM获取操作指令失败: {str(e)}")
+            return []
+    
     def _build_operation_context(self, slide_elements: List[Dict[str, Any]], current_section: Dict[str, Any]) -> Dict[str, str]:
         """
         构建提示词上下文
@@ -276,188 +238,123 @@ class SlideGeneratorAgent(BaseAgent):
     
     def _parse_llm_response(self, response: str) -> List[Dict[str, Any]]:
         """
-        解析LLM返回的响应
+        解析LLM响应，提取操作指令列表
         
         Args:
             response: LLM响应文本
             
         Returns:
-            解析后的操作指令列表
+            操作指令列表
         """
-        try:
-            # 提取JSON部分
-            json_text = response
-            if "```json" in response:
-                # 提取JSON代码块
-                pattern = r"```(?:json)?\s*([\s\S]*?)```"
-                matches = re.findall(pattern, response)
-                if matches:
-                    json_text = matches[0]
-            
-            # 解析JSON
-            result = json.loads(json_text)
-            
-            # 提取操作列表
-            if isinstance(result, dict):
-                # 兼容旧格式: {"matches": [...]}
-                if "matches" in result:
-                    return result["matches"]
-                # 新格式: {"operations": [...]}
-                if "operations" in result:
-                    return result["operations"]
-            
-            # 如果直接是列表，尝试直接使用
-            if isinstance(result, list):
-                return result
-                
-            logger.warning(f"LLM响应格式不符合预期: {json_text[:100]}...")
-            return []
-            
-        except Exception as e:
-            logger.exception(f"解析LLM响应时出错: {str(e)}")
-            return []
-    
-    def _extract_json_from_response(self, response: str) -> str:
-        """
-        从响应中提取JSON文本
-        
-        Args:
-            response: 响应文本
-            
-        Returns:
-            JSON文本
-        """
-        # 尝试直接解析JSON响应
-        json_text = response
-        
-        # 如果响应包含JSON代码块，提取它
-        if "```json" in response:
-            pattern = r"```(?:json)?\s*([\s\S]*?)```"
-            matches = re.findall(pattern, response)
-            if matches:
-                json_text = matches[0]
-                
-        return json_text
+        # 使用模型辅助工具解析JSON响应
+        return self.model_helper.parse_json_response(response, [])
     
     def _parse_vision_response(self, response: str) -> Dict[str, Any]:
         """
-        解析视觉模型响应
+        解析视觉模型的响应，提取验证结果
         
         Args:
             response: 视觉模型响应文本
             
         Returns:
-            解析后的结果字典
+            验证结果字典
         """
-        try:
-            # 提取JSON部分
-            json_text = self._extract_json_from_response(response)
-            
-            # 解析JSON
-            result = json.loads(json_text)
-            
-            # 确保结果有必要的字段
-            if not isinstance(result, dict):
-                raise ValueError("响应不是有效的JSON对象")
-            
-            # 添加默认字段
-            return self._ensure_default_fields(result)
-            
-        except Exception as e:
-            logger.error(f"解析视觉模型响应时出错: {str(e)}")
-            return {
-                "has_issues": True,
-                "issues": ["解析响应失败"],
-                "suggestions": ["尝试重新生成"]
-            }
+        default_fields = {
+            "has_issues": False,
+            "issues": [],
+            "suggestions": [],
+            "operations": []
+        }
+        
+        # 使用模型辅助工具解析JSON响应
+        result = self.model_helper.parse_vision_response(response, default_fields)
+        
+        # 确保结果字典包含所需的默认字段
+        return self._ensure_default_fields(result)
     
     async def _generate_slide(self, state: AgentState, presentation: Any) -> None:
         """
-        生成幻灯片内容
+        生成当前章节的幻灯片
         
         Args:
-            state: 当前状态
+            state: 工作流状态
             presentation: 演示文稿对象
         """
-        # 获取当前章节内容
+        # 检查是否已达到末尾
+        if not hasattr(state, 'current_section_index'):
+            logger.error("找不到当前章节索引")
+            return
+        
+        if not hasattr(state, 'content_plan') or not state.content_plan:
+            logger.error("找不到内容计划")
+            return
+        
         current_index = state.current_section_index
+        if current_index >= len(state.content_plan):
+            logger.info("已处理所有内容，无需生成更多幻灯片")
+            state.has_more_content = False
+            return
+        
+        # 获取当前章节内容
         current_section = state.content_plan[current_index]
-        logger.info(f"处理章节 {current_index + 1}/{len(state.content_plan)}: {current_section.get('slide_type', '未知类型')}")
+        logger.info(f"生成幻灯片，章节索引: {current_index}, 类型: {current_section.get('slide_type', '未知')}")
         
-        # 第一步：找到目标幻灯片
-        slide_index, presentation = await self._find_template_slide(state, presentation, current_section)
+        # 查找或创建匹配的幻灯片
+        slide_index, updated_presentation = await self._find_template_slide(state, presentation, current_section)
         
-        # 第二步：规划并执行幻灯片内容填充操作
+        # 将slide_id添加到幻灯片备注中（用于追踪和调试）
+        await self._add_slide_id_to_notes(updated_presentation, slide_index, current_section)
+        
+        # 填充幻灯片内容
         operations = await self._plan_and_execute_content_operations(
-            presentation, slide_index, current_section
+            updated_presentation, slide_index, current_section
         )
         
         # 更新状态
-        state.presentation = presentation
-        
-        # 初始化generated_slides如果不存在
-        if not hasattr(state, 'generated_slides') or state.generated_slides is None:
-            state.generated_slides = []
-        
-        # 更新当前幻灯片信息，供验证使用
         state.current_slide = {
             "section_index": current_index,
             "slide_index": slide_index,
             "slide_type": current_section.get("slide_type", ""),
             "template_info": current_section.get("template", {}),
             "section_content": current_section,
-            "operations": operations,
-            "timestamp": datetime.datetime.now().isoformat()
+            "operations": operations
         }
-        
-        # 记录详细日志
-        logger.info(f"已生成幻灯片，索引: {slide_index}, 类型: {current_section.get('slide_type', '未知类型')}")
+        state.presentation = updated_presentation
     
     async def _add_slide_id_to_notes(self, presentation: Any, slide_index: int, current_section: Dict[str, Any]) -> None:
         """
-        将content_planning中备注的slide_id信息写入到对应slide的备注信息中
+        为幻灯片添加唯一标识符到备注中
         
         Args:
             presentation: 演示文稿对象
             slide_index: 幻灯片索引
-            current_section: 当前章节内容
+            current_section: 当前处理的章节信息
         """
+        # 从章节信息中获取slide_id，如果没有则生成新的
+        slide_id = current_section.get("slide_id", None)
+        if not slide_id:
+            slide_id = f"slide_{str(slide_index).zfill(6)}"
+            current_section["slide_id"] = slide_id
+        
+        # 获取幻灯片对象
         try:
-            # 从当前章节获取slide_id
-            slide_id = current_section.get("slide_id")
-            
-            if not slide_id:
-                logger.warning(f"幻灯片索引 {slide_index} 没有关联的slide_id")
-                return
-            
-            logger.info(f"将slide_id: {slide_id} 添加到幻灯片 {slide_index} 的备注中")
-            
-            # 获取现有备注
-            notes_result = self.ppt_manager.get_slide_notes(
+            # 获取幻灯片和当前备注
+            existing_notes = self.ppt_manager.get_slide_notes(
                 presentation=presentation,
                 slide_index=slide_index
             )
             
-            existing_notes = notes_result.get("notes", "")
-            
-            # 构建新备注内容
-            new_notes = f"slide_id: {slide_id}"
-            if existing_notes:
-                new_notes = f"{existing_notes}\n{new_notes}"
-            
-            # 更新备注
+            # 添加或更新备注
+            new_notes = existing_notes + f"\nslide_id: {slide_id}" if existing_notes else f"slide_id: {slide_id}"
             self.ppt_manager.update_slide_notes(
                 presentation=presentation,
                 slide_index=slide_index,
                 notes=new_notes
             )
-            
-            logger.info(f"成功将slide_id添加到幻灯片 {slide_index} 的备注中")
-            
+            logger.info(f"为幻灯片 {slide_index} 添加ID: {slide_id}")
         except Exception as e:
-            logger.error(f"添加slide_id到备注时出错: {str(e)}")
-            # 记录错误但不中断主要流程
-
+            logger.error(f"为幻灯片添加ID时出错: {str(e)}")
+    
     async def _plan_and_execute_content_operations(
         self, presentation: Any, slide_index: int, current_section: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
@@ -466,208 +363,222 @@ class SlideGeneratorAgent(BaseAgent):
         
         Args:
             presentation: 演示文稿对象
-            slide_id: 幻灯片ID
-            current_section: 当前章节内容
+            slide_index: 幻灯片索引
+            current_section: 当前处理的章节信息
             
         Returns:
             执行的操作列表
         """
-        # 获取新幻灯片的详细信息
-        slide_result = self.ppt_manager.get_slide_json(
+        # 获取幻灯片中的元素
+        logger.info(f"获取幻灯片 {slide_index} 的元素信息")
+        slide_elements = self.ppt_manager.get_slide_json(
             presentation=presentation,
-            slide_index=slide_index            
+            slide_index=slide_index
         )
         
-        # 使用LLM匹配内容到幻灯片元素
-        logger.info("调用LLM进行内容-元素智能匹配及操作规划")
-        operations = await self._plan_slide_operations(
-            slide_elements=slide_result,
-            current_section=current_section
-        )
+        # 规划幻灯片操作
+        logger.info("根据内容和布局规划幻灯片操作")
+        operations = await self._plan_slide_operations(slide_elements, current_section)
         
-        # 执行LLM规划的操作
-        logger.info(f"执行幻灯片操作，共 {len(operations)} 项")
-        await self._execute_operations(presentation, slide_index, operations)
-        
-        # 将slide_id写入幻灯片备注
-        await self._add_slide_id_to_notes(presentation, slide_index, current_section)
+        # 执行操作
+        if operations:
+            logger.info(f"执行 {len(operations)} 个幻灯片操作")
+            success = await self._execute_operations(presentation, slide_index, operations)
+            if not success:
+                logger.warning("执行幻灯片操作时出现问题")
+        else:
+            logger.warning("没有需要执行的幻灯片操作")
         
         return operations
     
     async def _plan_slide_operations(self, slide_elements: List[Dict[str, Any]], current_section: Dict[str, Any]) -> List[Dict[str, Any]]:
         """
-        使用LLM规划幻灯片操作，包括内容匹配和特殊操作
+        根据幻灯片元素和当前章节内容规划幻灯片操作
         
         Args:
             slide_elements: 幻灯片元素列表
             current_section: 当前处理的章节信息
             
         Returns:
-            操作指令列表
+            幻灯片操作列表
         """
-        try:
-            # 构建提示词上下文
-            context = self._build_operation_context(slide_elements, current_section)
-            
-            # 获取LLM响应
-            operations = await self._get_operations_from_llm(context)
-            
-            if operations:
-                logger.info(f"LLM成功返回 {len(operations)} 个操作指令")
-                return operations
-            else:
-                logger.warning("无法从LLM响应中解析出有效的操作指令，将使用默认匹配")
-                
-        except Exception as e:
-            logger.exception(f"规划幻灯片操作时出错: {str(e)}")
+        # 构建上下文
+        context = self._build_operation_context(slide_elements, current_section)
+        
+        # 从LLM获取操作指令
+        logger.info("从LLM获取幻灯片操作指令")
+        operations = await self._get_operations_from_llm(context)
+        
+        if not operations:
+            logger.warning("LLM未返回有效的操作指令")
+            return []
+        
+        logger.info(f"成功获取 {len(operations)} 条操作指令")
+        return operations
     
     async def _execute_operations(self, presentation: Any, slide_index: int, operations: List[Dict[str, Any]]) -> bool:
         """
-        执行幻灯片操作指令
+        执行幻灯片操作
         
         Args:
-            presentation: PPT演示文稿对象
+            presentation: 演示文稿对象
             slide_index: 幻灯片索引
-            operations: 操作指令列表
+            operations: 操作列表
             
         Returns:
-            是否成功执行所有操作
+            操作是否全部成功
         """
-        if not self.ppt_operation_executor:
-            logger.error("PPT操作执行器未初始化")
-            return False
+        if not operations:
+            logger.warning("没有操作需要执行")
+            return True
         
-        # 使用PPT操作执行器执行批量操作
+        # 使用 execute_batch_operations 方法执行所有操作
         result = await self.ppt_operation_executor.execute_batch_operations(
             presentation=presentation,
             slide_index=slide_index,
             operations=operations
         )
         
-        # 返回是否有任何操作成功
-        return result.get("success", False)
+        success = result.get("success", False)
+        if not success:
+            logger.warning("执行幻灯片操作时出现问题")
+        
+        return success
     
-    async def _render_slide_to_image(self, state: AgentState, presentation: Any, slide_index: int) -> Optional[str]:
+    async def _create_new_slide_with_same_layout(self, presentation: Any, slide_index: int, current_section: Optional[Dict[str, Any]] = None) -> Tuple[int, Any]:
         """
-        渲染幻灯片为图片
-        
-        Args:
-            state: 当前状态
-            presentation: 演示文稿对象
-            slide_index: 幻灯片索引
-            
-        Returns:
-            图片路径，失败返回None
-        """
-        # 创建临时目录用于存储渲染的幻灯片图像和临时PPTX文件
-        session_dir = Path(f"workspace/sessions/{state.session_id}/slide_images")
-        session_dir.mkdir(parents=True, exist_ok=True)
-        
-        # 创建唯一的临时文件名
-        temp_pptx_filename = f"temp_{uuid.uuid4().hex}.pptx"
-        temp_pptx_path = session_dir / temp_pptx_filename
-        
-        try:
-            # 临时保存修改后的presentation对象为PPTX文件
-            logger.info(f"临时保存修改后的演示文稿到: {temp_pptx_path}")
-            self.ppt_manager.save_presentation(presentation, str(temp_pptx_path))
-            
-            # 使用临时保存的PPTX文件进行渲染
-            logger.info(f"使用临时PPTX文件渲染幻灯片，索引: {slide_index}")
-            image_paths = self.ppt_manager.render_pptx_file(
-                pptx_path=str(temp_pptx_path),
-                output_dir=str(session_dir),
-                slide_index=slide_index
-            )
-            
-            logger.info(f"渲染结果: {image_paths}")
-            
-            if not image_paths or len(image_paths) == 0:
-                logger.error("渲染幻灯片图像失败")
-                return None
-                
-            return image_paths[0]
-            
-        finally:
-            # 无论渲染成功与否，都删除临时PPTX文件
-            if temp_pptx_path.exists():
-                logger.info(f"删除临时PPTX文件: {temp_pptx_path}")
-                temp_pptx_path.unlink()
-    
-    async def _create_new_slide_with_same_layout(self, presentation: Any, slide_index: int, current_section: Optional[Dict[str, Any]] = None) -> tuple:
-        """
-        根据指定幻灯片的布局创建一个新的幻灯片
+        创建一个与指定幻灯片具有相同布局的新幻灯片
         
         Args:
             presentation: 演示文稿对象
             slide_index: 参考幻灯片索引
-            current_section: 当前章节内容，用于提取slide_id
+            current_section: 当前处理的章节信息
             
         Returns:
-            tuple: (新幻灯片ID, 更新后的演示文稿对象)
+            (新幻灯片索引, 更新后的演示文稿)
         """
-        # 获取当前幻灯片的布局信息
-        layout_json = self.ppt_manager.get_slide_layout_json(
-            presentation=presentation,
-            slide_index=slide_index
-        )
-        
-        # 从layout_json中获取layout_name
-        layout_name = layout_json.get("layout_name", "Title and Content")
-        logger.info(f"获取到幻灯片 {slide_index} 的布局名称: {layout_name}")
-        
-        # 创建新幻灯片
-        result = self.ppt_manager.create_slide_with_layout(
-            presentation=presentation,
-            layout_name=layout_name
-        )
-        
-        if result.get("success", False):
-            # 获取新创建的幻灯片ID
-            new_slide_index = result.get("slide_index")
-            logger.info(f"成功创建新幻灯片，ID: {new_slide_index}")
-            # 返回可能更新的presentation对象
-            presentation = result.get("presentation", presentation)
+        try:
+            # 获取参考幻灯片的布局
+            layout_json = self.ppt_manager.get_slide_layout_json(
+                presentation=presentation,
+                slide_index=slide_index
+            )
+            layout_name = layout_json.get("layout_name", "")
+            logger.info(f"从幻灯片 {slide_index} 获取布局: {layout_name}")
             
-            # 如果提供了current_section，则将slide_id写入新幻灯片的备注
-            if current_section and "slide_id" in current_section:
-                await self._add_slide_id_to_notes(presentation, new_slide_index, current_section)
+            # 创建新幻灯片
+            result = self.ppt_manager.create_slide_with_layout(
+                presentation=presentation,
+                layout_name=layout_name
+            )
             
-            return new_slide_index, presentation
-        else:
-            # 创建失败，仍使用原幻灯片
-            logger.warning(f"创建新幻灯片失败: {result.get('message')}，使用原幻灯片")
-            return slide_index, presentation
-
-    async def _find_template_slide(self, state: AgentState, presentation: Any, current_section: Dict[str, Any]) -> tuple:
+            if result.get("success", False):
+                new_slide_index = result.get("slide_index")
+                # 使用更新后的演示文稿对象
+                presentation = result.get("presentation", presentation)
+                logger.info(f"创建新幻灯片，索引: {new_slide_index}，使用布局: {layout_name}")
+                
+                # 如果提供了章节信息，将slide_id添加到幻灯片备注中
+                if current_section is not None:
+                    await self._add_slide_id_to_notes(presentation, new_slide_index, current_section)
+                
+                return new_slide_index, presentation
+            else:
+                logger.error(f"创建新幻灯片失败: {result.get('message', '未知错误')}")
+                return -1, presentation
+            
+        except Exception as e:
+            logger.error(f"创建与幻灯片 {slide_index} 相同布局的新幻灯片时出错: {str(e)}")
+            # 返回非法的索引和原始演示文稿
+            return -1, presentation
+    
+    async def _find_template_slide(self, state: AgentState, presentation: Any, current_section: Dict[str, Any]) -> Tuple[int, Any]:
         """
-        找到模板幻灯片
+        根据内容类型查找合适的模板幻灯片
         
         Args:
-            state: 当前状态
+            state: 工作流状态
             presentation: 演示文稿对象
-            current_section: 当前章节内容
+            current_section: 当前处理的章节信息
             
         Returns:
-            tuple: (幻灯片ID, 更新后的演示文稿对象)
+            (幻灯片索引, 更新后的演示文稿)
         """
-        # 获取PPT的JSON结构并找到模板幻灯片ID
-        ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
+        # 获取幻灯片类型和模板信息
+        slide_type = current_section.get("slide_type", "content")
         template_info = current_section.get("template", {})
-        slide_index = template_info.get("slide_index")
+        template_name = template_info.get("name", "")
         
-        # 从state获取已编辑幻灯片ID记录
-        if not hasattr(state, "edited_slides") or state.edited_slides is None:
-            state.edited_slides = set()
+        logger.info(f"查找幻灯片模板，类型: {slide_type}, 名称: {template_name}")
         
-        # 判断幻灯片是否已编辑过
-        if slide_index in state.edited_slides:
-            logger.info(f"幻灯片 {slide_index} 已被编辑过，创建新幻灯片")
-            return await self._create_new_slide_with_same_layout(presentation, slide_index, current_section)
-        else:
-            # 将当前幻灯片ID添加到已编辑列表
-            state.edited_slides.add(slide_index)
-            logger.info(f"使用现有幻灯片，ID: {slide_index}")
+        # 尝试查找匹配的布局
+        layout_found = False
+        slide_index = -1
+        
+        try:
+            # 获取PPT的JSON结构
+            ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
+            slides_count = ppt_json.get("slide_count", 0)
+            slide_layouts = []
+            
+            # 获取所有幻灯片的布局名称
+            for i in range(slides_count):
+                layout_json = self.ppt_manager.get_slide_layout_json(
+                    presentation=presentation,
+                    slide_index=i
+                )
+                layout_name = layout_json.get("layout_name", "")
+                slide_layouts.append({"index": i, "layout": layout_name.lower()})
+            
+            # 根据类型查找匹配的幻灯片
+            for slide_layout in slide_layouts:
+                layout_name = slide_layout["layout"]
+                if (slide_type == "title" and "title" in layout_name and not "content" in layout_name) or \
+                   (slide_type == "section" and "section" in layout_name) or \
+                   (slide_type == "content" and "content" in layout_name) or \
+                   (slide_type == "summary" and "summary" in layout_name) or \
+                   (slide_type == "ending" and ("ending" in layout_name or "thank" in layout_name)) or \
+                   (template_name and template_name.lower() in layout_name):
+                    slide_index = slide_layout["index"]
+                    layout_found = True
+                    logger.info(f"找到匹配的布局: 索引={slide_index}, 布局={layout_name}")
+                    break
+            
+            # 如果找不到匹配的布局，使用默认布局
+            if not layout_found:
+                logger.warning(f"找不到匹配的布局，将创建新的幻灯片")
+                # 使用默认布局（通常是索引为1的布局，即内容页）
+                default_index = 1 if slides_count > 1 else 0
+                slide_index, presentation = await self._create_new_slide_with_same_layout(
+                    presentation, default_index, current_section
+                )
+            else:
+                # 以找到的幻灯片为模板创建新幻灯片
+                slide_index, presentation = await self._create_new_slide_with_same_layout(
+                    presentation, slide_index, current_section
+                )
             
             return slide_index, presentation
+            
+        except Exception as e:
+            logger.error(f"查找模板幻灯片时出错: {str(e)}")
+            # 尝试使用第一张幻灯片作为模板
+            try:
+                slide_index, presentation = await self._create_new_slide_with_same_layout(
+                    presentation, 0, current_section
+                )
+                return slide_index, presentation
+            except Exception as inner_e:
+                logger.error(f"创建新幻灯片时出错: {str(inner_e)}")
+                raise RuntimeError(f"无法找到或创建模板幻灯片: {str(e)}, {str(inner_e)}")
+    
+    def add_checkpoint(self, state: AgentState) -> None:
+        """
+        添加工作流检查点
+        
+        Args:
+            state: 工作流状态
+        """
+        state.add_checkpoint("slide_generator_completed")
+        logger.info("添加检查点: slide_generator_completed")
     

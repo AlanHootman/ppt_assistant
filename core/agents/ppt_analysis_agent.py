@@ -10,23 +10,58 @@ PPT模板分析Agent模块
 import logging
 import os
 import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 
 from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
+from core.utils.model_helper import ModelHelper
+from core.utils.ppt_agent_helper import PPTAgentHelper
 from config.prompts.ppt_analyzer_prompts import TEMPLATE_ANALYSIS_PROMPT
-
-# 导入PPT管理器
-try:
-    from libs.ppt_manager.interfaces.ppt_api import PPTManager
-except ImportError:
-    logger = logging.getLogger(__name__)
-    logger.error("无法导入PPT管理器，请确保libs/ppt_manager已正确安装")
-    raise
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+class LayoutUsageDetector:
+    """布局用途检测工具，用于推断幻灯片布局的适用场景"""
+    
+    @staticmethod
+    def detect_layout_usage(layout_name: str, placeholders: List[Dict[str, Any]]) -> str:
+        """
+        根据布局名称和占位符推断布局用途
+        
+        Args:
+            layout_name: 布局名称
+            placeholders: 布局占位符列表
+            
+        Returns:
+            布局用途描述
+        """
+        layout_name_lower = layout_name.lower()
+        placeholder_names = [p.get("name", "").lower() for p in placeholders]
+        
+        # 定义布局类型与检测规则的映射
+        layout_rules = [
+            # (布局类型, 检测函数)
+            ("首页标题页", lambda: "title" in layout_name_lower and any(p == "subtitle" for p in placeholder_names)),
+            ("章节页", lambda: "section" in layout_name_lower),
+            ("双栏内容页", lambda: "content" in layout_name_lower and len([p for p in placeholder_names if p.startswith("content")]) > 1),
+            ("普通内容页", lambda: "content" in layout_name_lower),
+            ("图片页", lambda: any(term in layout_name_lower for term in ["picture", "photo", "image"])),
+            ("表格页", lambda: "table" in layout_name_lower),
+            ("对比页", lambda: "comparison" in layout_name_lower),
+            ("内容页", lambda: "title" in placeholder_names and "content" in placeholder_names),
+            ("标题页", lambda: "title" in placeholder_names and "subtitle" in placeholder_names),
+        ]
+        
+        # 按顺序检查每个规则
+        for layout_type, rule_func in layout_rules:
+            if rule_func():
+                return layout_type
+        
+        # 无法确定类型
+        return "未知布局类型"
 
 class PPTAnalysisAgent(BaseAgent):
     """PPT模板分析Agent，负责分析PPT模板并提取布局特征"""
@@ -39,26 +74,29 @@ class PPTAnalysisAgent(BaseAgent):
             config: Agent配置
         """
         super().__init__(config)
-        # 初始化模型管理器
+        # 初始化模型管理器和辅助工具
         self.model_manager = ModelManager()
+        self.model_helper = ModelHelper(self.model_manager)
         
-        # 从配置获取模型类型和名称
-        self.model_type = config.get("model_type", "vision")
-        
-        # 初始化模型属性
-        model_config = self.model_manager.get_model_config(self.model_type)
+        # 获取模型配置
+        model_config = self.model_helper.get_model_config(config, "vision")
         self.vision_model = model_config.get("model")
-        # 直接使用模型配置中的值，不再需要类型转换
         self.temperature = model_config.get("temperature")
         self.max_tokens = model_config.get("max_tokens")
+        self.max_retries = model_config.get("max_retries", 3)
         
         # 图片分析批次大小配置
         self.batch_size = config.get("batch_size", 1)
         
         # 初始化PPT管理器
-        self.ppt_manager = PPTManager()
+        self.ppt_manager = PPTAgentHelper.init_ppt_manager()
+        if not self.ppt_manager:
+            raise ImportError("无法初始化PPT管理器，请确保PPT Manager已正确安装")
         
-        logger.info(f"初始化PPTAnalysisAgent，使用模型: {self.vision_model}, 批次大小: {self.batch_size}")
+        # 布局用途检测器
+        self.layout_detector = LayoutUsageDetector()
+        
+        logger.info(f"初始化PPTAnalysisAgent，使用模型: {self.vision_model}，批次大小: {self.batch_size}，最大重试次数: {self.max_retries}")
     
     async def run(self, state: AgentState) -> AgentState:
         """
@@ -117,8 +155,7 @@ class PPTAnalysisAgent(BaseAgent):
         logger.info(f"分析PPT模板: {template_path}")
         
         # 创建临时目录用于存储渲染的幻灯片图像
-        session_dir = Path(f"workspace/sessions/{state.session_id}/template_images")
-        session_dir.mkdir(parents=True, exist_ok=True)
+        session_dir = PPTAgentHelper.setup_temp_session_dir(state.session_id, "template_images")
         
         # 1. 加载PPT文件
         presentation = self.ppt_manager.load_presentation(str(template_path))
@@ -145,7 +182,10 @@ class PPTAnalysisAgent(BaseAgent):
                 layout_info = {
                     "name": layout.get("layout_name", "未知布局"),
                     "placeholders": layout.get("placeholders", []),
-                    "usage": self._infer_layout_usage(layout.get("layout_name", ""), layout.get("placeholders", []))
+                    "usage": LayoutUsageDetector.detect_layout_usage(
+                        layout.get("layout_name", ""), 
+                        layout.get("placeholders", [])
+                    )
                 }
                 available_layouts.append(layout_info)
         
@@ -167,63 +207,12 @@ class PPTAnalysisAgent(BaseAgent):
                 "fonts": font_families
             },
             "visualFeatures": visual_analysis.get("visualFeatures", {}),
-            "slideLayouts": visual_analysis.get("slideLayouts", []),  # 使用更新后的字段名
+            "slideLayouts": visual_analysis.get("slideLayouts", []),
             "recommendations": visual_analysis.get("recommendations", {}),
             "slideImages": image_paths,  # 保存图片路径，以便后续处理
         }
         
         return layout_features
-    
-    def _infer_layout_usage(self, layout_name: str, placeholders: List[Dict[str, Any]]) -> str:
-        """
-        根据布局名称和占位符推断布局用途
-        
-        Args:
-            layout_name: 布局名称
-            placeholders: 布局占位符列表
-            
-        Returns:
-            布局用途描述
-        """
-        layout_name_lower = layout_name.lower()
-        
-        # 标题页布局
-        if "title" in layout_name_lower and any(p.get("name", "").lower() == "subtitle" for p in placeholders):
-            return "首页标题页"
-            
-        # 章节页布局
-        if "section" in layout_name_lower:
-            return "章节页"
-            
-        # 内容页布局
-        if "content" in layout_name_lower:
-            # 检查是否为双栏布局
-            if len([p for p in placeholders if p.get("name", "").lower().startswith("content")]) > 1:
-                return "双栏内容页"
-            return "普通内容页"
-            
-        # 图片布局
-        if "picture" in layout_name_lower or "photo" in layout_name_lower or "image" in layout_name_lower:
-            return "图片页"
-            
-        # 表格布局
-        if "table" in layout_name_lower:
-            return "表格页"
-            
-        # 对比布局
-        if "comparison" in layout_name_lower:
-            return "对比页"
-            
-        # 默认判断
-        placeholder_names = [p.get("name", "").lower() for p in placeholders]
-        if "title" in placeholder_names:
-            if "content" in placeholder_names:
-                return "内容页"
-            if "subtitle" in placeholder_names:
-                return "标题页"
-        
-        # 无法确定类型
-        return "未知布局类型"
     
     async def _analyze_slides_with_vision(self, image_paths: List[str], presentation_json: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -249,220 +238,173 @@ class PPTAnalysisAgent(BaseAgent):
         slides_json_map = {}
         
         for i, image_path in enumerate(image_paths):
-            # 从图像路径中提取文件名
-            filename = os.path.basename(image_path)
-            # 尝试提取真实的幻灯片索引
-            real_index = i  # 默认索引
-            
-            # 尝试从文件名中提取索引
-            import re
-            match = re.search(r'slide-(\d+)', filename)
-            if match:
-                try:
-                    # 提取的索引通常从1开始，转换为从0开始
-                    extracted_index = int(match.group(1)) - 1
-                    real_index = extracted_index
-                except ValueError:
-                    pass
-            
-            # 获取对应的幻灯片JSON结构
-            slide_json = None
-            if 0 <= real_index < len(all_slides_json):
-                slide_json = all_slides_json[real_index]
-            
-            # 构建图像索引信息，包含对应的幻灯片JSON
-            image_info = {
-                "filename": filename,
-                "position": i,  # 在当前分析中的位置
-                "slideIndex": real_index,  # 在原始PPT中的索引
-                "slide_json": slide_json  # 添加幻灯片JSON结构
-            }
-            
-            all_image_indices.append(image_info)
-            slides_json_map[real_index] = slide_json
+            if i < len(all_slides_json):
+                slide_json = all_slides_json[i]
+                all_image_indices.append((i, image_path))
+                slides_json_map[i] = slide_json
         
-        # 准备模板信息
-        template_info = {
-            "template_name": presentation_json.get("name", "未知模板"),
-            "slide_count": presentation_json.get("slide_count", 0),
-            "theme": presentation_json.get("theme", {})
+        # 处理每个批次的图像
+        batch_results = []
+        
+        for i in range(0, len(all_image_indices), batch_size):
+            # 获取当前批次的图像
+            batch_indices = all_image_indices[i:i+batch_size]
+            
+            # 收集当前批次的幻灯片JSON
+            batch_slides_json = [slides_json_map[idx] for idx, _ in batch_indices if idx in slides_json_map]
+            
+            # 收集当前批次的图像路径
+            batch_image_paths = [path for _, path in batch_indices]
+            
+            # 分析当前批次
+            batch_result = await self._analyze_batch(batch_image_paths, batch_slides_json)
+            
+            # 添加批次分析结果
+            if batch_result:
+                batch_results.append(batch_result)
+        
+        # 合并所有批次的结果
+        return self._merge_batch_results(batch_results, presentation_json)
+    
+    async def _analyze_batch(self, image_paths: List[str], slides_json: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """
+        分析一批幻灯片图像
+        
+        Args:
+            image_paths: 当前批次的图像路径
+            slides_json: 当前批次的幻灯片JSON结构
+            
+        Returns:
+            当前批次的分析结果
+        """
+        if not image_paths:
+            logger.warning("没有要分析的图像")
+            return None
+        
+        # 构建提示词
+        template_info = {"slides": slides_json}
+        prompt = self._build_analysis_prompt(image_paths, template_info)
+        
+        try:
+            # 使用视觉模型分析图像
+            logger.info(f"开始分析 {len(image_paths)} 张幻灯片图像，使用模型: {self.vision_model}")
+            
+            # 使用重试机制调用视觉模型
+            response = await self.model_helper.analyze_image_with_retry(
+                model=self.vision_model,
+                prompt=prompt,
+                image_path=image_paths[0],  # 使用第一张图作为输入
+                max_retries=self.max_retries
+            )
+            
+            # 解析视觉模型响应
+            analysis_result = self.model_helper.parse_json_response(response)
+            
+            if not analysis_result:
+                logger.error("视觉模型返回的JSON无法解析")
+                return {"slideLayouts": [], "visualFeatures": {}, "recommendations": {}}
+            
+            logger.info(f"成功分析 {len(image_paths)} 张幻灯片图像")
+            return analysis_result
+            
+        except Exception as e:
+            logger.error(f"分析幻灯片图像时出错: {str(e)}")
+            # 返回空结果
+            return {"slideLayouts": [], "visualFeatures": {}, "recommendations": {}}
+    
+    def _build_analysis_prompt(self, image_paths: List[str], template_info: Dict[str, Any]) -> str:
+        """
+        构建用于视觉分析的提示词
+        
+        Args:
+            image_paths: 图像路径列表
+            template_info: 模板信息
+            
+        Returns:
+            提示词
+        """
+        # 将template_info转换为JSON字符串
+        template_info_json = json.dumps(template_info, ensure_ascii=False, indent=2)
+        
+        # 构建上下文
+        context = {
+            "template_info_json": template_info_json,
+            "image_count": len(image_paths)
         }
         
-        # 分批处理图像
-        batched_results = []
-        batch_count = (len(image_paths) + batch_size - 1) // batch_size
-        
-        for batch_idx in range(batch_count):
-            start_idx = batch_idx * batch_size
-            end_idx = min(start_idx + batch_size, len(image_paths))
-            
-            batch_images = image_paths[start_idx:end_idx]
-            batch_indices = all_image_indices[start_idx:end_idx]
-            
-            # 提取当前批次对应的幻灯片JSON
-            batch_slides_json = []
-            for image_info in batch_indices:
-                slide_index = image_info["slideIndex"]
-                if slide_index in slides_json_map and slides_json_map[slide_index]:
-                    batch_slides_json.append({
-                        "slide_index": slide_index,
-                        "content": slides_json_map[slide_index]
-                    })
-            
-            logger.info(f"处理第 {batch_idx + 1}/{batch_count} 批图像，包含 {len(batch_images)} 张图片")
-            
-            # 准备模板上下文
-            context = {
-                "template_info": template_info,
-                "has_images": True,
-                "image_indices": batch_indices,
-                "slides_json": batch_slides_json,  # 添加幻灯片JSON结构
-                "presentation_json": presentation_json,
-                "is_batch": True,
-                "batch_info": {
-                    "current": batch_idx + 1,
-                    "total": batch_count
-                }
-            }
-            
-            # 渲染提示词
-            prompt = self.model_manager.render_template(TEMPLATE_ANALYSIS_PROMPT, context)
-            
-            try:
-                # 构建图片列表
-                images = []
-                for i, image_path in enumerate(batch_images):
-                    if os.path.exists(image_path):
-                        images.append({
-                            "url": f"file://{image_path}", 
-                            "detail": "high"
-                        })
-                
-                # 调用视觉模型API
-                if hasattr(self.model_manager, 'generate_vision_response'):
-                    vision_response = await self.model_manager.generate_vision_response(
-                        model=self.vision_model,
-                        prompt=prompt,
-                        images=images,
-                        temperature=self.temperature,
-                        max_tokens=self.max_tokens
-                    )
-                    
-                    # 解析JSON响应
-                    try:
-                        # 清理响应中的markdown格式代码块
-                        json_text = vision_response
-                        if "```json" in vision_response:
-                            import re
-                            pattern = r"```(?:json)?\s*([\s\S]*?)```"
-                            matches = re.findall(pattern, vision_response)
-                            if matches:
-                                json_text = matches[0]
-                        
-                        batch_result = json.loads(json_text)
-                        logger.info(f"第 {batch_idx + 1} 批图像视觉模型分析成功")
-                        batched_results.append(batch_result)
-                    except Exception as e:
-                        logger.error(f"解析第 {batch_idx + 1} 批视觉模型响应失败: {str(e)}")
-                        # 继续处理下一批，不中断整个过程
-                else:
-                    logger.warning("模型管理器不支持视觉模型调用")
-                    # 返回错误信息
-                    raise ValueError("当前模型管理器不支持视觉模型调用，无法分析幻灯片")
-                    
-            except Exception as e:
-                logger.error(f"第 {batch_idx + 1} 批视觉模型分析失败: {str(e)}")
-                # 继续处理下一批，不中断整个过程
-        
-        # 如果所有批次都失败，返回错误信息
-        if not batched_results:
-            logger.error("所有批次分析都失败")
-            raise ValueError("幻灯片视觉分析失败，无法获取有效的分析结果")
-        
-        # 合并分析结果
-        return self._merge_batch_results(batched_results, template_info)
+        # 使用ModelManager的render_template方法渲染模板
+        return self.model_manager.render_template(TEMPLATE_ANALYSIS_PROMPT, context)
     
     def _merge_batch_results(self, results: List[Dict[str, Any]], template_info: Dict[str, Any]) -> Dict[str, Any]:
         """
-        合并多批次分析结果
+        合并多个批次的分析结果
         
         Args:
-            results: 多批次分析结果列表
+            results: 批次分析结果列表
             template_info: 模板信息
             
         Returns:
             合并后的分析结果
         """
         if not results:
-            logger.error("没有有效的分析结果可合并")
-            raise ValueError("幻灯片分析结果为空，无法合并分析结果")
+            logger.warning("没有任何分析结果可合并")
+            return {"slideLayouts": [], "visualFeatures": {}, "recommendations": {}}
         
-        # 如果只有一个批次，直接返回
-        if len(results) == 1:
-            return results[0]
-        
-        # 提取第一个有效结果作为基础
+        # 初始化合并结果
         merged_result = {
-            "templateName": template_info.get("template_name", "未知模板"),
-            "style": results[0].get("style", "professional"),
-            "visualFeatures": results[0].get("visualFeatures", {})
+            "slideLayouts": [],
+            "visualFeatures": {
+                "dominantColors": [],
+                "fontFamilies": [],
+                "layoutTypes": set()
+            },
+            "recommendations": {}
         }
         
-        # 合并所有幻灯片布局
-        all_slide_layouts = []
+        # 合并所有批次的结果
         for result in results:
-            slide_layouts = result.get("slideLayouts", [])
-            if slide_layouts:
-                all_slide_layouts.extend(slide_layouts)
-        
-        # 确保幻灯片布局按照索引排序
-        all_slide_layouts.sort(key=lambda x: x.get("slideIndex", 0))
-        merged_result["slideLayouts"] = all_slide_layouts
-        
-        # 合并布局分组
-        layout_groups = {}
-        for result in results:
-            for group in result.get("layoutGroups", []):
-                group_name = group.get("groupName")
-                if not group_name:
-                    continue
-                    
-                if group_name not in layout_groups:
-                    layout_groups[group_name] = {
-                        "groupName": group_name,
-                        "slideIndices": [],
-                        "commonFeatures": group.get("commonFeatures", "")
-                    }
+            # 合并幻灯片布局
+            layouts = result.get("slideLayouts", [])
+            if layouts:
+                merged_result["slideLayouts"].extend(layouts)
+            
+            # 合并视觉特征
+            visual_features = result.get("visualFeatures", {})
+            if visual_features:
+                # 合并主色
+                dominant_colors = visual_features.get("dominantColors", [])
+                merged_result["visualFeatures"]["dominantColors"].extend(dominant_colors or [])
                 
-                # 合并索引并去重
-                layout_groups[group_name]["slideIndices"].extend(group.get("slideIndices", []))
-                layout_groups[group_name]["slideIndices"] = list(set(layout_groups[group_name]["slideIndices"]))
+                # 合并字体
+                font_families = visual_features.get("fontFamilies", [])
+                merged_result["visualFeatures"]["fontFamilies"].extend(font_families or [])
+                
+                # 合并布局类型
+                layout_types = visual_features.get("layoutTypes", [])
+                if layout_types:
+                    merged_result["visualFeatures"]["layoutTypes"].update(layout_types)
+            
+            # 合并建议
+            recommendations = result.get("recommendations", {})
+            if recommendations:
+                # 对于重复的键，使用较新的值
+                merged_result["recommendations"].update(recommendations)
         
-        merged_result["layoutGroups"] = list(layout_groups.values())
+        # 将layoutTypes从集合转换回列表
+        merged_result["visualFeatures"]["layoutTypes"] = list(merged_result["visualFeatures"]["layoutTypes"])
         
-        # 使用最后一个批次的推荐建议，通常最后一个批次有更全面的信息
-        merged_result["recommendations"] = results[-1].get("recommendations", {})
+        # 去重主色和字体
+        merged_result["visualFeatures"]["dominantColors"] = list(set(merged_result["visualFeatures"]["dominantColors"]))
+        merged_result["visualFeatures"]["fontFamilies"] = list(set(merged_result["visualFeatures"]["fontFamilies"]))
         
-        # 合并幻灯片摘要信息
-        slide_summary = {
-            "openingSlides": [],
-            "contentSlides": [],
-            "closingSlides": [],
-            "presentationFlow": results[-1].get("slideSummary", {}).get("presentationFlow", "")
-        }
+        return merged_result
+    
+    def add_checkpoint(self, state: AgentState) -> None:
+        """
+        添加工作流检查点
         
-        for result in results:
-            summary = result.get("slideSummary", {})
-            slide_summary["openingSlides"].extend(summary.get("openingSlides", []))
-            slide_summary["contentSlides"].extend(summary.get("contentSlides", []))
-            slide_summary["closingSlides"].extend(summary.get("closingSlides", []))
-        
-        # 去重并排序
-        slide_summary["openingSlides"] = sorted(list(set(slide_summary["openingSlides"])))
-        slide_summary["contentSlides"] = sorted(list(set(slide_summary["contentSlides"])))
-        slide_summary["closingSlides"] = sorted(list(set(slide_summary["closingSlides"])))
-        
-        merged_result["slideSummary"] = slide_summary
-        
-        logger.info(f"成功合并 {len(results)} 批分析结果，共有 {len(all_slide_layouts)} 个幻灯片布局分析")
-        return merged_result 
+        Args:
+            state: 工作流状态
+        """
+        state.add_checkpoint("ppt_analyzer_completed")
+        logger.info("添加检查点: ppt_analyzer_completed") 

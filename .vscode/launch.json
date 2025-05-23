@@ -7,8 +7,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/run_workflow.py",
             "args": [
-                "--md_file", "tests/testfiles/技术思维五导教学内容.md",
-                "--ppt_template", "tests/testfiles/黄色小清新文艺工作总结ppt模板.pptx",
+                "--markdown", "tests/testfiles/技术思维五导教学内容.md",
+                "--template", "tests/testfiles/黄色小清新文艺工作总结ppt模板.pptx",
                 "--output_dir", "workspace/output",
                 "--trace"
             ],
@@ -24,8 +24,8 @@
             "request": "launch",
             "program": "${workspaceFolder}/run_workflow.py",
             "args": [
-                "--md_file", "${input:markdownFile}",
-                "--ppt_template", "${input:templateFile}",
+                "--markdown", "${input:markdownFile}",
+                "--template", "${input:templateFile}",
                 "--output_dir", "${input:outputDir}"
             ],
             "console": "integratedTerminal",
