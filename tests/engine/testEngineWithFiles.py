@@ -63,9 +63,8 @@ class TestEngineWithFiles:
         assert len(result.content_structure["sections"]) > 0
         
         # 验证布局决策
-        assert result.decision_result is not None
-        assert "slides" in result.decision_result
-        assert len(result.decision_result["slides"]) > 0
+        assert result.content_plan is not None
+        assert len(result.content_plan) > 0
         
         # 验证输出文件
         if result.ppt_file_path:

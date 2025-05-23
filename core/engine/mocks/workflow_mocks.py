@@ -38,40 +38,16 @@ class WorkflowMocks:
         logger.info(f"[模拟] 执行布局决策: 内容结构存在={state.content_structure is not None}, 布局特征存在={state.layout_features is not None}")
         
         # 模拟决策结果
-        state.decision_result = {
-            "slides": [
-                {
-                    "type": "title_slide",
-                    "content": {
-                        "title": state.content_structure.get("title", "演示文稿"),
-                        "subtitle": "自动生成的PPT"
-                    }
-                }
-            ]
-        }
+        state.content_plan = [
+            # 以幻灯片内容代替
+        ]
         
-        # 添加内容幻灯片
-        sections = state.content_structure.get("sections", [])
-        for section in sections:
-            section_title = section.get("title", "")
-            section_content = section.get("content", [])
-            
-            slide = {
-                "type": "content_slide",
-                "content": {
-                    "title": section_title,
-                    "bullets": section_content
-                }
-            }
-            
-            state.decision_result["slides"].append(slide)
-        
-        logger.info(f"[模拟] 布局决策完成: 生成了{len(state.decision_result.get('slides', []))}张幻灯片")
+        logger.info(f"[模拟] 布局决策完成: 生成了{len(state.content_plan)}张幻灯片")
     
     @staticmethod
     def mock_ppt_generator(state: AgentState) -> None:
         """模拟PPT生成实现"""
-        slides = state.decision_result.get("slides", [])
+        slides = state.content_plan
         
         # 检查输出目录设置
         output_dir = getattr(state, 'output_dir', None)
@@ -89,7 +65,7 @@ class WorkflowMocks:
         
         # 仅做测试记录
         with open(output_path.with_suffix(".json"), "w", encoding="utf-8") as f:
-            json.dump(state.decision_result, f, ensure_ascii=False, indent=2)
+            json.dump(state.content_plan, f, ensure_ascii=False, indent=2)
         
         state.ppt_file_path = str(output_path)
         state.output_ppt_path = str(output_path)  # 添加这个属性以保持一致性
@@ -281,13 +257,6 @@ class WorkflowMocks:
                 })
             
             # 创建决策结果
-            state.decision_result = {
-                "slides": content_plan,
-                "total_slides": len(content_plan),
-                "theme": state.layout_features.get("theme", {})
-            }
-            
-            # 更新为新的内容规划格式
             state.content_plan = content_plan
             
             logger.info(f"内容规划完成，计划生成 {len(content_plan)} 张幻灯片")
@@ -301,8 +270,8 @@ class WorkflowMocks:
         logger.info(f"模拟执行幻灯片生成节点(包含验证)，章节索引: {state.current_section_index}")
         
         content_plan = getattr(state, 'content_plan', None)
-        if not content_plan and state.decision_result and "slides" in state.decision_result:
-            content_plan = state.decision_result.get("slides", [])
+        if not content_plan and state.content_plan and len(state.content_plan) > 0:
+            content_plan = state.content_plan
             
         if content_plan:
             if state.current_section_index is None:
@@ -347,8 +316,8 @@ class WorkflowMocks:
         logger.info("模拟执行下一页或结束判断节点")
         
         content_plan = getattr(state, 'content_plan', None)
-        if not content_plan and hasattr(state, 'decision_result'):
-            content_plan = state.decision_result.get('slides', [])
+        if not content_plan and state.content_plan and len(state.content_plan) > 0:
+            content_plan = state.content_plan
         
         total_slides = len(content_plan) if content_plan else 0
         

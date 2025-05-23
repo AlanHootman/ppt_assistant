@@ -421,9 +421,9 @@ class WorkflowEngine:
         if check_item and error_message:
             return self._check_state_condition(state, check_item, error_message)
         
-        # 特殊情况：内容规划节点需要检查content_plan和decision_result
+        # 特殊情况：内容规划节点需要检查content_plan
         if node_name == "content_planner":
-            if not state.content_plan and not state.decision_result:
+            if not state.content_plan:
                 error_msg = "内容规划失败，无法获取内容规划结果"
                 logger.error(error_msg)
                 state.record_failure(error_msg)
@@ -711,19 +711,15 @@ class WorkflowEngine:
             
             # 确保状态中有必要的属性
             if not hasattr(state, 'content_plan') or not state.content_plan:
-                if not hasattr(state, 'decision_result') or not state.decision_result:
-                    error_msg = "无法检查进度：缺少内容规划结果"
-                    logger.error(error_msg)
-                    state.record_failure(error_msg)
-                    state.has_more_content = False
-                    return
-                
-                # 使用旧版兼容模式
-                slides = state.decision_result.get('slides', [])
-                total_slides = len(slides)
-            else:
-                # 使用新版content_plan
-                total_slides = len(state.content_plan)
+                # 移除使用decision_result的兼容代码
+                error_msg = "无法检查进度：缺少内容规划结果"
+                logger.error(error_msg)
+                state.record_failure(error_msg)
+                state.has_more_content = False
+                return
+            
+            # 直接使用content_plan
+            total_slides = len(state.content_plan)
             
             # 当前幻灯片已验证通过，将其添加到已生成列表中
             if state.current_slide and state.validation_result:
@@ -899,7 +895,6 @@ class WorkflowEngine:
                         
                         # 更新状态
                         state.content_plan = cached_data.get("content_plan")
-                        state.decision_result = cached_data.get("decision_result")
                         state.current_section_index = 0  # 重置为0，准备开始生成
                         
                         logger.info(f"从缓存加载内容规划结果，计划幻灯片数: {len(state.content_plan) if state.content_plan else 0}")
@@ -933,7 +928,6 @@ class WorkflowEngine:
                 
                 # 更新状态
                 state.content_plan = updated_state.content_plan
-                state.decision_result = updated_state.decision_result
                 state.current_section_index = updated_state.current_section_index
                 
                 logger.info(f"ContentPlanningAgent执行完成，计划了 {len(state.content_plan) if state.content_plan else 0} 张幻灯片")
@@ -952,10 +946,9 @@ class WorkflowEngine:
                         
                         cache_file = cache_dir / f"{combined_hash}_content_plan.json"
                         
-                        # 保存内容规划结果和决策结果到缓存
+                        # 保存内容规划结果到缓存
                         cache_data = {
-                            "content_plan": state.content_plan,
-                            "decision_result": state.decision_result
+                            "content_plan": state.content_plan
                         }
                         
                         # 写入缓存文件

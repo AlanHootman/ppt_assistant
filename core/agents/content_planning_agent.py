@@ -141,13 +141,6 @@ class ContentPlanningAgent(BaseAgent):
             # 设置当前章节索引为0，准备开始逐页生成
             state.current_section_index = 0
             
-            # 向后兼容：添加decision_result（旧版本API）
-            state.decision_result = {
-                "slides": state.content_plan,
-                "total_slides": total_slides,
-                "theme": state.layout_features.get("theme", {})
-            }
-            
             logger.info(f"内容规划完成，计划生成 {total_slides} 张幻灯片")
             
             # 记录检查点
