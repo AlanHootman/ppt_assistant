@@ -26,8 +26,7 @@ from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
 from core.utils.ppt_operations import PPTOperationExecutor
 from config.prompts.slide_generator_prompts import (
-    LLM_PPT_ELEMENT_MATCHING_PROMPT, 
-    SLIDE_SELF_VALIDATION_PROMPT
+    LLM_PPT_ELEMENT_MATCHING_PROMPT
 )
 
 # 导入PPT管理器

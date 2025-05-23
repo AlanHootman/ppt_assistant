@@ -21,7 +21,7 @@ from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
 from core.utils.ppt_operations import PPTOperationExecutor
-from config.prompts.slide_generator_prompts import SLIDE_SELF_VALIDATION_PROMPT
+from config.prompts.slide_validation_prompts import SLIDE_SELF_VALIDATION_PROMPT
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
