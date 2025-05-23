@@ -171,8 +171,11 @@ class NodeExecutor:
         
         logger.info("执行Markdown解析节点")
         
+        # 从状态中获取markdown文件路径（可能是从命令行参数传递的）
+        md_file_path = state.markdown_path if hasattr(state, 'markdown_path') else None
+        
         # 尝试从缓存获取解析结果
-        cached_result = self.cache_manager.get_markdown_cache(state.raw_md)
+        cached_result = self.cache_manager.get_markdown_cache(state.raw_md, md_file_path)
         
         if cached_result:
             logger.info("使用缓存的Markdown解析结果")
@@ -196,7 +199,7 @@ class NodeExecutor:
                 state.content_structure = result.content_structure
                 
                 # 保存到缓存
-                self.cache_manager.save_markdown_cache(state.raw_md, state.content_structure)
+                self.cache_manager.save_markdown_cache(state.raw_md, state.content_structure, md_file_path)
                 
                 # 添加检查点
                 state.add_checkpoint("markdown_parser_completed")

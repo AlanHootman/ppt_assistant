@@ -84,7 +84,9 @@ async def main():
         result = await engine.run_async(
             raw_md=md_content,
             ppt_template_path=args.template,
-            output_dir=args.output_dir
+            output_dir=args.output_dir,
+            # 重要：传递Markdown文件路径，方便用于缓存命名
+            markdown_path=args.markdown
         )
         
         # 输出结果
