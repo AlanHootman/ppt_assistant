@@ -20,6 +20,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
+from core.utils.ppt_operations import PPTOperationExecutor
 from config.prompts.slide_generator_prompts import SLIDE_SELF_VALIDATION_PROMPT
 from config.settings import settings
 
@@ -74,6 +75,15 @@ class PPTFinalizerAgent(BaseAgent):
         except ImportError as e:
             logger.error(f"无法导入PPTManager: {str(e)}")
             self.ppt_manager = None
+        
+        # 初始化PPT操作执行器
+        if self.ppt_manager:
+            self.ppt_operation_executor = PPTOperationExecutor(
+                ppt_manager=self.ppt_manager,
+                agent_name="PPTFinalizerAgent"
+            )
+        else:
+            self.ppt_operation_executor = None
         
         # 创建验证日志目录
         self.validation_logs_dir = settings.LOG_DIR / "slide_validation"
@@ -890,101 +900,19 @@ class PPTFinalizerAgent(BaseAgent):
         Returns:
             是否成功执行所有操作
         """
-        if not operations:
-            logger.warning("没有操作指令可执行")
+        if not self.ppt_operation_executor:
+            logger.error("PPT操作执行器未初始化")
             return False
         
-        success_count = 0
-        total_count = len(operations)
+        # 使用PPT操作执行器执行批量操作
+        result = await self.ppt_operation_executor.execute_batch_operations(
+            presentation=presentation,
+            slide_index=slide_index,
+            operations=operations
+        )
         
-        for operation in operations:
-            element_id = operation.get("element_id")
-            if not element_id:
-                logger.warning(f"跳过缺少element_id的操作: {operation}")
-                continue
-                
-            try:
-                # 执行操作
-                result = await self._execute_single_operation(presentation, slide_index, operation)
-                
-                if result.get("success"):
-                    success_count += 1
-                    logger.info(f"成功执行操作 {operation.get('operation')} 于元素 {element_id}")
-                else:
-                    logger.warning(f"执行操作 {operation.get('operation')} 失败: {result.get('message')}")
-            
-            except Exception as e:
-                logger.warning(f"执行操作时出错: {str(e)}")
-        
-        # 计算成功率
-        success_rate = success_count / total_count if total_count > 0 else 0
-        logger.info(f"操作执行完成，成功率: {success_rate:.2%} ({success_count}/{total_count})")
-        
-        # 如果有任何操作成功应用，就认为整体成功
-        return success_count > 0
-    
-    async def _execute_single_operation(self, presentation: Any, slide_index: int, operation: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        执行单个操作
-        
-        Args:
-            presentation: PPT演示文稿对象
-            slide_index: 幻灯片索引
-            operation: 操作指令
-            
-        Returns:
-            操作结果
-        """
-        element_id = operation.get("element_id")
-        operation_type = operation.get("operation", "update_element_content")
-        content = operation.get("content")
-        
-        # 根据操作类型执行不同的操作
-        if operation_type == "update_element_content":
-            # 文本替换操作
-            return self.ppt_manager.update_element_content(
-                presentation=presentation,
-                slide_index=slide_index,
-                element_id=element_id,
-                new_content=str(content).strip()
-            )
-        elif operation_type == "adjust_text_font_size":
-            # 调整字体大小
-            return self.ppt_manager.adjust_text_font_size(
-                presentation=presentation,
-                slide_index=slide_index,
-                element_id=element_id,
-                font_size=int(content)
-            )
-        elif operation_type == "replace_image":
-            # 替换图片
-            return self.ppt_manager.replace_image(
-                presentation=presentation,
-                slide_index=slide_index,
-                element_id=element_id,
-                image_path=content
-            )
-        elif operation_type == "adjust_element_position":
-            # 调整元素位置
-            return self.ppt_manager.adjust_element_position(
-                presentation=presentation,
-                slide_index=slide_index,
-                element_id=element_id,
-                left=content.get("left"),
-                top=content.get("top"),
-                width=content.get("width"),
-                height=content.get("height")
-            )
-        elif operation_type == "delete_element":
-            # 删除元素
-            return self.ppt_manager.delete_element(
-                presentation=presentation,
-                slide_index=slide_index,
-                element_id=element_id
-            )
-        else:
-            logger.warning(f"未知的操作类型: {operation_type}")
-            return {"success": False, "message": f"未知的操作类型: {operation_type}"}
+        # 返回是否有任何操作成功
+        return result.get("success", False)
     
     def _save_validation_logs(self, log_dir: Path, iteration: int, slide_index: int, 
                             slide_elements: List[Dict[str, Any]], section_content: Dict[str, Any],
