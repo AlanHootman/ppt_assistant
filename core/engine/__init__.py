@@ -2,6 +2,8 @@
 工作流引擎初始化模块。
 """
 
-from core.engine.registry import registry
+# 更新为引入核心组件
+from core.engine.workflowEngine import WorkflowEngine
+from core.engine.state import AgentState
 
-__all__ = ["registry"]
+__all__ = ["WorkflowEngine", "AgentState"]
