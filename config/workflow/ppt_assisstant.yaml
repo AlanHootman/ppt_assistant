@@ -24,12 +24,15 @@ workflow:
     - name: slide_generator
       agent: SlideGeneratorAgent
       config:
-        model_type: vision  # 对应环境变量VISION_MODEL
+        model_type: text  # 对应环境变量LLM_MODEL
         
     - name: ppt_finalizer
       agent: PPTFinalizerAgent
+      config:
+        model_type: vision  # 对应环境变量VISION_MODEL
+        max_iterations: 3
   
-  # 边配置
+  # 边配置 - 线性流程
   edges:
     - from: start
       to: markdown_parser
@@ -40,14 +43,6 @@ workflow:
     - from: content_planner
       to: slide_generator
     - from: slide_generator
-      to: next_slide_or_end
-      condition:
-        pass: next_slide_or_end
-        retry: slide_generator
-    - from: next_slide_or_end
-      to: slide_generator
-      condition:
-        has_more_content: slide_generator
-        completed: ppt_finalizer
+      to: ppt_finalizer
     - from: ppt_finalizer
       to: end 

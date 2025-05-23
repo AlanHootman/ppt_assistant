@@ -60,18 +60,13 @@ class SlideGeneratorAgent(BaseAgent):
         self.model_manager = ModelManager()
         
         # 从配置获取模型类型和名称
-        self.model_type = config.get("model_type", "vision")
+        self.model_type = config.get("model_type", "text")
         
         # 初始化模型属性
         model_config = self.model_manager.get_model_config(self.model_type)
         self.llm_model = model_config.get("model")
-        self.vision_model = model_config.get("model")  # 为验证功能使用同一个视觉模型
-        # 直接使用模型配置中的值，不再需要类型转换
         self.temperature = model_config.get("temperature")
         self.max_tokens = model_config.get("max_tokens")
-        
-        # 获取迭代优化相关配置
-        self.max_iterations = config.get("max_iterations", settings.MAX_SLIDE_ITERATIONS)
         
         # 初始化PPTManager
         try:
@@ -82,16 +77,11 @@ class SlideGeneratorAgent(BaseAgent):
             logger.error(f"无法导入PPTManager: {str(e)}")
             self.ppt_manager = None
         
-        # 创建日志目录
-        self.validation_logs_dir = settings.LOG_DIR / "slide_validation"
-        self.validation_logs_dir.mkdir(parents=True, exist_ok=True)
-        logger.info(f"幻灯片验证日志将保存到: {self.validation_logs_dir}")
-        
-        logger.info(f"初始化SlideGeneratorAgent，使用模型: {self.llm_model}, 最大迭代次数: {self.max_iterations}")
+        logger.info(f"初始化SlideGeneratorAgent，使用模型: {self.llm_model}")
     
     async def run(self, state: AgentState) -> AgentState:
         """
-        执行幻灯片生成逻辑，包含自验证功能
+        执行幻灯片生成逻辑，生成所有规划的幻灯片
 
         Args:
             state: 工作流引擎状态
@@ -99,24 +89,77 @@ class SlideGeneratorAgent(BaseAgent):
         Returns:
             更新后的工作流引擎状态
         """
-        logger.info("开始生成幻灯片")
+        logger.info("开始生成所有规划的幻灯片")
         
         try:
             # 第一步：准备工作 - 加载和检查必要资源
             presentation = await self._prepare_presentation(state)
             
-            # 第二步：生成幻灯片
-            await self._generate_slide(state, presentation)
+            # 检查状态中是否有内容计划
+            if not hasattr(state, 'content_plan') or not state.content_plan:
+                error_msg = "无法生成幻灯片：找不到内容计划"
+                logger.error(error_msg)
+                state.record_failure(error_msg)
+                return state
+                
+            # 初始化存储生成幻灯片的列表
+            state.generated_slides = []
             
-            # 第三步：验证幻灯片质量
-            await self._validate_slide(state, presentation)
+            # 循环处理所有章节内容
+            total_sections = len(state.content_plan)
+            logger.info(f"开始生成 {total_sections} 张幻灯片")
+            
+            for section_index, current_section in enumerate(state.content_plan):
+                logger.info(f"生成第 {section_index + 1}/{total_sections} 张幻灯片: {current_section.get('slide_type', '未知类型')}")
+                
+                try:
+                    # 更新当前章节索引
+                    state.current_section_index = section_index
+                    
+                    # 生成幻灯片
+                    slide_index, presentation = await self._find_template_slide(state, presentation, current_section)
+                    
+                    # 执行幻灯片内容填充操作
+                    operations = await self._plan_and_execute_content_operations(
+                        presentation, slide_index, current_section
+                    )
+                    
+                    # 记录生成的幻灯片信息
+                    slide_info = {
+                        "section_index": section_index,
+                        "slide_index": slide_index,
+                        "slide_type": current_section.get("slide_type", ""),
+                        "template_info": current_section.get("template", {}),
+                        "section_content": current_section,
+                        "operations": operations,
+                        "timestamp": datetime.datetime.now().isoformat()
+                    }
+                    
+                    # 将幻灯片信息添加到已生成列表
+                    state.generated_slides.append(slide_info)
+                    logger.info(f"成功生成第 {section_index + 1} 张幻灯片，索引: {slide_index}")
+                    
+                except Exception as e:
+                    error_msg = f"生成第 {section_index + 1} 张幻灯片失败: {str(e)}"
+                    logger.error(error_msg)
+                    logger.exception(e)
+                    state.record_failure(error_msg)
+                    # 继续生成其他幻灯片，不中断整个过程
+            
+            # 更新状态
+            state.presentation = presentation
+            state.has_more_content = False  # 标记所有内容已处理完毕
+            
+            # 记录完成信息
+            logger.info(f"已完成所有 {len(state.generated_slides)}/{total_sections} 张幻灯片的生成")
             
             return state
             
         except Exception as e:
-            error_msg = f"幻灯片生成失败: {str(e)}"
+            error_msg = f"幻灯片生成流程失败: {str(e)}"
             logger.error(error_msg)
             logger.exception(e)
+            state.record_failure(error_msg)
             raise RuntimeError(error_msg)
     
     def _ensure_default_fields(self, result: Dict[str, Any]) -> Dict[str, Any]:
@@ -134,78 +177,6 @@ class SlideGeneratorAgent(BaseAgent):
         result.setdefault("suggestions", [])
         return result
     
-    def _check_validation_prerequisites(self, state: AgentState) -> bool:
-        """
-        检查验证前置条件
-        
-        Args:
-            state: 当前状态
-            
-        Returns:
-            是否满足前置条件
-        """
-        if not hasattr(state, "current_slide") or not state.current_slide:
-            logger.error("没有当前幻灯片可供验证")
-            state.validation_result = False
-            state.validation_issues = ["缺少幻灯片数据"]
-            state.validation_suggestions = ["重新生成幻灯片"]
-            return False
-            
-        if not hasattr(state, "content_plan") or not state.content_plan:
-            logger.error("没有内容计划可供验证")
-            state.validation_result = False
-            state.validation_issues = ["缺少内容计划"]
-            state.validation_suggestions = ["重新生成内容计划"]
-            return False
-            
-        return True
-    
-    def _update_validation_result(self, state: AgentState, analysis: Dict[str, Any]) -> None:
-        """
-        更新验证结果
-        
-        Args:
-            state: 当前状态
-            analysis: 分析结果
-        """
-        # 获取分析结果
-        issues = analysis.get("issues", [])
-        suggestions = analysis.get("suggestions", [])
-        quality_score = analysis.get("quality_score", 0)
-        
-        # 更新状态
-        state.validation_issues = issues
-        state.validation_suggestions = suggestions
-        
-        # 记录质量分数
-        if not hasattr(state, "quality_scores"):
-            state.quality_scores = []
-        state.quality_scores.append(quality_score)
-        
-        # 记录验证信息
-        if state.validation_result:
-            logger.info(f"幻灯片验证通过，质量评分: {quality_score}/10")
-        else:
-            logger.warning(f"幻灯片验证不通过，质量评分: {quality_score}/10")
-            logger.warning(f"问题: {issues}")
-            logger.info(f"修复建议: {suggestions}")
-            
-        # 记录验证次数
-        logger.info(f"总验证尝试次数: {state.validation_attempts}") 
-
-    def _set_validation_failure(self, state: AgentState, issue: str, suggestions: List[str]) -> None:
-        """
-        设置验证失败状态
-        
-        Args:
-            state: 当前状态
-            issue:
-            suggestions:
-        """
-        state.validation_result = False
-        state.validation_issues = [issue]
-        state.validation_suggestions = suggestions
-
     async def _prepare_presentation(self, state: AgentState) -> Any:
         """
         准备演示文稿对象
@@ -557,233 +528,6 @@ class SlideGeneratorAgent(BaseAgent):
         except Exception as e:
             logger.exception(f"规划幻灯片操作时出错: {str(e)}")
     
-    async def _analyze_with_vision_model(self, image_path: str, slide_elements: List[Dict[str, Any]], 
-                                        current_section: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        使用多模态视觉模型分析幻灯片图像并提供修改建议
-        
-        Args:
-            image_path: 幻灯片图像路径
-            slide_elements: 幻灯片元素详细信息
-            current_section: 当前处理的章节内容
-            
-        Returns:
-            分析结果，包含问题、建议和操作指令
-        """
-        # 检查图像是否存在
-        if not os.path.exists(image_path):
-            logger.warning(f"图像文件不存在: {image_path}")
-            return {
-                "has_issues": True, 
-                "issues": ["图像文件不存在"], 
-                "suggestions": ["重新生成幻灯片预览"]
-            }
-        
-        try:
-            # 准备并发送分析请求
-            logger.info(f"使用多模态模型分析幻灯片图像: {image_path}")
-            
-            # 准备上下文数据
-            context = {
-                "section_json": json.dumps(current_section, ensure_ascii=False, indent=2, cls=EnumEncoder),
-                "slide_elements_json": json.dumps(slide_elements, ensure_ascii=False, indent=2, cls=EnumEncoder)
-            }
-            
-            # 渲染提示词
-            prompt = self.model_manager.render_template(SLIDE_SELF_VALIDATION_PROMPT, context)
-            
-            # 调用多模态视觉模型
-            response = await self.model_manager.analyze_image(
-                model=self.vision_model,
-                prompt=prompt,
-                image_path=image_path
-            )
-            
-            # 解析响应
-            result = self._parse_vision_response(response)
-            
-            # 记录分析结果
-            issues = result.get("issues", [])
-            suggestions = result.get("suggestions", [])
-            operations = result.get("operations", [])
-            
-            if issues:
-                logger.info(f"多模态模型发现问题: {issues}")
-                logger.info(f"修改建议: {suggestions}")
-                logger.info(f"修改操作: {len(operations)} 项")
-            else:
-                logger.info("多模态模型未发现问题")
-            
-            return result
-            
-        except Exception as e:
-            logger.exception(f"多模态分析过程中出错: {str(e)}")
-            return {
-                "has_issues": True,
-                "issues": ["多模态分析过程中出错"],
-                "suggestions": ["检查日志并修复错误"]
-            }
-    
-    async def _validate_slide(self, state: AgentState, presentation: Any) -> None:
-        """
-        验证生成的幻灯片质量，并根据多模态模型分析结果进行迭代优化
-        
-        Args:
-            state: 当前状态
-            presentation: PPT演示文稿对象
-        """
-        logger.info("开始验证生成的幻灯片")
-        
-        # 1. 检查前置条件
-        if not self._check_validation_prerequisites(state):
-            return
-        
-        try:
-            # 2. 准备验证所需参数
-            current_slide = state.current_slide
-            slide_index = current_slide.get("slide_index")
-            operations = current_slide.get("operations", [])
-            current_section = state.content_plan[state.current_section_index]
-            
-            # 创建验证会话日志目录
-            session_id = state.session_id
-            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-            validation_session_dir = self.validation_logs_dir / f"{session_id}_{timestamp}_slide_{slide_index}"
-            validation_session_dir.mkdir(parents=True, exist_ok=True)
-            
-            # 保存初始信息到日志
-            self._save_validation_logs(
-                log_dir=validation_session_dir,
-                iteration=0,
-                slide_index=slide_index,
-                slide_elements=self.ppt_manager.get_slide_json(presentation, slide_index),
-                current_section=current_section,
-                analysis=None,
-                image_path=None,
-                phase="initial"
-            )
-            
-            # 初始化验证尝试次数
-            if not hasattr(state, "validation_attempts") or state.validation_attempts is None:
-                state.validation_attempts = 0
-            
-            has_issues = True
-            iteration_count = 0
-            
-            # 3. 获取幻灯片详细信息，供多模态模型分析
-            slide_elements = self.ppt_manager.get_slide_json(
-                presentation=presentation,
-                slide_index=slide_index            
-            )
-            
-            # 5. 迭代优化循环
-            while has_issues and iteration_count < self.max_iterations:
-                iteration_count += 1
-                logger.info(f"开始第 {iteration_count} 次幻灯片优化迭代")
-                
-                # 5.1 渲染幻灯片为图片
-                image_path = await self._render_slide_to_image(state, presentation, slide_index)
-                if not image_path:
-                    break
-                
-                # 更新幻灯片图片路径
-                current_slide["image_path"] = image_path
-                
-                # 5.2 使用多模态模型分析幻灯片
-                analysis = await self._analyze_with_vision_model(
-                    image_path=image_path, 
-                    slide_elements=slide_elements,
-                    current_section=current_section
-                )
-                
-                # 保存本次迭代的验证信息到日志
-                self._save_validation_logs(
-                    log_dir=validation_session_dir,
-                    iteration=iteration_count,
-                    slide_index=slide_index,
-                    slide_elements=slide_elements,
-                    current_section=current_section,
-                    analysis=analysis,
-                    image_path=image_path,
-                    phase="analysis"
-                )
-                
-                # 检查是否有问题需要修复
-                has_issues = analysis.get("has_issues", False)
-                if not has_issues:
-                    logger.info(f"第 {iteration_count} 次分析未发现问题，优化完成")
-                    break
-                
-                # 5.3 获取修改操作列表
-                fix_operations = analysis.get("operations", [])
-                if not fix_operations:
-                    logger.warning(f"第 {iteration_count} 次分析发现问题，但未提供修复操作")
-                    break
-                
-                # 5.4 执行修复操作
-                logger.info(f"执行第 {iteration_count} 次修复操作，共 {len(fix_operations)} 项")
-                success = await self._execute_operations(presentation, slide_index, fix_operations)
-                
-                # 记录操作执行结果
-                self._save_validation_logs(
-                    log_dir=validation_session_dir,
-                    iteration=iteration_count,
-                    slide_index=slide_index,
-                    slide_elements=self.ppt_manager.get_slide_json(presentation, slide_index),
-                    current_section=current_section,
-                    analysis={"operations": fix_operations, "success": success},
-                    image_path=None,
-                    phase="operations"
-                )
-                
-                if success:
-                    # 合并操作记录
-                    current_slide["operations"] = operations + fix_operations
-                    operations = current_slide["operations"]
-                    logger.info(f"第 {iteration_count} 次修复操作执行成功")
-                else:
-                    logger.warning(f"第 {iteration_count} 次修复操作执行失败")
-                    break
-            
-            # 6. 记录最终验证结果
-            state.validation_attempts += iteration_count
-            state.validation_result = not has_issues
-            
-            if has_issues and iteration_count >= self.max_iterations:
-                logger.warning(f"已达到最大迭代次数 {self.max_iterations}，强制通过验证")
-                state.validation_result = True
-                analysis.setdefault("issues", []).append(f"经过 {iteration_count} 次修改尝试，仍有未解决的问题")
-            
-            # 7. 更新验证结果
-            self._update_validation_result(state, analysis)
-            
-            # 8. 保存最终状态到日志
-            final_image_path = await self._render_slide_to_image(state, presentation, slide_index)
-            self._save_validation_logs(
-                log_dir=validation_session_dir,
-                iteration=iteration_count+1,
-                slide_index=slide_index,
-                slide_elements=self.ppt_manager.get_slide_json(presentation, slide_index),
-                current_section=current_section,
-                analysis={"validation_result": state.validation_result, 
-                          "issues": state.validation_issues,
-                          "suggestions": state.validation_suggestions},
-                image_path=final_image_path,
-                phase="final"
-            )
-            
-            # 记录日志路径
-            if not hasattr(state, "validation_logs_paths"):
-                state.validation_logs_paths = []
-            state.validation_logs_paths.append(str(validation_session_dir))
-            logger.info(f"幻灯片验证日志已保存到: {validation_session_dir}")
-            
-        except Exception as e:
-            error_msg = f"幻灯片验证失败: {str(e)}"
-            logger.error(error_msg)
-            logger.exception(e)
-            self._set_validation_failure(state, "验证过程出错", ["检查日志并修复错误"])
-    
     async def _execute_operations(self, presentation: Any, slide_index: int, operations: List[Dict[str, Any]]) -> bool:
         """
         执行幻灯片操作指令
@@ -903,7 +647,7 @@ class SlideGeneratorAgent(BaseAgent):
             图片路径，失败返回None
         """
         # 创建临时目录用于存储渲染的幻灯片图像和临时PPTX文件
-        session_dir = Path(f"workspace/sessions/{state.session_id}/validator_images")
+        session_dir = Path(f"workspace/sessions/{state.session_id}/slide_images")
         session_dir.mkdir(parents=True, exist_ok=True)
         
         # 创建唯一的临时文件名
@@ -927,7 +671,6 @@ class SlideGeneratorAgent(BaseAgent):
             
             if not image_paths or len(image_paths) == 0:
                 logger.error("渲染幻灯片图像失败")
-                self._set_validation_failure(state, "渲染幻灯片图像失败", ["检查PPT渲染服务"])
                 return None
                 
             return image_paths[0]
@@ -1014,69 +757,4 @@ class SlideGeneratorAgent(BaseAgent):
             logger.info(f"使用现有幻灯片，ID: {slide_index}")
             
             return slide_index, presentation
-    
-    def _save_validation_logs(self, log_dir: Path, iteration: int, slide_index: int, 
-                              slide_elements: List[Dict[str, Any]], current_section: Dict[str, Any],
-                              analysis: Optional[Dict[str, Any]], image_path: Optional[str],
-                              phase: str) -> None:
-        """
-        保存验证日志
-        
-        Args:
-            log_dir: 日志目录
-            iteration: 当前迭代次数
-            slide_index: 幻灯片索引
-            slide_elements: 幻灯片元素信息
-            current_section: 当前处理的章节内容
-            analysis: 分析结果
-            image_path: 幻灯片图像路径
-            phase: 当前阶段（初始、分析、操作、最终）
-        """
-        try:
-            # 创建迭代子目录
-            iter_dir = log_dir / f"iteration_{iteration}_{phase}"
-            iter_dir.mkdir(exist_ok=True)
-            
-            # 保存幻灯片元素信息
-            slide_json_path = iter_dir / "slide_elements.json"
-            with open(slide_json_path, 'w', encoding='utf-8') as f:
-                json.dump(slide_elements, f, ensure_ascii=False, indent=2, cls=EnumEncoder)
-            
-            # 保存章节内容
-            section_json_path = iter_dir / "current_section.json"
-            with open(section_json_path, 'w', encoding='utf-8') as f:
-                json.dump(current_section, f, ensure_ascii=False, indent=2, cls=EnumEncoder)
-            
-            # 保存分析结果（如果有）
-            if analysis:
-                analysis_json_path = iter_dir / "analysis_result.json"
-                with open(analysis_json_path, 'w', encoding='utf-8') as f:
-                    json.dump(analysis, f, ensure_ascii=False, indent=2, cls=EnumEncoder)
-            
-            # 复制图片（如果有）
-            if image_path and os.path.exists(image_path):
-                import shutil
-                image_filename = os.path.basename(image_path)
-                dest_image_path = iter_dir / image_filename
-                shutil.copy2(image_path, dest_image_path)
-                
-            # 创建元数据文件
-            metadata = {
-                "timestamp": datetime.datetime.now().isoformat(),
-                "iteration": iteration,
-                "slide_index": slide_index,
-                "phase": phase,
-                "has_image": image_path is not None and os.path.exists(image_path),
-                "has_analysis": analysis is not None
-            }
-            
-            metadata_path = iter_dir / "metadata.json"
-            with open(metadata_path, 'w', encoding='utf-8') as f:
-                json.dump(metadata, f, ensure_ascii=False, indent=2)
-                
-            logger.debug(f"已保存验证日志到 {iter_dir}")
-            
-        except Exception as e:
-            logger.error(f"保存验证日志失败: {str(e)}")
-            # 记录错误但不中断主要流程
     

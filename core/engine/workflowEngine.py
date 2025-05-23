@@ -508,20 +508,12 @@ class WorkflowEngine:
                 }
             
             # 初始化幻灯片生成状态
-            if state.current_section_index is None:
-                state.current_section_index = 0
-            state.has_more_content = True
             state.generated_slides = []
             
-            # 循环生成幻灯片，直到所有内容处理完毕
-            while state.has_more_content:
-                # 4. 执行幻灯片生成 (已包含验证功能)
-                await self._execute_and_validate_node("slide_generator", state)
-                
-                # 5. 检查是否还有更多内容
-                await self._execute_and_validate_node("next_slide_or_end", state)
+            # 4. 执行幻灯片生成
+            await self._execute_and_validate_node("slide_generator", state)
             
-            # 6. 完成PPT生成
+            # 5. 执行PPT清理、验证与保存
             await self._execute_and_validate_node("ppt_finalizer", state)
             
             # 保存最终状态
@@ -532,36 +524,40 @@ class WorkflowEngine:
             # 结束MLflow跟踪，标记为成功
             if self.enable_tracking and self.tracker:
                 self.tracker.end_workflow_run("FINISHED")
-            
-            # 返回结果
+                
+            # 返回执行结果
             return {
-                "status": "success",
                 "session_id": state.session_id,
-                "output_ppt_path": state.output_ppt_path,
+                "status": "completed",
+                "output_ppt_path": getattr(state, "output_ppt_path", None),
+                "slides_count": len(getattr(state, "generated_slides", [])),
+                "execution_time": (datetime.now() - state.created_at).total_seconds(),
                 "timestamp": datetime.now().isoformat()
             }
             
         except Exception as e:
-            logger.error(f"工作流执行异常: {str(e)}")
-            traceback.print_exc()
+            error_msg = f"工作流执行失败: {str(e)}"
+            logger.error(error_msg)
+            logger.error(traceback.format_exc())
             
-            # 创建状态对象（如果尚未创建）
-            if not state:
-                state = AgentState(session_id=session_id)
-            
-            # 记录失败
-            state.record_failure(str(e))
-            
-            # 结束MLflow跟踪，标记为失败
-            if self.enable_tracking and self.tracker:
-                self.tracker.end_workflow_run("FAILED")
+            if state:
+                state.record_failure(error_msg)
+                state.save()
                 
-            # 返回错误信息
-            return {
-                "error": str(e),
-                "session_id": state.session_id,
-                "timestamp": datetime.now().isoformat()
-            }
+                # 结束MLflow跟踪，标记为失败
+                if self.enable_tracking and self.tracker:
+                    self.tracker.end_workflow_run("FAILED")
+                    
+                return {
+                    "error": error_msg,
+                    "session_id": state.session_id,
+                    "timestamp": datetime.now().isoformat()
+                }
+            else:
+                return {
+                    "error": error_msg,
+                    "timestamp": datetime.now().isoformat()
+                }
 
     async def _execute_markdown_parser(self, state: AgentState) -> None:
         """
@@ -657,13 +653,13 @@ class WorkflowEngine:
     
     async def _execute_slide_generator(self, state: AgentState) -> None:
         """
-        使用真实的SlideGeneratorAgent生成幻灯片，包含自验证功能
+        使用真实的SlideGeneratorAgent生成所有幻灯片
         
         Args:
             state: 代理状态
         """
         try:
-            logger.info("执行真实的SlideGeneratorAgent处理")
+            logger.info("执行真实的SlideGeneratorAgent处理，生成所有幻灯片")
             
             # 从配置中获取slide_generator节点的配置
             node_config = None
@@ -673,7 +669,7 @@ class WorkflowEngine:
                     break
             
             if not node_config:
-                node_config = {"model_type": "vision", "max_retries": "3"}
+                node_config = {"model_type": "text"}
                 logger.warning("未找到slide_generator节点配置，使用默认配置")
             
             # 创建SlideGeneratorAgent实例
@@ -684,10 +680,15 @@ class WorkflowEngine:
                 updated_state = await slide_generator_agent.run(state)
                 
                 # 更新状态
-                state.current_slide = updated_state.current_slide
-                
-                logger.info(f"SlideGeneratorAgent执行完成，生成了幻灯片: {state.current_slide.get('slide_id') if state.current_slide else 'None'}")
-                
+                if hasattr(updated_state, "presentation") and updated_state.presentation:
+                    state.presentation = updated_state.presentation
+                    
+                if hasattr(updated_state, "generated_slides") and updated_state.generated_slides:
+                    state.generated_slides = updated_state.generated_slides
+                    logger.info(f"成功生成 {len(state.generated_slides)} 张幻灯片")
+                else:
+                    logger.warning("未能生成任何幻灯片")
+                    
             except Exception as agent_error:
                 logger.error(f"SlideGeneratorAgent执行出错: {str(agent_error)}")
                 logger.error(f"错误详情: {traceback.format_exc()}")
