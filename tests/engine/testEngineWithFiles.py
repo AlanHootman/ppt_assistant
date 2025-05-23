@@ -49,7 +49,7 @@ class TestEngineWithFiles:
             "ppt_template_path": str(self.ppt_path)
         }
         
-        result = await engine.run(input_data=input_data)
+        result = await engine.run_async(**input_data)
         
         # 验证基本处理结果
         assert result.raw_md == self.md_content

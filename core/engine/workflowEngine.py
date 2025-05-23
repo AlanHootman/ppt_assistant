@@ -711,7 +711,6 @@ class WorkflowEngine:
             
             # 确保状态中有必要的属性
             if not hasattr(state, 'content_plan') or not state.content_plan:
-                # 移除使用decision_result的兼容代码
                 error_msg = "无法检查进度：缺少内容规划结果"
                 logger.error(error_msg)
                 state.record_failure(error_msg)
