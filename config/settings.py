@@ -61,6 +61,7 @@ class Settings:
         
         # 幻灯片生成配置
         self.MAX_SLIDE_ITERATIONS = int(os.environ.get("MAX_SLIDE_ITERATIONS", "1"))
+        self.MAX_VISION_RETRIES = int(os.environ.get("MAX_VISION_RETRIES", "1"))
         
         # 缓存配置
         self.USE_CACHE = os.environ.get("USE_CACHE", "true").lower() in ("true", "1", "yes")

@@ -67,6 +67,9 @@ class PPTFinalizerAgent(BaseAgent):
         # 验证迭代相关配置
         self.max_iterations = config.get("max_iterations", settings.MAX_SLIDE_ITERATIONS)
         
+        # 视觉模型重试相关配置
+        self.max_vision_retries = int(config.get("max_vision_retries", settings.MAX_VISION_RETRIES))
+        
         # 初始化PPTManager
         try:
             from interfaces.ppt_api import PPTManager
@@ -89,7 +92,7 @@ class PPTFinalizerAgent(BaseAgent):
         self.validation_logs_dir = settings.LOG_DIR / "slide_validation"
         self.validation_logs_dir.mkdir(parents=True, exist_ok=True)
         
-        logger.info(f"初始化PPTFinalizerAgent，使用模型: {self.vision_model}, 最大迭代次数: {self.max_iterations}")
+        logger.info(f"初始化PPTFinalizerAgent，使用模型: {self.vision_model}, 最大迭代次数: {self.max_iterations}, 视觉模型最大重试次数: {self.max_vision_retries}")
     
     async def run(self, state: AgentState) -> AgentState:
         """
@@ -797,50 +800,80 @@ class PPTFinalizerAgent(BaseAgent):
                 "suggestions": ["重新生成幻灯片预览"]
             }
         
-        try:
-            # 准备并发送分析请求
-            logger.info(f"使用多模态模型分析幻灯片图像: {image_path}")
-            
-            # 准备上下文数据
-            context = {
-                "section_json": json.dumps(section_content, ensure_ascii=False, indent=2, cls=EnumEncoder),
-                "slide_elements_json": json.dumps(slide_elements, ensure_ascii=False, indent=2, cls=EnumEncoder)
-            }
-            
-            # 渲染提示词
-            prompt = self.model_manager.render_template(SLIDE_SELF_VALIDATION_PROMPT, context)
-            
-            # 调用多模态视觉模型
-            response = await self.model_manager.analyze_image(
-                model=self.vision_model,
-                prompt=prompt,
-                image_path=image_path
-            )
-            
-            # 解析响应
-            result = self._parse_vision_response(response)
-            
-            # 记录分析结果
-            issues = result.get("issues", [])
-            suggestions = result.get("suggestions", [])
-            operations = result.get("operations", [])
-            
-            if issues:
-                logger.info(f"多模态模型发现问题: {issues}")
-                logger.info(f"修改建议: {suggestions}")
-                logger.info(f"修改操作: {len(operations)} 项")
-            else:
-                logger.info("多模态模型未发现问题")
-            
-            return result
-            
-        except Exception as e:
-            logger.exception(f"多模态分析过程中出错: {str(e)}")
-            return {
-                "has_issues": True,
-                "issues": ["多模态分析过程中出错"],
-                "suggestions": ["检查日志并修复错误"]
-            }
+        # 准备上下文数据
+        context = {
+            "section_json": json.dumps(section_content, ensure_ascii=False, indent=2, cls=EnumEncoder),
+            "slide_elements_json": json.dumps(slide_elements, ensure_ascii=False, indent=2, cls=EnumEncoder)
+        }
+        
+        # 渲染提示词
+        prompt = self.model_manager.render_template(SLIDE_SELF_VALIDATION_PROMPT, context)
+        
+        # 实现重试机制
+        max_attempts = self.max_vision_retries + 1  # 总尝试次数 = 初始尝试 + 重试次数
+        empty_result = {
+            "has_issues": True,
+            "issues": ["多模态分析返回空结果"],
+            "suggestions": ["尝试重新生成"],
+            "operations": [],
+            "quality_score": 0
+        }
+        
+        # 使用attempt_count表示当前是第几次尝试（包括初始尝试）
+        attempt_count = 1
+        
+        while attempt_count <= max_attempts:
+            try:
+                # 准备并发送分析请求
+                logger.info(f"使用多模态模型分析幻灯片图像: {image_path}，第 {attempt_count}/{max_attempts} 次尝试")
+                
+                # 调用多模态视觉模型
+                response = await self.model_manager.analyze_image(
+                    model=self.vision_model,
+                    prompt=prompt,
+                    image_path=image_path
+                )
+                
+                # 解析响应
+                result = self._parse_vision_response(response)
+                
+                # 检查结果是否有效
+                if result and isinstance(result, dict):
+                    # 记录分析结果
+                    issues = result.get("issues", [])
+                    suggestions = result.get("suggestions", [])
+                    operations = result.get("operations", [])
+                    
+                    if issues:
+                        logger.info(f"多模态模型发现问题: {issues}")
+                        logger.info(f"修改建议: {suggestions}")
+                        logger.info(f"修改操作: {len(operations)} 项")
+                    else:
+                        logger.info("多模态模型未发现问题")
+                    
+                    return result
+                else:
+                    logger.warning(f"多模态模型返回空结果，将重试 (第 {attempt_count}/{max_attempts} 次尝试)")
+                    attempt_count += 1
+                    
+            except Exception as e:
+                logger.exception(f"多模态分析过程中出错 (第 {attempt_count}/{max_attempts} 次尝试): {str(e)}")
+                attempt_count += 1
+                
+                # 如果已达到最大尝试次数，返回错误结果
+                if attempt_count > max_attempts:
+                    logger.error(f"多模态分析失败，已达到最大尝试次数 ({max_attempts})")
+                    return {
+                        "has_issues": True,
+                        "issues": [f"多模态分析过程中出错: {str(e)}"],
+                        "suggestions": ["检查日志并修复错误"],
+                        "operations": [],
+                        "quality_score": 0
+                    }
+        
+        # 如果所有尝试都失败，返回空结果
+        logger.error(f"所有尝试均失败，返回空结果")
+        return empty_result
     
     def _parse_vision_response(self, response: str) -> Dict[str, Any]:
         """
