@@ -5,6 +5,7 @@
 import os
 import json
 import logging
+import re
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 import hashlib
@@ -44,25 +45,31 @@ class CacheManager:
         type_dir = self.cache_dir / cache_type
         type_dir.mkdir(parents=True, exist_ok=True)
         
-        # 返回完整路径，确保文件名合法化
-        sanitized_key = self._sanitize_filename(key)
-        return type_dir / f"{sanitized_key}.json"
+        # 处理文件名，确保其有效
+        safe_key = self._sanitize_filename(key)
+        
+        # 返回完整路径
+        return type_dir / f"{safe_key}.json"
     
     def _sanitize_filename(self, filename: str) -> str:
         """
-        清理文件名，去除不合法字符
+        清理文件名，移除非法字符
         
         Args:
             filename: 原始文件名
             
         Returns:
-            合法的文件名
+            处理后的安全文件名
         """
-        # 去除不合法字符
-        invalid_chars = '<>:"/\\|?*'
-        for char in invalid_chars:
-            filename = filename.replace(char, '_')
-        return filename
+        # 替换非法字符
+        safe_name = re.sub(r'[\\/*?:"<>|]', "_", filename)
+        # 限制长度
+        if len(safe_name) > 100:
+            safe_name = safe_name[:100]
+        # 确保不为空
+        if not safe_name:
+            safe_name = "untitled"
+        return safe_name
     
     def generate_cache_key(self, content: str) -> str:
         """
@@ -141,54 +148,66 @@ class CacheManager:
         cache_path = self.get_cache_path(cache_type, key)
         return cache_path.exists()
     
-    def get_markdown_cache(self, raw_md: str, md_file_path: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    def _extract_title_from_markdown(self, raw_md: str) -> str:
+        """
+        从Markdown内容中提取主标题
+        
+        Args:
+            raw_md: 原始Markdown内容
+            
+        Returns:
+            提取的标题，如果没有找到则返回默认值
+        """
+        # 尝试匹配"# 标题"格式的标题
+        title_match = re.search(r'^#\s+(.+)$', raw_md, re.MULTILINE)
+        if title_match:
+            return title_match.group(1).strip()
+        
+        # 尝试匹配第一行非空内容作为标题
+        lines = raw_md.split('\n')
+        for line in lines:
+            if line.strip():
+                return line.strip()
+        
+        # 如果没有找到有效标题，生成默认名称
+        return f"markdown_{self.generate_cache_key(raw_md)[:8]}"
+    
+    def get_markdown_cache(self, raw_md: str) -> Optional[Dict[str, Any]]:
         """
         获取Markdown解析缓存
         
         Args:
             raw_md: 原始Markdown内容
-            md_file_path: Markdown文件路径，优先使用文件名作为缓存键
             
         Returns:
             缓存的解析结果，如果不存在则返回None
         """
-        # 优先使用文件名作为缓存键
-        if md_file_path:
-            file_path = Path(md_file_path)
-            cache_key = file_path.stem  # 使用文件名（不含扩展名）
-            logger.info(f"使用Markdown文件名作为缓存键: {cache_key}")
-        else:
-            # 回退到使用内容哈希
-            cache_key = self.generate_cache_key(raw_md)
-            logger.info("未提供Markdown文件路径，使用内容哈希作为缓存键")
+        # 提取标题作为缓存键
+        title = self._extract_title_from_markdown(raw_md)
         
         # 从缓存加载
-        return self.load_from_cache("markdown", cache_key)
+        return self.load_from_cache("markdown", title)
     
-    def save_markdown_cache(self, raw_md: str, content_structure: Dict[str, Any], md_file_path: Optional[str] = None) -> Path:
+    def save_markdown_cache(self, raw_md: str, content_structure: Dict[str, Any]) -> Path:
         """
         保存Markdown解析缓存
         
         Args:
             raw_md: 原始Markdown内容
             content_structure: 解析后的内容结构
-            md_file_path: Markdown文件路径，优先使用文件名作为缓存键
             
         Returns:
             缓存文件路径
         """
-        # 优先使用文件名作为缓存键
-        if md_file_path:
-            file_path = Path(md_file_path)
-            cache_key = file_path.stem  # 使用文件名（不含扩展名）
-            logger.info(f"使用Markdown文件名作为缓存键: {cache_key}")
-        else:
-            # 回退到使用内容哈希
-            cache_key = self.generate_cache_key(raw_md)
-            logger.info("未提供Markdown文件路径，使用内容哈希作为缓存键")
+        # 如果content_structure中有标题，优先使用
+        title = content_structure.get("title")
+        
+        # 如果没有从结构中获取到标题，则从原始Markdown中提取
+        if not title:
+            title = self._extract_title_from_markdown(raw_md)
         
         # 保存到缓存
-        return self.save_to_cache("markdown", cache_key, content_structure)
+        return self.save_to_cache("markdown", title, content_structure)
     
     def get_ppt_analysis_cache(self, ppt_path: str) -> Optional[Dict[str, Any]]:
         """
@@ -200,24 +219,11 @@ class CacheManager:
         Returns:
             缓存的分析结果，如果不存在则返回None
         """
-        # 从路径中提取文件名（不含扩展名）作为缓存键
-        file_path = Path(ppt_path)
-        if not file_path.exists():
-            return None
-            
         # 使用模板名称作为缓存键
-        template_name = file_path.stem
-        
-        # 获取文件的修改时间，用于防止模板更新后仍使用旧缓存
-        file_stats = os.stat(file_path)
-        mtime = str(int(file_stats.st_mtime))
-        
-        # 最终缓存键: 模板名称_修改时间
-        cache_key = f"{template_name}_{mtime}"
-        logger.info(f"使用PPT模板名称作为缓存键: {cache_key}")
+        template_name = Path(ppt_path).stem
         
         # 从缓存加载
-        return self.load_from_cache("ppt_analysis", cache_key)
+        return self.load_from_cache("ppt_analysis", template_name)
     
     def save_ppt_analysis_cache(self, ppt_path: str, layout_features: Dict[str, Any]) -> Path:
         """
@@ -230,22 +236,11 @@ class CacheManager:
         Returns:
             缓存文件路径
         """
-        # 从路径中提取文件名（不含扩展名）作为缓存键
-        file_path = Path(ppt_path)
-        
         # 使用模板名称作为缓存键
-        template_name = file_path.stem
-        
-        # 获取文件的修改时间，用于防止模板更新后仍使用旧缓存
-        file_stats = os.stat(file_path)
-        mtime = str(int(file_stats.st_mtime))
-        
-        # 最终缓存键: 模板名称_修改时间
-        cache_key = f"{template_name}_{mtime}"
-        logger.info(f"使用PPT模板名称作为缓存键: {cache_key}")
+        template_name = Path(ppt_path).stem
         
         # 保存到缓存
-        return self.save_to_cache("ppt_analysis", cache_key, layout_features)
+        return self.save_to_cache("ppt_analysis", template_name, layout_features)
     
     def get_content_plan_cache(self, content_structure: Dict[str, Any], layout_features: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
@@ -258,15 +253,12 @@ class CacheManager:
         Returns:
             缓存的内容规划，如果不存在则返回None
         """
-        # 获取文档标题作为缓存键的一部分
-        doc_title = content_structure.get("title", "untitled")
+        # 获取标题和模板名称
+        title = content_structure.get("title", "untitled")
+        template_name = layout_features.get("templateName", "unknown")
         
-        # 获取模板名称作为缓存键的一部分
-        template_name = layout_features.get("templateName", "unknown_template")
-        
-        # 组合缓存键
-        cache_key = f"{doc_title}_{template_name}"
-        logger.info(f"使用文档标题和模板名称作为内容规划缓存键: {cache_key}")
+        # 组合成缓存键
+        cache_key = f"{title}_{template_name}"
         
         # 从缓存加载
         return self.load_from_cache("content_plan", cache_key)
@@ -283,15 +275,12 @@ class CacheManager:
         Returns:
             缓存文件路径
         """
-        # 获取文档标题作为缓存键的一部分
-        doc_title = content_structure.get("title", "untitled")
+        # 获取标题和模板名称
+        title = content_structure.get("title", "untitled")
+        template_name = layout_features.get("templateName", "unknown")
         
-        # 获取模板名称作为缓存键的一部分
-        template_name = layout_features.get("templateName", "unknown_template")
-        
-        # 组合缓存键
-        cache_key = f"{doc_title}_{template_name}"
-        logger.info(f"使用文档标题和模板名称作为内容规划缓存键: {cache_key}")
+        # 组合成缓存键
+        cache_key = f"{title}_{template_name}"
         
         # 保存到缓存
         return self.save_to_cache("content_plan", cache_key, content_plan) 
