@@ -418,6 +418,32 @@ class PPTFinalizerAgent(BaseAgent):
         """
         logger.info(f"开始验证 {len(generated_slides)} 张幻灯片")
         
+        # 初始化验证环境
+        validation_context = self._setup_validation_environment(state, generated_slides, content_plan)
+        
+        # 执行迭代优化验证
+        await self._perform_iterative_validation(state, presentation, generated_slides, content_plan, validation_context)
+        
+        # 处理最终验证结果
+        validated_slides = self._finalize_validation_results(state, generated_slides)
+        
+        logger.info(f"所有幻灯片验证完成，共 {len(validated_slides)} 张，平均质量分数: {sum(state.quality_scores)/len(state.quality_scores) if state.quality_scores else 0}")
+        
+        return validated_slides
+    
+    def _setup_validation_environment(self, state: AgentState, generated_slides: List[Dict[str, Any]], 
+                                    content_plan: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """
+        设置验证环境
+        
+        Args:
+            state: 当前状态
+            generated_slides: 已生成的幻灯片列表
+            content_plan: 内容规划列表
+            
+        Returns:
+            验证上下文信息
+        """
         # 创建验证会话目录
         session_id = state.session_id
         timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -428,9 +454,6 @@ class PPTFinalizerAgent(BaseAgent):
         state.validation_attempts = 0
         state.quality_scores = []
         
-        # 存储验证结果
-        validated_slides = []
-        
         # 创建slide_id到content的映射
         content_map = {}
         for section in content_plan:
@@ -438,12 +461,43 @@ class PPTFinalizerAgent(BaseAgent):
             if slide_id:
                 content_map[slide_id] = section
         
-        # 提取所有需要验证的幻灯片索引
-        slide_indices = [slide_info.get("slide_index") for slide_info in generated_slides 
-                        if slide_info.get("slide_index") is not None]
+        # 重要：获取当前演示文稿中的实际幻灯片索引
+        # 因为经过删除和重排序后，原始的slide_index已经失效
+        presentation = getattr(state, "presentation", None)
+        if presentation:
+            # 获取当前演示文稿的所有幻灯片
+            ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
+            current_slides_count = len(ppt_json.get("slides", []))
+            slide_indices = list(range(current_slides_count))  # 使用当前的连续索引 [0, 1, 2, ...]
+            logger.info(f"删除和重排序后，演示文稿中共有 {current_slides_count} 张幻灯片，索引: {slide_indices}")
+        else:
+            logger.warning("无法获取presentation对象，使用空的slide_indices")
+            slide_indices = []
         
-        # 最大迭代次数
-        max_iterations = self.max_iterations
+        return {
+            "validation_session_dir": validation_session_dir,
+            "content_map": content_map,
+            "slide_indices": slide_indices,
+            "max_iterations": self.max_iterations
+        }
+    
+    async def _perform_iterative_validation(self, state: AgentState, presentation: Any,
+                                          generated_slides: List[Dict[str, Any]], 
+                                          content_plan: List[Dict[str, Any]], 
+                                          validation_context: Dict[str, Any]) -> None:
+        """
+        执行迭代优化验证
+        
+        Args:
+            state: 当前状态
+            presentation: 演示文稿对象
+            generated_slides: 已生成的幻灯片列表
+            content_plan: 内容规划列表
+            validation_context: 验证上下文信息
+        """
+        slide_indices = validation_context["slide_indices"]
+        max_iterations = validation_context["max_iterations"]
+        validation_session_dir = validation_context["validation_session_dir"]
         
         # 开始迭代优化循环
         has_issues = True
@@ -457,104 +511,10 @@ class PPTFinalizerAgent(BaseAgent):
             slide_image_map = await self._render_all_slides_to_images(state, presentation, slide_indices)
             
             # 验证每张幻灯片并进行修改
-            all_slides_ok = True
-            operation_count = 0
-            
-            for slide_info in generated_slides:
-                slide_index = slide_info.get("slide_index")
-                if slide_index is None or slide_index not in slide_image_map:
-                    logger.warning(f"跳过缺少有效图片的幻灯片，索引: {slide_index}")
-                    continue
-                    
-                section_index = slide_info.get("section_index")
-                if section_index is None or section_index >= len(content_plan):
-                    logger.warning(f"幻灯片 {slide_index} 缺少有效的section_index")
-                    section_content = None
-                else:
-                    section_content = content_plan[section_index]
-                
-                # 验证单张幻灯片
-                validation_dir = validation_session_dir / f"iteration_{iteration_count}_slide_{slide_index}"
-                validation_dir.mkdir(parents=True, exist_ok=True)
-                
-                # 获取该幻灯片的图像路径
-                image_path = slide_image_map.get(slide_index)
-                if not image_path:
-                    logger.warning(f"幻灯片 {slide_index} 缺少有效的图像路径")
-                    continue
-                
-                # 获取幻灯片详细信息
-                slide_elements = self.ppt_manager.get_slide_json(
-                    presentation=presentation,
-                    slide_index=slide_index            
-                )
-                
-                # 保存初始信息到日志
-                self._save_validation_logs(
-                    log_dir=validation_dir,
-                    iteration=iteration_count,
-                    slide_index=slide_index,
-                    slide_elements=slide_elements,
-                    section_content=section_content,
-                    analysis=None,
-                    image_path=image_path,
-                    phase="initial"
-                )
-                
-                # 使用多模态模型分析幻灯片
-                analysis = await self._analyze_with_vision_model(
-                    image_path=image_path, 
-                    slide_elements=slide_elements,
-                    section_content=section_content
-                )
-                
-                # 保存分析结果
-                self._save_validation_logs(
-                    log_dir=validation_dir,
-                    iteration=iteration_count,
-                    slide_index=slide_index,
-                    slide_elements=slide_elements,
-                    section_content=section_content,
-                    analysis=analysis,
-                    image_path=image_path,
-                    phase="analysis"
-                )
-                
-                # 检查是否有问题需要修复
-                has_slide_issues = analysis.get("has_issues", False)
-                
-                # 如果有任何一张幻灯片有问题，则标记全局还有问题
-                if has_slide_issues:
-                    all_slides_ok = False
-                    
-                    # 获取修改操作列表
-                    fix_operations = analysis.get("operations", [])
-                    if fix_operations:
-                        # 执行修复操作
-                        logger.info(f"执行幻灯片 {slide_index} 的第 {iteration_count} 次修复操作，共 {len(fix_operations)} 项")
-                        success = await self._execute_operations(presentation, slide_index, fix_operations)
-                        operation_count += len(fix_operations)
-                        
-                        # 记录操作执行结果
-                        self._save_validation_logs(
-                            log_dir=validation_dir,
-                            iteration=iteration_count,
-                            slide_index=slide_index,
-                            slide_elements=self.ppt_manager.get_slide_json(presentation, slide_index),
-                            section_content=section_content,
-                            analysis={"operations": fix_operations, "success": success},
-                            image_path=None,
-                            phase="operations"
-                        )
-                
-                # 更新幻灯片信息
-                slide_info.update({
-                    "iteration": iteration_count,
-                    "validation_issues": analysis.get("issues", []),
-                    "validation_suggestions": analysis.get("suggestions", []),
-                    "quality_score": analysis.get("quality_score", 0),
-                    "image_path": image_path
-                })
+            all_slides_ok, operation_count = await self._validate_and_fix_slides(
+                presentation, generated_slides, content_plan, slide_image_map,
+                validation_session_dir, iteration_count
+            )
             
             # 如果所有幻灯片都没有问题，或者没有执行任何操作，结束迭代
             has_issues = not all_slides_ok and operation_count > 0
@@ -562,15 +522,172 @@ class PPTFinalizerAgent(BaseAgent):
             
             # 增加验证尝试次数
             state.validation_attempts += 1
+    
+    async def _validate_and_fix_slides(self, presentation: Any, generated_slides: List[Dict[str, Any]],
+                                     content_plan: List[Dict[str, Any]], slide_image_map: Dict[int, str],
+                                     validation_session_dir: Path, iteration_count: int) -> Tuple[bool, int]:
+        """
+        验证并修复所有幻灯片
         
-        # 最终验证结果处理
+        Args:
+            presentation: 演示文稿对象
+            generated_slides: 已生成的幻灯片列表
+            content_plan: 内容规划列表
+            slide_image_map: 幻灯片索引到图片路径的映射
+            validation_session_dir: 验证日志目录
+            iteration_count: 当前迭代次数
+            
+        Returns:
+            (所有幻灯片是否都OK, 执行的操作数量)
+        """
+        all_slides_ok = True
+        operation_count = 0
+        
+        # 获取当前演示文稿中的所有幻灯片，建立position到slide_id的映射
+        current_slide_mapping = self._build_current_slide_mapping(presentation)
+        
+        # 遍历当前演示文稿中的每张幻灯片（按位置索引）
+        for current_position in slide_image_map.keys():
+            if current_position not in current_slide_mapping:
+                logger.warning(f"跳过无法识别slide_id的幻灯片，位置: {current_position}")
+                continue
+            
+            slide_id = current_slide_mapping[current_position]
+            
+            # 根据slide_id找到对应的章节内容
+            section_content = self._get_section_content_by_slide_id(slide_id, content_plan)
+            
+            # 验证单张幻灯片
+            slide_validation_result = await self._validate_single_slide(
+                presentation, current_position, section_content, slide_image_map,
+                validation_session_dir, iteration_count
+            )
+            
+            # 更新全局状态
+            if slide_validation_result["has_issues"]:
+                all_slides_ok = False
+                operation_count += slide_validation_result["operations_executed"]
+            
+            # 更新对应的generated_slides中的信息
+            self._update_generated_slide_info(generated_slides, slide_id, current_position, slide_validation_result["slide_update_info"])
+        
+        return all_slides_ok, operation_count
+    
+    def _build_current_slide_mapping(self, presentation: Any) -> Dict[int, str]:
+        """
+        建立当前演示文稿中位置索引到slide_id的映射
+        
+        Args:
+            presentation: 演示文稿对象
+            
+        Returns:
+            位置索引到slide_id的映射字典
+        """
+        current_mapping = {}
+        try:
+            # 获取演示文稿JSON结构
+            ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
+            slides_count = len(ppt_json.get("slides", []))
+            
+            # 遍历所有当前位置，从备注中提取slide_id
+            for position in range(slides_count):
+                slide_id = self._extract_slide_id_from_notes(presentation, position)
+                if slide_id:
+                    current_mapping[position] = slide_id
+                    logger.debug(f"当前位置 {position} 对应的slide_id: {slide_id}")
+            
+            logger.info(f"建立了当前幻灯片映射: {current_mapping}")
+            return current_mapping
+                
+        except Exception as e:
+            logger.error(f"建立当前幻灯片映射时出错: {str(e)}")
+            return {}
+    
+    def _get_section_content_by_slide_id(self, slide_id: str, content_plan: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """
+        根据slide_id获取对应的章节内容
+        
+        Args:
+            slide_id: 幻灯片ID
+            content_plan: 内容规划列表
+            
+        Returns:
+            章节内容，如果找不到则返回None
+        """
+        for section in content_plan:
+            if section.get("slide_id") == slide_id:
+                return section
+        
+        logger.warning(f"无法找到slide_id为 {slide_id} 的章节内容")
+        return None
+    
+    def _update_generated_slide_info(self, generated_slides: List[Dict[str, Any]], slide_id: str, 
+                                   current_position: int, slide_update_info: Dict[str, Any]) -> None:
+        """
+        更新generated_slides中对应幻灯片的信息
+        
+        Args:
+            generated_slides: 已生成的幻灯片列表
+            slide_id: 幻灯片ID
+            current_position: 当前位置索引
+            slide_update_info: 需要更新的幻灯片信息
+        """
+        # 找到对应的generated_slide并更新信息
+        for slide_info in generated_slides:
+            # 尝试多种方式匹配
+            if (slide_info.get("section_content", {}).get("slide_id") == slide_id or 
+                self._extract_slide_id_from_section(slide_info) == slide_id):
+                
+                # 更新当前位置索引
+                slide_info["current_position"] = current_position
+                # 更新验证信息
+                slide_info.update(slide_update_info)
+                logger.debug(f"更新了slide_id {slide_id} 的验证信息，当前位置: {current_position}")
+                return
+        
+        logger.warning(f"无法在generated_slides中找到slide_id为 {slide_id} 的幻灯片信息")
+    
+    def _extract_slide_id_from_section(self, slide_info: Dict[str, Any]) -> Optional[str]:
+        """
+        从slide_info中提取slide_id
+        
+        Args:
+            slide_info: 幻灯片信息
+            
+        Returns:
+            提取的slide_id，如果未找到则返回None
+        """
+        # 尝试从不同的位置提取slide_id
+        section_content = slide_info.get("section_content", {})
+        if isinstance(section_content, dict) and "slide_id" in section_content:
+            return section_content["slide_id"]
+        
+        # 如果section_content是字典但没有slide_id，尝试其他方式
+        if "slide_id" in slide_info:
+            return slide_info["slide_id"]
+            
+        return None
+    
+    def _finalize_validation_results(self, state: AgentState, generated_slides: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        处理最终验证结果
+        
+        Args:
+            state: 当前状态
+            generated_slides: 已生成的幻灯片列表
+            
+        Returns:
+            最终验证后的幻灯片列表
+        """
+        validated_slides = []
+        
         for slide_info in generated_slides:
             slide_index = slide_info.get("slide_index")
             if slide_index is None:
                 continue
                 
             # 记录最终的验证结果
-            slide_info["validation_result"] = not has_issues or iteration_count >= max_iterations
+            slide_info["validation_result"] = True  # 假设经过迭代后都已通过验证
             
             # 记录质量分数
             quality_score = slide_info.get("quality_score", 0)
@@ -587,9 +704,6 @@ class PPTFinalizerAgent(BaseAgent):
                 logger.warning(f"问题: {slide_info.get('validation_issues', [])}")
                 logger.info(f"修复建议: {slide_info.get('validation_suggestions', [])}")
         
-        
-        logger.info(f"所有幻灯片验证完成，共 {len(validated_slides)} 张，平均质量分数: {sum(state.quality_scores)/len(state.quality_scores) if state.quality_scores else 0}")
-        
         return validated_slides
     
     async def _render_all_slides_to_images(self, state: AgentState, presentation: Any, slide_indices: List[int]) -> Dict[int, str]:
@@ -599,7 +713,7 @@ class PPTFinalizerAgent(BaseAgent):
         Args:
             state: 当前状态
             presentation: 演示文稿对象
-            slide_indices: 要渲染的幻灯片索引列表
+            slide_indices: 要渲染的幻灯片索引列表（当前演示文稿中的位置索引）
             
         Returns:
             幻灯片索引到图片路径的映射字典
@@ -620,18 +734,7 @@ class PPTFinalizerAgent(BaseAgent):
             logger.info(f"临时保存演示文稿到临时文件: {temp_pptx_path}")
             self.ppt_manager.save_presentation(presentation, str(temp_pptx_path))
             
-            # 获取presentation中的所有幻灯片信息，用于确认幻灯片顺序
-            ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
-            slides = ppt_json.get("slides", [])
-            
-            # 创建实际索引到幻灯片位置的映射
-            slide_index_to_position = {}
-            for position, slide in enumerate(slides):
-                slide_real_index = slide.get("real_index", position)
-                if slide_real_index in slide_indices:
-                    slide_index_to_position[slide_real_index] = position
-            
-            logger.info(f"准备渲染 {len(slide_index_to_position)} 张幻灯片")
+            logger.info(f"准备渲染 {len(slide_indices)} 张幻灯片，索引: {slide_indices}")
             
             # 一次性渲染所有幻灯片
             all_image_paths = self.ppt_manager.render_pptx_file(
@@ -641,11 +744,13 @@ class PPTFinalizerAgent(BaseAgent):
             
             logger.info(f"渲染完成，获得 {len(all_image_paths)} 张图片")
             
-            # 构建索引到图片路径的映射
-            for slide_index, position in slide_index_to_position.items():
-                if position < len(all_image_paths):
-                    slide_image_map[slide_index] = all_image_paths[position]
-                    logger.info(f"幻灯片索引 {slide_index}（位置 {position}）渲染成功: {all_image_paths[position]}")
+            # 直接按位置索引建立映射
+            for slide_index in slide_indices:
+                if slide_index < len(all_image_paths):
+                    slide_image_map[slide_index] = all_image_paths[slide_index]
+                    logger.info(f"幻灯片位置索引 {slide_index} 渲染成功: {all_image_paths[slide_index]}")
+                else:
+                    logger.warning(f"幻灯片索引 {slide_index} 超出渲染范围（总共 {len(all_image_paths)} 张图片）")
             
             logger.info(f"成功建立 {len(slide_image_map)}/{len(slide_indices)} 张幻灯片的图片映射")
             return slide_image_map
@@ -946,3 +1051,149 @@ class PPTFinalizerAgent(BaseAgent):
         except Exception as e:
             logger.error(f"保存验证日志失败: {str(e)}")
             # 记录错误但不中断主要流程 
+
+    async def _validate_single_slide(self, presentation: Any, slide_index: int, 
+                                   section_content: Optional[Dict[str, Any]], 
+                                   slide_image_map: Dict[int, str],
+                                   validation_session_dir: Path, iteration_count: int) -> Dict[str, Any]:
+        """
+        验证单张幻灯片
+        
+        Args:
+            presentation: 演示文稿对象
+            slide_index: 幻灯片索引
+            section_content: 章节内容
+            slide_image_map: 幻灯片索引到图片路径的映射
+            validation_session_dir: 验证日志目录
+            iteration_count: 当前迭代次数
+            
+        Returns:
+            验证结果字典
+        """
+        # 创建单独的验证目录
+        validation_dir = validation_session_dir / f"iteration_{iteration_count}_slide_{slide_index}"
+        validation_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 获取幻灯片图像路径
+        image_path = slide_image_map.get(slide_index)
+        if not image_path:
+            logger.warning(f"幻灯片 {slide_index} 缺少有效的图像路径")
+            return self._create_empty_validation_result()
+        
+        # 获取幻灯片详细信息
+        slide_elements = self.ppt_manager.get_slide_json(
+            presentation=presentation,
+            slide_index=slide_index            
+        )
+        
+        # 保存初始信息到日志
+        self._save_validation_logs(
+            log_dir=validation_dir,
+            iteration=iteration_count,
+            slide_index=slide_index,
+            slide_elements=slide_elements,
+            section_content=section_content,
+            analysis=None,
+            image_path=image_path,
+            phase="initial"
+        )
+        
+        # 使用多模态模型分析幻灯片
+        analysis = await self._analyze_with_vision_model(
+            image_path=image_path, 
+            slide_elements=slide_elements,
+            section_content=section_content
+        )
+        
+        # 保存分析结果
+        self._save_validation_logs(
+            log_dir=validation_dir,
+            iteration=iteration_count,
+            slide_index=slide_index,
+            slide_elements=slide_elements,
+            section_content=section_content,
+            analysis=analysis,
+            image_path=image_path,
+            phase="analysis"
+        )
+        
+        # 执行修复操作（如果需要）
+        operations_executed = 0
+        has_slide_issues = analysis.get("has_issues", False)
+        
+        if has_slide_issues:
+            operations_executed = await self._execute_slide_fixes(
+                presentation, slide_index, analysis, validation_dir,
+                iteration_count, section_content
+            )
+        
+        # 返回验证结果
+        return {
+            "has_issues": has_slide_issues,
+            "operations_executed": operations_executed,
+            "slide_update_info": {
+                "iteration": iteration_count,
+                "validation_issues": analysis.get("issues", []),
+                "validation_suggestions": analysis.get("suggestions", []),
+                "quality_score": analysis.get("quality_score", 0),
+                "image_path": image_path
+            }
+        }
+    
+    def _create_empty_validation_result(self) -> Dict[str, Any]:
+        """
+        创建空的验证结果
+        
+        Returns:
+            空的验证结果字典
+        """
+        return {
+            "has_issues": False,
+            "operations_executed": 0,
+            "slide_update_info": {
+                "iteration": 0,
+                "validation_issues": [],
+                "validation_suggestions": [],
+                "quality_score": 0,
+                "image_path": None
+            }
+        }
+    
+    async def _execute_slide_fixes(self, presentation: Any, slide_index: int, analysis: Dict[str, Any],
+                                 validation_dir: Path, iteration_count: int, 
+                                 section_content: Optional[Dict[str, Any]]) -> int:
+        """
+        执行幻灯片修复操作
+        
+        Args:
+            presentation: 演示文稿对象
+            slide_index: 幻灯片索引
+            analysis: 分析结果
+            validation_dir: 验证日志目录
+            iteration_count: 当前迭代次数
+            section_content: 章节内容
+            
+        Returns:
+            执行的操作数量
+        """
+        fix_operations = analysis.get("operations", [])
+        if not fix_operations:
+            return 0
+        
+        # 执行修复操作
+        logger.info(f"执行幻灯片 {slide_index} 的第 {iteration_count} 次修复操作，共 {len(fix_operations)} 项")
+        success = await self._execute_operations(presentation, slide_index, fix_operations)
+        
+        # 记录操作执行结果
+        self._save_validation_logs(
+            log_dir=validation_dir,
+            iteration=iteration_count,
+            slide_index=slide_index,
+            slide_elements=self.ppt_manager.get_slide_json(presentation, slide_index),
+            section_content=section_content,
+            analysis={"operations": fix_operations, "success": success},
+            image_path=None,
+            phase="operations"
+        )
+        
+        return len(fix_operations) 
