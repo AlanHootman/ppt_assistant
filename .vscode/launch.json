@@ -42,7 +42,7 @@
             "args": [
                 "analyze",
                 "tests/testfiles/黄色小清新文艺工作总结ppt模板.pptx",
-                "-o", "workspace/ppt_cache",
+                "-o", "workspace/cache/ppt_analysis",
                 "-f"
             ],
             "console": "integratedTerminal",

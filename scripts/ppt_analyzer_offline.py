@@ -41,7 +41,7 @@ async def analyze_template(template_path: str, output_dir: str = None, force: bo
     
     Args:
         template_path: PPT模板路径
-        output_dir: 输出目录，默认为workspace/ppt_cache
+        output_dir: 输出目录，默认为workspace/cache/ppt_analysis
         force: 是否强制重新分析
         
     Returns:
@@ -54,7 +54,7 @@ async def analyze_template(template_path: str, output_dir: str = None, force: bo
     
     # 确定输出目录
     if not output_dir:
-        output_dir = str(settings.PPT_CACHE_DIR)
+        output_dir = str(settings.CACHE_DIR / "ppt_analysis")
     
     # 创建输出目录
     os.makedirs(output_dir, exist_ok=True)
@@ -117,7 +117,7 @@ async def batch_analyze(template_dir: str, pattern: str = "*.pptx", output_dir: 
     Args:
         template_dir: 包含PPT模板的目录
         pattern: 文件匹配模式，默认为*.pptx
-        output_dir: 输出目录，默认为workspace/ppt_cache
+        output_dir: 输出目录，默认为workspace/cache/ppt_analysis
         force: 是否强制重新分析
         
     Returns:
@@ -191,7 +191,7 @@ def main():
     
     elif args.command == 'list':
         # 列出已缓存的PPT模板分析结果
-        cache_dir = settings.PPT_CACHE_DIR
+        cache_dir = settings.CACHE_DIR / "ppt_analysis"
         json_files = glob.glob(os.path.join(cache_dir, "*_layout_features.json"))
         
         if not json_files:

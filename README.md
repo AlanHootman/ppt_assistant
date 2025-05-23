@@ -60,11 +60,12 @@ engine = WorkflowEngine()
 # 运行工作流
 result = await engine.run_async(
     raw_md="# 标题\n## 子标题\n- 要点1\n- 要点2",
-    ppt_template_path="/path/to/template.pptx"
+    ppt_template_path="templates/default.pptx"
 )
 
 # 获取生成的PPT文件路径
-ppt_file_path = result.output_ppt_path
+ppt_path = result.output_ppt_path
+print(f"PPT已生成: {ppt_path}")
 ```
 
 ## 项目结构
