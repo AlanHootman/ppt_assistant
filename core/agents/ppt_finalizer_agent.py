@@ -15,7 +15,7 @@ import json
 import uuid
 import enum
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
@@ -198,7 +198,32 @@ class PPTFinalizerAgent(BaseAgent):
             logger.warning("PPTManager未初始化，无法重新排序幻灯片")
             return
         
-        # 创建slide_id到page_number的映射
+        # 获取slide_id到page_number的映射关系
+        slide_id_to_page = self._get_slide_id_to_page_mapping(content_plan)
+        if not slide_id_to_page:
+            return
+            
+        # 获取当前幻灯片索引到slide_id的映射关系
+        current_slides = self._get_current_slides_mapping(presentation)
+        if not current_slides:
+            return
+                
+        # 生成幻灯片移动计划
+        move_operations = self._generate_slide_move_operations(current_slides, slide_id_to_page)
+        
+        # 执行移动操作
+        self._execute_slide_move_operations(presentation, move_operations)
+    
+    def _get_slide_id_to_page_mapping(self, content_plan: List[Dict[str, Any]]) -> Dict[str, int]:
+        """
+        从内容规划中提取slide_id到page_number的映射关系
+        
+        Args:
+            content_plan: 内容规划列表
+            
+        Returns:
+            slide_id到page_number的映射字典
+        """
         slide_id_to_page = {}
         for slide_info in content_plan:
             slide_id = slide_info.get("slide_id")
@@ -208,56 +233,107 @@ class PPTFinalizerAgent(BaseAgent):
         
         if not slide_id_to_page:
             logger.warning("内容规划中没有找到有效的slide_id和page_number映射")
-            return
+        else:
+            logger.info(f"获取到slide_id到page_number的映射: {slide_id_to_page}")
+            
+        return slide_id_to_page
+    
+    def _get_current_slides_mapping(self, presentation: Any) -> Dict[int, str]:
+        """
+        获取当前演示文稿中幻灯片索引到slide_id的映射
         
-        logger.info(f"获取到slide_id到page_number的映射: {slide_id_to_page}")
-        
-        # 创建当前幻灯片索引到slide_id的映射
+        Args:
+            presentation: PPT演示文稿对象
+            
+        Returns:
+            幻灯片索引到slide_id的映射字典
+        """
         current_slides = {}
         try:
-            # 遍历所有幻灯片的备注信息
+            # 获取演示文稿JSON结构
             ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
-            for slide_index in range(len(ppt_json.get("slides", []))):
-                # 获取幻灯片备注
-                notes_result = self.ppt_manager.get_slide_notes(presentation, slide_index)
-                if notes_result.get("success") and notes_result.get("notes"):
-                    notes = notes_result.get("notes", "")
-                    # 使用正则表达式匹配slide_id
-                    match = re.search(r"slide_id:\s*(slide_\d+)", notes)
-                    if match:
-                        slide_id = match.group(1)
-                        current_slides[slide_index] = slide_id
-                        logger.info(f"幻灯片索引 {slide_index} 对应的slide_id: {slide_id}")
+            slides_count = len(ppt_json.get("slides", []))
+            
+            # 遍历所有幻灯片，从备注中提取slide_id
+            for slide_index in range(slides_count):
+                slide_id = self._extract_slide_id_from_notes(presentation, slide_index)
+                if slide_id:
+                    current_slides[slide_index] = slide_id
+                    logger.info(f"幻灯片索引 {slide_index} 对应的slide_id: {slide_id}")
             
             # 检查是否找到了足够的幻灯片
             if not current_slides:
                 logger.warning("未在幻灯片备注中找到任何slide_id信息，无法进行排序")
-                return
+            
+            return current_slides
                 
-            # 根据page_number对幻灯片进行排序
-            # 创建源索引到目标索引的映射
-            moves = []
-            for current_index, slide_id in current_slides.items():
-                if slide_id in slide_id_to_page:
-                    target_index = slide_id_to_page[slide_id]
-                    moves.append((current_index, target_index))
-            
-            # 按目标索引排序，确保移动操作的正确性
-            moves.sort(key=lambda x: x[1])
-            
-            # 执行移动操作
-            for source_index, target_index in moves:
-                try:
-                    result = self.ppt_manager.move_slide(presentation, source_index, target_index)
-                    if result.get("success"):
-                        logger.info(f"成功将幻灯片从索引 {source_index} 移动到 {target_index}")
-                    else:
-                        logger.warning(f"移动幻灯片失败: {result.get('message')}")
-                except Exception as e:
-                    logger.error(f"移动幻灯片时出错: {str(e)}")
-                    
         except Exception as e:
-            logger.error(f"重新排序幻灯片时发生错误: {str(e)}")
+            logger.error(f"获取当前幻灯片映射时出错: {str(e)}")
+            return {}
+    
+    def _extract_slide_id_from_notes(self, presentation: Any, slide_index: int) -> Optional[str]:
+        """
+        从幻灯片备注中提取slide_id
+        
+        Args:
+            presentation: PPT演示文稿对象
+            slide_index: 幻灯片索引
+            
+        Returns:
+            提取的slide_id，如果未找到则返回None
+        """
+        # 获取幻灯片备注
+        notes_result = self.ppt_manager.get_slide_notes(presentation, slide_index)
+        if not notes_result.get("success") or not notes_result.get("notes"):
+            return None
+            
+        notes = notes_result.get("notes", "")
+        # 使用正则表达式匹配slide_id
+        match = re.search(r"slide_id:\s*(slide_\d+)", notes)
+        if match:
+            return match.group(1)
+        return None
+    
+    def _generate_slide_move_operations(
+        self, current_slides: Dict[int, str], slide_id_to_page: Dict[str, int]
+    ) -> List[Tuple[int, int]]:
+        """
+        生成幻灯片移动操作计划
+        
+        Args:
+            current_slides: 当前幻灯片索引到slide_id的映射
+            slide_id_to_page: slide_id到目标页码的映射
+            
+        Returns:
+            移动操作列表，每个元素为(源索引, 目标索引)元组
+        """
+        moves = []
+        for current_index, slide_id in current_slides.items():
+            if slide_id in slide_id_to_page:
+                target_index = slide_id_to_page[slide_id]
+                moves.append((current_index, target_index))
+        
+        # 按目标索引排序，确保移动操作的正确性
+        moves.sort(key=lambda x: x[1])
+        return moves
+    
+    def _execute_slide_move_operations(self, presentation: Any, move_operations: List[Tuple[int, int]]) -> None:
+        """
+        执行幻灯片移动操作
+        
+        Args:
+            presentation: PPT演示文稿对象
+            move_operations: 移动操作列表，每个元素为(源索引, 目标索引)元组
+        """
+        for source_index, target_index in move_operations:
+            try:
+                result = self.ppt_manager.move_slide(presentation, source_index, target_index)
+                if result.get("success"):
+                    logger.info(f"成功将幻灯片从索引 {source_index} 移动到 {target_index}")
+                else:
+                    logger.warning(f"移动幻灯片失败: {result.get('message')}")
+            except Exception as e:
+                logger.error(f"移动幻灯片时出错: {str(e)}")
     
     def _delete_unused_slides(self, presentation: Any, generated_slides: List[Dict[str, Any]]) -> None:
         """
@@ -541,13 +617,23 @@ class PPTFinalizerAgent(BaseAgent):
         
         try:
             # 临时保存修改后的presentation对象为PPTX文件
-            logger.info(f"临时保存修改后的演示文稿到: {temp_pptx_path}")
+            logger.info(f"临时保存演示文稿到临时文件: {temp_pptx_path}")
             self.ppt_manager.save_presentation(presentation, str(temp_pptx_path))
             
-            # 一次性渲染所有幻灯片
-            logger.info(f"一次性渲染所有幻灯片")
+            # 获取presentation中的所有幻灯片信息，用于确认幻灯片顺序
+            ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
+            slides = ppt_json.get("slides", [])
             
-            # 不传slide_index参数，render_pptx_file将渲染所有幻灯片
+            # 创建实际索引到幻灯片位置的映射
+            slide_index_to_position = {}
+            for position, slide in enumerate(slides):
+                slide_real_index = slide.get("real_index", position)
+                if slide_real_index in slide_indices:
+                    slide_index_to_position[slide_real_index] = position
+            
+            logger.info(f"准备渲染 {len(slide_index_to_position)} 张幻灯片")
+            
+            # 一次性渲染所有幻灯片
             all_image_paths = self.ppt_manager.render_pptx_file(
                 pptx_path=str(temp_pptx_path),
                 output_dir=str(session_dir)
@@ -555,19 +641,11 @@ class PPTFinalizerAgent(BaseAgent):
             
             logger.info(f"渲染完成，获得 {len(all_image_paths)} 张图片")
             
-            # 获取presentation中的所有幻灯片信息，用于确认幻灯片顺序
-            ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
-            slides = ppt_json.get("slides", [])
-            
-            # 建立幻灯片索引与图片路径的映射
-            # 假设render_pptx_file返回的图片路径列表顺序与幻灯片索引一致
-            for i, image_path in enumerate(all_image_paths):
-                # 确认当前索引是否在需要渲染的索引列表中
-                if i < len(slides):
-                    slide_real_index = slides[i].get("real_index", i)
-                    if slide_real_index in slide_indices:
-                        slide_image_map[slide_real_index] = image_path
-                        logger.info(f"幻灯片 {slide_real_index} 渲染成功: {image_path}")
+            # 构建索引到图片路径的映射
+            for slide_index, position in slide_index_to_position.items():
+                if position < len(all_image_paths):
+                    slide_image_map[slide_index] = all_image_paths[position]
+                    logger.info(f"幻灯片索引 {slide_index}（位置 {position}）渲染成功: {all_image_paths[position]}")
             
             logger.info(f"成功建立 {len(slide_image_map)}/{len(slide_indices)} 张幻灯片的图片映射")
             return slide_image_map
