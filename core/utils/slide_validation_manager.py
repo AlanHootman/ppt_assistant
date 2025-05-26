@@ -11,6 +11,7 @@ import logging
 import os
 import json
 import datetime
+import asyncio
 from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -23,7 +24,8 @@ class SlideValidationManager:
     """幻灯片验证管理器，负责幻灯片的质量验证和修复操作"""
     
     def __init__(self, ppt_manager, ppt_operation_executor, model_manager, model_helper, 
-                 vision_model, max_iterations=3, max_vision_retries=3, validation_logs_dir=None):
+                 vision_model, max_iterations=3, max_vision_retries=3, validation_logs_dir=None,
+                 use_parallel=False, max_workers=None):
         """
         初始化幻灯片验证管理器
         
@@ -36,6 +38,8 @@ class SlideValidationManager:
             max_iterations: 最大迭代次数
             max_vision_retries: 视觉模型重试次数
             validation_logs_dir: 验证日志目录
+            use_parallel: 是否使用多协程并行处理
+            max_workers: 最大协程数量，如果为None则使用幻灯片数量
         """
         self.ppt_manager = ppt_manager
         self.ppt_operation_executor = ppt_operation_executor
@@ -44,6 +48,10 @@ class SlideValidationManager:
         self.vision_model = vision_model
         self.max_iterations = max_iterations
         self.max_vision_retries = max_vision_retries
+        
+        # 多协程处理配置
+        self.use_parallel = use_parallel
+        self.max_workers = max_workers
         
         # 创建验证日志目录
         self.validation_logs_dir = validation_logs_dir
@@ -64,13 +72,24 @@ class SlideValidationManager:
         Returns:
             验证后的幻灯片列表
         """
-        logger.info(f"开始验证 {len(generated_slides)} 张幻灯片")
+        logger.info(f"开始验证 {len(generated_slides)} 张幻灯片" + 
+                    f" (使用{'并行' if self.use_parallel else '串行'}处理)")
         
         # 初始化验证环境
         validation_context = self._setup_validation_environment(state, generated_slides, content_plan)
         
-        # 执行迭代优化验证
-        await self._perform_iterative_validation(state, presentation, generated_slides, content_plan, validation_context, slide_cleanup_manager)
+        if self.use_parallel:
+            # 并行执行迭代优化验证
+            await self._perform_parallel_iterative_validation(
+                state, presentation, generated_slides, content_plan, 
+                validation_context, slide_cleanup_manager
+            )
+        else:
+            # 串行执行迭代优化验证
+            await self._perform_iterative_validation(
+                state, presentation, generated_slides, content_plan, 
+                validation_context, slide_cleanup_manager
+            )
         
         # 处理最终验证结果
         validated_slides = self._finalize_validation_results(state, generated_slides)
@@ -169,6 +188,225 @@ class SlideValidationManager:
             
             # 增加验证尝试次数
             state.validation_attempts += 1
+    
+    async def _perform_parallel_iterative_validation(self, state, presentation, generated_slides, 
+                                          content_plan, validation_context, slide_cleanup_manager) -> None:
+        """
+        执行并行迭代优化验证
+        
+        Args:
+            state: 当前状态
+            presentation: 演示文稿对象
+            generated_slides: 已生成的幻灯片列表
+            content_plan: 内容规划列表
+            validation_context: 验证上下文信息
+            slide_cleanup_manager: 幻灯片清理管理器实例
+        """
+        slide_indices = validation_context["slide_indices"]
+        max_iterations = validation_context["max_iterations"]
+        validation_session_dir = validation_context["validation_session_dir"]
+        
+        # 开始迭代优化循环
+        has_issues = True
+        iteration_count = 0
+        
+        while has_issues and iteration_count < max_iterations:
+            iteration_count += 1
+            logger.info(f"开始第 {iteration_count} 次全局优化迭代（并行处理）")
+            
+            # 一次性渲染所有幻灯片为图片
+            slide_image_map = await self._render_all_slides_to_images(state, presentation, slide_indices)
+            
+            # 获取当前演示文稿中的所有幻灯片，建立position到slide_id的映射
+            current_slide_mapping = slide_cleanup_manager.build_current_slide_mapping(presentation)
+            
+            # 准备并行分析任务
+            analysis_tasks, slides_to_process = self._prepare_parallel_tasks(
+                presentation, 
+                slide_image_map, 
+                current_slide_mapping, 
+                content_plan, 
+                slide_cleanup_manager,
+                validation_session_dir, 
+                iteration_count
+            )
+            
+            # 并行执行分析任务
+            analysis_results = await self._execute_parallel_analysis(analysis_tasks)
+            
+            # 串行执行修复操作并更新状态
+            all_slides_ok, operation_count = await self._process_analysis_results(
+                presentation, 
+                generated_slides, 
+                analysis_results, 
+                slides_to_process, 
+                slide_image_map,
+                validation_session_dir, 
+                iteration_count
+            )
+            
+            # 如果所有幻灯片都没有问题，或者没有执行任何操作，结束迭代
+            has_issues = not all_slides_ok and operation_count > 0
+            logger.info(f"第 {iteration_count} 次迭代完成，执行了 {operation_count} 项修改操作，还有问题: {has_issues}")
+            
+            # 增加验证尝试次数
+            state.validation_attempts += 1
+    
+    def _prepare_parallel_tasks(self, presentation, slide_image_map, current_slide_mapping, 
+                              content_plan, slide_cleanup_manager, validation_session_dir, 
+                              iteration_count):
+        """
+        准备并行分析任务
+        
+        Args:
+            presentation: 演示文稿对象
+            slide_image_map: 幻灯片索引到图像路径的映射
+            current_slide_mapping: 当前幻灯片位置到ID的映射
+            content_plan: 内容规划列表
+            slide_cleanup_manager: 幻灯片清理管理器实例
+            validation_session_dir: 验证日志目录
+            iteration_count: 当前迭代次数
+            
+        Returns:
+            (analysis_tasks, slides_to_process): 分析任务列表和待处理的幻灯片信息列表
+        """
+        # 准备并行处理的任务
+        analysis_tasks = []
+        slides_to_process = []
+        
+        # 配置最大协程数
+        max_workers = self.max_workers or len(slide_image_map)
+        max_workers = min(max_workers, len(slide_image_map))  # 确保不超过幻灯片数量
+        
+        logger.info(f"使用 {max_workers} 个协程并行处理幻灯片分析")
+        
+        # 准备并行任务
+        for current_position in slide_image_map.keys():
+            if current_position not in current_slide_mapping:
+                logger.warning(f"跳过无法识别slide_id的幻灯片，位置: {current_position}")
+                continue
+            
+            slide_id = current_slide_mapping[current_position]
+            section_content = slide_cleanup_manager.get_section_content_by_slide_id(slide_id, content_plan)
+            
+            if not section_content:
+                logger.warning(f"找不到幻灯片 {current_position} (slide_id: {slide_id}) 的内容数据")
+                continue
+            
+            # 获取幻灯片图像路径
+            image_path = slide_image_map.get(current_position)
+            if not image_path:
+                logger.warning(f"幻灯片 {current_position} 缺少有效的图像路径")
+                continue
+            
+            # 获取幻灯片元素信息
+            slide_elements = self.ppt_manager.get_slide_json(
+                presentation=presentation,
+                slide_index=current_position            
+            )
+            
+            # 准备分析任务（只包含分析部分，不包含修改操作）
+            task = self._analyze_slide_task(
+                image_path=image_path,
+                slide_elements=slide_elements,
+                section_content=section_content,
+                slide_index=current_position,
+                validation_session_dir=validation_session_dir,
+                iteration_count=iteration_count
+            )
+            
+            analysis_tasks.append(task)
+            slides_to_process.append({
+                "current_position": current_position,
+                "slide_id": slide_id,
+                "section_content": section_content
+            })
+            
+        return analysis_tasks, slides_to_process
+    
+    async def _execute_parallel_analysis(self, analysis_tasks):
+        """
+        并行执行幻灯片分析任务
+        
+        Args:
+            analysis_tasks: 分析任务列表
+            
+        Returns:
+            分析结果列表
+        """
+        if not analysis_tasks:
+            logger.warning("没有需要分析的幻灯片任务")
+            return []
+            
+        # 使用asyncio.gather并行执行所有分析任务
+        analysis_results = []
+        batch_size = self.max_workers or len(analysis_tasks)
+        
+        for i in range(0, len(analysis_tasks), batch_size):
+            batch = analysis_tasks[i:i+batch_size]
+            logger.info(f"执行第 {i//batch_size + 1} 批分析任务，共 {len(batch)} 个任务")
+            batch_results = await asyncio.gather(*batch)
+            analysis_results.extend(batch_results)
+            
+        logger.info(f"完成 {len(analysis_results)} 个幻灯片分析任务")
+        return analysis_results
+    
+    async def _process_analysis_results(self, presentation, generated_slides, analysis_results, 
+                                      slides_to_process, slide_image_map, validation_session_dir, 
+                                      iteration_count):
+        """
+        处理分析结果，串行执行修复操作
+        
+        Args:
+            presentation: 演示文稿对象
+            generated_slides: 已生成的幻灯片列表
+            analysis_results: 分析结果列表
+            slides_to_process: 待处理的幻灯片信息列表
+            slide_image_map: 幻灯片索引到图像路径的映射
+            validation_session_dir: 验证日志目录
+            iteration_count: 当前迭代次数
+            
+        Returns:
+            (all_slides_ok, operation_count): 所有幻灯片是否都没有问题，执行的操作数量
+        """
+        # 串行执行修复操作（避免并发操作同一个PPTX文件）
+        operation_count = 0
+        all_slides_ok = True
+        
+        for i, result in enumerate(analysis_results):
+            if i >= len(slides_to_process):
+                continue
+                
+            slide_info = slides_to_process[i]
+            current_position = slide_info["current_position"]
+            slide_id = slide_info["slide_id"]
+            section_content = slide_info["section_content"]
+            
+            # 执行修复操作
+            if result["has_issues"]:
+                all_slides_ok = False
+                operations = result.get("operations", [])
+                if operations:
+                    # 执行当前幻灯片的修复操作
+                    executed = await self._execute_slide_fixes(
+                        presentation, current_position, result, validation_session_dir,
+                        iteration_count, section_content
+                    )
+                    operation_count += executed
+            
+            # 更新generated_slides中的信息
+            self._update_generated_slide_info(
+                generated_slides, slide_id, current_position, 
+                {
+                    "iteration": iteration_count,
+                    "validation_issues": result.get("issues", []),
+                    "validation_suggestions": result.get("suggestions", []),
+                    "quality_score": result.get("quality_score", 0),
+                    "image_path": slide_image_map.get(current_position)
+                }
+            )
+            
+        return all_slides_ok, operation_count
     
     async def _validate_and_fix_slides(self, presentation, generated_slides, content_plan, 
                                      slide_image_map, validation_session_dir, iteration_count, 
@@ -662,4 +900,62 @@ class SlideValidationManager:
                 logger.warning(f"问题: {slide_info.get('validation_issues', [])}")
                 logger.info(f"修复建议: {slide_info.get('validation_suggestions', [])}")
         
-        return validated_slides 
+        return validated_slides
+    
+    async def _analyze_slide_task(self, image_path, slide_elements, section_content, 
+                             slide_index, validation_session_dir, iteration_count) -> Dict[str, Any]:
+        """
+        处理单个幻灯片的分析任务
+        
+        Args:
+            image_path: 幻灯片图像路径
+            slide_elements: 幻灯片元素列表
+            section_content: 章节内容
+            slide_index: 幻灯片索引
+            validation_session_dir: 验证日志目录
+            iteration_count: 当前迭代次数
+            
+        Returns:
+            分析结果
+        """
+        # 创建单独的验证目录
+        if validation_session_dir:
+            validation_dir = validation_session_dir / f"iteration_{iteration_count}_slide_{slide_index}"
+            validation_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            validation_dir = None
+        
+        # 保存初始信息到日志
+        if validation_dir:
+            self._save_validation_logs(
+                log_dir=validation_dir,
+                iteration=iteration_count,
+                slide_index=slide_index,
+                slide_elements=slide_elements,
+                section_content=section_content,
+                analysis=None,
+                image_path=image_path,
+                phase="initial"
+            )
+        
+        # 使用多模态模型分析幻灯片
+        analysis = await self._analyze_with_vision_model(
+            image_path=image_path, 
+            slide_elements=slide_elements,
+            section_content=section_content
+        )
+        
+        # 保存分析结果
+        if validation_dir:
+            self._save_validation_logs(
+                log_dir=validation_dir,
+                iteration=iteration_count,
+                slide_index=slide_index,
+                slide_elements=slide_elements,
+                section_content=section_content,
+                analysis=analysis,
+                image_path=image_path,
+                phase="analysis"
+            )
+        
+        return analysis 
