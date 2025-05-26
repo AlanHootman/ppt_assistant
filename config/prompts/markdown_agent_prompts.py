@@ -5,12 +5,6 @@
 Markdown Agent提示词配置
 """
 
-from config.prompts.content_types import (
-    SEMANTIC_TYPES,
-    RELATION_TYPES,
-    SEMANTIC_TYPE_GUIDELINES,
-    RELATION_TYPE_GUIDELINES
-)
 
 ANALYSIS_PROMPT = """
 你是一个专业的PPT内容分析专家。请直接分析以下Markdown文本，生成适合PPT制作的完整结构化JSON，无需依赖任何已有的基础解析结果。

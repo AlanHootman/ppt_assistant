@@ -18,6 +18,13 @@ from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
 from core.utils.model_helper import ModelHelper
 from config.prompts.markdown_agent_prompts import ANALYSIS_PROMPT
+from config.prompts.content_types import (
+    SEMANTIC_TYPES,
+    RELATION_TYPES,
+    CONTENT_STRUCTURES,
+    SEMANTIC_TYPE_GUIDELINES,
+    RELATION_TYPE_GUIDELINES
+)
 
 logger = logging.getLogger(__name__)
 
@@ -96,6 +103,11 @@ class MarkdownAgent(BaseAgent):
         # 构建提示词上下文
         context = {
             "markdown_text": markdown_text,
+            "SEMANTIC_TYPES": SEMANTIC_TYPES,
+            "RELATION_TYPES": RELATION_TYPES,
+            "CONTENT_STRUCTURES": CONTENT_STRUCTURES,
+            "SEMANTIC_TYPE_GUIDELINES": SEMANTIC_TYPE_GUIDELINES,
+            "RELATION_TYPE_GUIDELINES": RELATION_TYPE_GUIDELINES
         }
         
         # 使用模型管理器的模板渲染方法

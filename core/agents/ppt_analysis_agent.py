@@ -19,6 +19,13 @@ from core.llm.model_manager import ModelManager
 from core.utils.model_helper import ModelHelper
 from core.utils.ppt_agent_helper import PPTAgentHelper
 from config.prompts.ppt_analyzer_prompts import TEMPLATE_ANALYSIS_PROMPT
+from config.prompts.content_types import (
+    SEMANTIC_TYPES,
+    RELATION_TYPES,
+    CONTENT_STRUCTURES,
+    SEMANTIC_TYPE_GUIDELINES,
+    RELATION_TYPE_GUIDELINES
+)
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -329,7 +336,13 @@ class PPTAnalysisAgent(BaseAgent):
         # 构建上下文
         context = {
             "template_info_json": template_info_json,
-            "image_count": len(image_paths)
+            "image_count": len(image_paths),
+            # 添加内容类型变量到上下文中
+            "SEMANTIC_TYPES": SEMANTIC_TYPES,
+            "RELATION_TYPES": RELATION_TYPES,
+            "CONTENT_STRUCTURES": CONTENT_STRUCTURES,
+            "SEMANTIC_TYPE_GUIDELINES": SEMANTIC_TYPE_GUIDELINES,
+            "RELATION_TYPE_GUIDELINES": RELATION_TYPE_GUIDELINES
         }
         
         # 使用ModelManager的render_template方法渲染模板

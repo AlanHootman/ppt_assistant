@@ -5,13 +5,13 @@
 PPT分析器Agent提示词配置
 """
 
-from config.prompts.content_types import (
-    SEMANTIC_TYPES,
-    RELATION_TYPES,
-    CONTENT_STRUCTURES,
-    SEMANTIC_TYPE_GUIDELINES,
-    RELATION_TYPE_GUIDELINES
-)
+# from config.prompts.content_types import (
+#     SEMANTIC_TYPES,
+#     RELATION_TYPES,
+#     CONTENT_STRUCTURES,
+#     SEMANTIC_TYPE_GUIDELINES,
+#     RELATION_TYPE_GUIDELINES
+# )
 
 TEMPLATE_ANALYSIS_PROMPT = """
 你是专业的PPT模板分析专家，需要分析以下PPT模板的布局和设计特点，从而帮助内容规划模块更好地匹配内容与布局。
