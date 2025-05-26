@@ -63,6 +63,18 @@ class Settings:
         self.MAX_SLIDE_ITERATIONS = int(os.environ.get("MAX_SLIDE_ITERATIONS", "1"))
         self.MAX_VISION_RETRIES = int(os.environ.get("MAX_VISION_RETRIES", "1"))
         
+        # 幻灯片生成并行处理配置
+        self.USE_PARALLEL_GENERATION = os.environ.get("USE_PARALLEL_GENERATION", "false").lower() in ("true", "1", "yes")
+        self.GENERATION_MAX_WORKERS = int(os.environ.get("GENERATION_MAX_WORKERS", "0")) or None
+        
+        # 幻灯片验证并行处理配置
+        self.USE_PARALLEL_VALIDATION = os.environ.get("USE_PARALLEL_VALIDATION", "false").lower() in ("true", "1", "yes")
+        self.VALIDATION_MAX_WORKERS = int(os.environ.get("VALIDATION_MAX_WORKERS", "0")) or None
+        
+        # PPT分析并行处理配置
+        self.USE_PARALLEL_ANALYSIS = os.environ.get("USE_PARALLEL_ANALYSIS", "false").lower() in ("true", "1", "yes")
+        self.ANALYSIS_MAX_WORKERS = int(os.environ.get("ANALYSIS_MAX_WORKERS", "0")) or None
+        
         # 缓存配置
         self.USE_CACHE = os.environ.get("USE_CACHE", "true").lower() in ("true", "1", "yes")
         

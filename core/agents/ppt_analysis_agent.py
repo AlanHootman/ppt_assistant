@@ -95,6 +95,10 @@ class PPTAnalysisAgent(BaseAgent):
         # 图片分析批次大小配置
         self.batch_size = config.get("batch_size", 1)
         
+        # 并行处理配置 - 优先使用配置参数，如果没有则使用环境变量设置
+        self.use_parallel = config.get("use_parallel_analysis", settings.USE_PARALLEL_ANALYSIS)
+        self.max_workers = config.get("analysis_max_workers", settings.ANALYSIS_MAX_WORKERS)
+        
         # 初始化PPT管理器
         self.ppt_manager = PPTAgentHelper.init_ppt_manager()
         if not self.ppt_manager:
@@ -103,7 +107,9 @@ class PPTAnalysisAgent(BaseAgent):
         # 布局用途检测器
         self.layout_detector = LayoutUsageDetector()
         
-        logger.info(f"初始化PPTAnalysisAgent，使用模型: {self.vision_model}，批次大小: {self.batch_size}，最大重试次数: {self.max_retries}")
+        logger.info(f"初始化PPTAnalysisAgent，使用模型: {self.vision_model}，批次大小: {self.batch_size}，"
+                   f"最大重试次数: {self.max_retries}，并行处理: {'启用' if self.use_parallel else '禁用'}，"
+                   f"最大协程数: {self.max_workers or '自动'}")
     
     async def run(self, state: AgentState) -> AgentState:
         """

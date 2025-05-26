@@ -50,6 +50,10 @@ class SlideGeneratorAgent(BaseAgent):
         self.max_tokens = model_config.get("max_tokens")
         self.max_retries = model_config.get("max_retries", 3)
         
+        # 多协程处理配置 - 优先使用配置参数，如果没有则使用环境变量设置
+        self.use_parallel = config.get("use_parallel_generation", settings.USE_PARALLEL_GENERATION)
+        self.max_workers = config.get("generation_max_workers", settings.GENERATION_MAX_WORKERS)
+        
         # 初始化PPT管理器
         self.ppt_manager = PPTAgentHelper.init_ppt_manager()
         if not self.ppt_manager:
@@ -61,7 +65,9 @@ class SlideGeneratorAgent(BaseAgent):
             agent_name="SlideGeneratorAgent"
         )
         
-        logger.info(f"初始化SlideGeneratorAgent，使用模型: {self.llm_model}，最大重试次数: {self.max_retries}")
+        logger.info(f"初始化SlideGeneratorAgent，使用模型: {self.llm_model}，最大重试次数: {self.max_retries}, "
+                   f"并行处理: {'启用' if self.use_parallel else '禁用'}, "
+                   f"最大协程数: {self.max_workers or '自动'}")
     
     async def run(self, state: AgentState) -> AgentState:
         """

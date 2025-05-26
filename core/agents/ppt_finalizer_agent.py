@@ -81,8 +81,8 @@ class PPTFinalizerAgent(BaseAgent):
             max_iterations=self.max_iterations,
             max_vision_retries=self.max_vision_retries,
             validation_logs_dir=self.validation_logs_dir,
-            use_parallel=config.get("use_parallel_validation", True),
-            max_workers=config.get("validation_max_workers", None)
+            use_parallel=config.get("use_parallel_validation", settings.USE_PARALLEL_VALIDATION),
+            max_workers=config.get("validation_max_workers", settings.VALIDATION_MAX_WORKERS)
         )
         
         logger.info(f"初始化PPTFinalizerAgent，使用模型: {self.vision_model}, 最大迭代次数: {self.max_iterations}, 视觉模型最大重试次数: {self.max_vision_retries}")
