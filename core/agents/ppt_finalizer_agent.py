@@ -163,7 +163,7 @@ class PPTFinalizerAgent(BaseAgent):
         content_plan = getattr(state, "content_plan", [])
         if not content_plan:
             logger.warning("找不到content_plan，将跳过幻灯片排序和内容验证")
-        return None
+            return None
             
         return presentation, generated_slides, content_plan
     
