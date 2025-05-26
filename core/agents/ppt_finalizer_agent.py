@@ -144,24 +144,24 @@ class PPTFinalizerAgent(BaseAgent):
             如果失败，返回None
         """
         # 获取演示文稿对象
-        presentation = getattr(state, "presentation", None)
-        if not presentation:
-            error_msg = "找不到presentation对象，无法保存PPT"
-            logger.error(error_msg)
-            state.record_failure(error_msg)
+            presentation = getattr(state, "presentation", None)
+            if not presentation:
+                error_msg = "找不到presentation对象，无法保存PPT"
+                logger.error(error_msg)
+                state.record_failure(error_msg)
             return None
-        
+                
         # 获取已生成的幻灯片列表
-        generated_slides = getattr(state, "generated_slides", [])
-        logger.info(f"获取到已生成的幻灯片列表: {len(generated_slides)} 张")
-        
+            generated_slides = getattr(state, "generated_slides", [])
+            logger.info(f"获取到已生成的幻灯片列表: {len(generated_slides)} 张")
+            
         # 提取幻灯片索引用于日志记录和调试
-        slide_indices = [slide.get("slide_index") for slide in generated_slides if slide.get("slide_index") is not None]
-        logger.info(f"幻灯片索引列表: {slide_indices}")
-        
+            slide_indices = [slide.get("slide_index") for slide in generated_slides if slide.get("slide_index") is not None]
+            logger.info(f"幻灯片索引列表: {slide_indices}")
+            
         # 获取内容计划
-        content_plan = getattr(state, "content_plan", [])
-        if not content_plan:
+            content_plan = getattr(state, "content_plan", [])
+            if not content_plan:
             logger.warning("找不到content_plan，将跳过幻灯片排序和内容验证")
             return None
             
@@ -180,9 +180,9 @@ class PPTFinalizerAgent(BaseAgent):
             content_plan: 内容计划
         """
         # 删除未使用的幻灯片（只保留generated_slides中记录的幻灯片）
-        logger.info("删除未使用的模板幻灯片")
+            logger.info("删除未使用的模板幻灯片")
         self.slide_cleanup_manager.delete_unused_slides(presentation, generated_slides)
-        
+            
         # 重新排序幻灯片
         logger.info("根据content_plan重新排序幻灯片")
         self.slide_cleanup_manager.reorder_slides(presentation, content_plan)
@@ -220,29 +220,29 @@ class PPTFinalizerAgent(BaseAgent):
             presentation: 演示文稿对象
             validated_slides: 验证后的幻灯片列表
         """
-        # 获取或创建输出目录
-        output_dir = getattr(state, "output_dir", "workspace/output")
-        os.makedirs(output_dir, exist_ok=True)
-        
+            # 获取或创建输出目录
+            output_dir = getattr(state, "output_dir", "workspace/output")
+            os.makedirs(output_dir, exist_ok=True)
+            
         # 生成带有时间戳的输出文件名
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"presentation_{state.session_id}_{timestamp}.pptx"
-        output_path = os.path.join(output_dir, output_filename)
-        
-        # 保存前检查演示文稿状态
-        ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
-        all_slides = ppt_json.get("slides", [])
-        logger.info(f"保存前，演示文稿中共有 {len(all_slides)} 张幻灯片")
-        
-        # 保存演示文稿
-        logger.info(f"保存演示文稿到: {output_path}")
-        saved_path = self.ppt_manager.save_presentation(presentation, output_path)
-        
-        # 更新状态
-        state.output_ppt_path = saved_path
+            timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+            output_filename = f"presentation_{state.session_id}_{timestamp}.pptx"
+            output_path = os.path.join(output_dir, output_filename)
+            
+            # 保存前检查演示文稿状态
+            ppt_json = self.ppt_manager.get_presentation_json(presentation, include_details=False)
+            all_slides = ppt_json.get("slides", [])
+            logger.info(f"保存前，演示文稿中共有 {len(all_slides)} 张幻灯片")
+            
+            # 保存演示文稿
+            logger.info(f"保存演示文稿到: {output_path}")
+            saved_path = self.ppt_manager.save_presentation(presentation, output_path)
+            
+            # 更新状态
+            state.output_ppt_path = saved_path
         state.validated_slides = validated_slides
-        logger.info(f"PPT已成功保存: {saved_path}")
-    
+            logger.info(f"PPT已成功保存: {saved_path}")
+            
     def add_checkpoint(self, state: AgentState) -> None:
         """
         添加工作流检查点

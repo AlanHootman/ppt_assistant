@@ -207,14 +207,36 @@ class SlideGeneratorAgent(BaseAgent):
             )
             
             # 解析LLM响应
-            operations = self.model_helper.parse_json_response(response, [])
+            parsed_response = self.model_helper.parse_json_response(response, {})
             
-            if not operations:
+            # 处理可能的响应格式：直接操作列表或嵌套在operations字段中
+            operations = []
+            if isinstance(parsed_response, list):
+                # 直接是操作列表
+                operations = parsed_response
+            elif isinstance(parsed_response, dict) and "operations" in parsed_response:
+                # 操作列表嵌套在operations字段中
+                operations = parsed_response.get("operations", [])
+                if not isinstance(operations, list):
+                    logger.warning(f"LLM返回的operations字段不是列表: {operations}")
+                    operations = []
+            else:
+                logger.warning(f"LLM响应格式不符合预期: {parsed_response}")
+            
+            # 验证每个操作是否是字典
+            validated_operations = []
+            for op in operations:
+                if isinstance(op, dict):
+                    validated_operations.append(op)
+                else:
+                    logger.warning(f"跳过无效的操作: {op}")
+            
+            if not validated_operations:
                 logger.warning("LLM未返回有效的操作指令")
                 return []
             
-            logger.info(f"成功从LLM获取 {len(operations)} 条操作指令")
-            return operations
+            logger.info(f"成功从LLM获取 {len(validated_operations)} 条操作指令")
+            return validated_operations
             
         except Exception as e:
             logger.error(f"从LLM获取操作指令失败: {str(e)}")
@@ -345,7 +367,22 @@ class SlideGeneratorAgent(BaseAgent):
             )
             
             # 添加或更新备注
-            new_notes = existing_notes + f"\nslide_id: {slide_id}" if existing_notes else f"slide_id: {slide_id}"
+            # 处理existing_notes可能是字典或字符串的情况
+            if existing_notes is None:
+                new_notes = f"slide_id: {slide_id}"
+            elif isinstance(existing_notes, dict):
+                # 如果是字典，可能需要提取其中的文本内容，或者直接使用新的备注
+                logger.info(f"获取到的备注是字典格式: {existing_notes}")
+                # 尝试从字典中提取notes或text字段
+                notes_text = existing_notes.get('notes', '') or existing_notes.get('text', '')
+                if notes_text and isinstance(notes_text, str):
+                    new_notes = f"{notes_text}\nslide_id: {slide_id}"
+                else:
+                    new_notes = f"slide_id: {slide_id}"
+            else:
+                # 假设是字符串
+                new_notes = f"{existing_notes}\nslide_id: {slide_id}" if existing_notes else f"slide_id: {slide_id}"
+            
             self.ppt_manager.update_slide_notes(
                 presentation=presentation,
                 slide_index=slide_index,
@@ -354,6 +391,7 @@ class SlideGeneratorAgent(BaseAgent):
             logger.info(f"为幻灯片 {slide_index} 添加ID: {slide_id}")
         except Exception as e:
             logger.error(f"为幻灯片添加ID时出错: {str(e)}")
+            logger.exception(e)  # 添加详细的异常信息用于调试
     
     async def _plan_and_execute_content_operations(
         self, presentation: Any, slide_index: int, current_section: Dict[str, Any]
@@ -431,19 +469,41 @@ class SlideGeneratorAgent(BaseAgent):
         if not operations:
             logger.warning("没有操作需要执行")
             return True
+            
+        # 确保operations是列表
+        if not isinstance(operations, list):
+            logger.error(f"operations不是列表类型: {type(operations)}")
+            return False
         
+        # 过滤掉非字典类型的操作
+        valid_operations = []
+        for op in operations:
+            if isinstance(op, dict):
+                valid_operations.append(op)
+            else:
+                logger.warning(f"跳过无效的操作类型: {type(op)}, 值: {op}")
+        
+        if not valid_operations:
+            logger.warning("没有有效的操作需要执行")
+            return True
+            
         # 使用 execute_batch_operations 方法执行所有操作
-        result = await self.ppt_operation_executor.execute_batch_operations(
-            presentation=presentation,
-            slide_index=slide_index,
-            operations=operations
-        )
-        
-        success = result.get("success", False)
-        if not success:
-            logger.warning("执行幻灯片操作时出现问题")
-        
-        return success
+        try:
+            result = await self.ppt_operation_executor.execute_batch_operations(
+                presentation=presentation,
+                slide_index=slide_index,
+                operations=valid_operations
+            )
+            
+            success = result.get("success", False)
+            if not success:
+                logger.warning("执行幻灯片操作时出现问题")
+            
+            return success
+        except Exception as e:
+            logger.error(f"执行操作时发生异常: {str(e)}")
+            logger.exception(e)
+            return False
     
     async def _create_new_slide_with_same_layout(self, presentation: Any, slide_index: int, current_section: Optional[Dict[str, Any]] = None) -> Tuple[int, Any]:
         """

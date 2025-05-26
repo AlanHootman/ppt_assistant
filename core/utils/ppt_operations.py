@@ -45,32 +45,43 @@ class PPTOperationExecutor:
         if not operations:
             return {"success": True, "message": "没有需要执行的操作", "operations_count": 0}
         
+        # 确保operations是列表
+        if not isinstance(operations, list):
+            return {"success": False, "message": f"operations不是列表类型: {type(operations)}", "operations_count": 0}
+        
         logger.info(f"开始执行幻灯片 {slide_index} 的 {len(operations)} 个操作")
         success_count = 0
         failed_operations = []
         
         for i, operation in enumerate(operations):
-            op_type = operation.get("type", "unknown")
-            op_target = operation.get("target", "unknown")
+            # 确保每个操作是字典类型
+            if not isinstance(operation, dict):
+                logger.warning(f"操作 {i+1} 不是字典类型: {type(operation)}, 值: {operation}")
+                failed_operations.append({
+                    "index": i,
+                    "operation": "unknown",
+                    "element_id": "unknown",
+                    "message": f"操作不是字典类型: {type(operation)}"
+                })
+                continue
+                
+            op_type = operation.get("operation", "unknown")
+            element_id = operation.get("element_id", "unknown")
             
             try:
                 # 根据操作类型执行不同的操作
-                if op_type == "update_text":
+                if op_type == "update_element_content":
                     result = self._execute_update_text(presentation, slide_index, operation)
-                elif op_type == "add_text":
-                    result = self._execute_add_text(presentation, slide_index, operation)
                 elif op_type == "delete_element":
                     result = self._execute_delete_element(presentation, slide_index, operation)
-                elif op_type == "resize_element":
+                elif op_type == "adjust_element_position":
                     result = self._execute_resize_element(presentation, slide_index, operation)
                 elif op_type == "move_element":
                     result = self._execute_move_element(presentation, slide_index, operation)
-                elif op_type == "update_style":
-                    result = self._execute_update_style(presentation, slide_index, operation)
-                elif op_type == "update_chart":
-                    result = self._execute_update_chart(presentation, slide_index, operation)
-                elif op_type == "update_image":
+                elif op_type == "replace_image":
                     result = self._execute_update_image(presentation, slide_index, operation)
+                elif op_type == "adjust_text_font_size":
+                    result = self._execute_adjust_font_size(presentation, slide_index, operation)
                 else:
                     logger.warning(f"不支持的操作类型: {op_type}")
                     result = {"success": False, "message": f"不支持的操作类型: {op_type}"}
@@ -78,24 +89,24 @@ class PPTOperationExecutor:
                 # 记录操作结果
                 if result.get("success"):
                     success_count += 1
-                    logger.info(f"成功执行操作 {i+1}/{len(operations)}: {op_type} -> {op_target}")
+                    logger.info(f"成功执行操作 {i+1}/{len(operations)}: {op_type} -> {element_id}")
                 else:
                     failed_operations.append({
                         "index": i,
-                        "type": op_type,
-                        "target": op_target,
+                        "operation": op_type,
+                        "element_id": element_id,
                         "message": result.get("message", "未知错误")
                     })
-                    logger.warning(f"操作失败 {i+1}/{len(operations)}: {op_type} -> {op_target}, 错误: {result.get('message')}")
+                    logger.warning(f"操作失败 {i+1}/{len(operations)}: {op_type} -> {element_id}, 错误: {result.get('message')}")
                     
             except Exception as e:
                 failed_operations.append({
                     "index": i,
-                    "type": op_type,
-                    "target": op_target,
+                    "operation": op_type,
+                    "element_id": element_id,
                     "message": str(e)
                 })
-                logger.error(f"执行操作时出错 {i+1}/{len(operations)}: {op_type} -> {op_target}, 错误: {str(e)}")
+                logger.error(f"执行操作时出错 {i+1}/{len(operations)}: {op_type} -> {element_id}, 错误: {str(e)}")
         
         # 返回总体结果
         overall_success = success_count == len(operations)
@@ -120,50 +131,22 @@ class PPTOperationExecutor:
             操作结果
         """
         element_id = operation.get("element_id")
-        position = operation.get("position")
-        text = operation.get("text")
+        content = operation.get("content")
         
-        if not text:
-            return {"success": False, "message": "缺少text参数"}
+        if not content:
+            return {"success": False, "message": "缺少content参数"}
         
-        # 根据element_id或position更新文本
+        # 使用update_element_content更新文本
         if element_id:
-            result = self.ppt_manager.update_text_by_id(
-                presentation, slide_index, element_id, text
-            )
-        elif position is not None:
-            result = self.ppt_manager.update_text_by_position(
-                presentation, slide_index, position, text
+            result = self.ppt_manager.update_element_content(
+                presentation=presentation,
+                slide_index=slide_index,
+                element_id=element_id,
+                new_content=content
             )
         else:
-            return {"success": False, "message": "缺少element_id或position参数"}
+            return {"success": False, "message": "缺少element_id参数"}
         
-        return result
-    
-    def _execute_add_text(self, presentation: Any, slide_index: int, operation: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        执行添加文本操作
-        
-        Args:
-            presentation: 演示文稿对象
-            slide_index: 幻灯片索引
-            operation: 操作参数
-            
-        Returns:
-            操作结果
-        """
-        text = operation.get("text")
-        left = operation.get("left", 0)
-        top = operation.get("top", 0)
-        width = operation.get("width", 300)
-        height = operation.get("height", 100)
-        
-        if not text:
-            return {"success": False, "message": "缺少text参数"}
-        
-        result = self.ppt_manager.add_text(
-            presentation, slide_index, text, left, top, width, height
-        )
         return result
     
     def _execute_delete_element(self, presentation: Any, slide_index: int, operation: Dict[str, Any]) -> Dict[str, Any]:
@@ -179,25 +162,22 @@ class PPTOperationExecutor:
             操作结果
         """
         element_id = operation.get("element_id")
-        position = operation.get("position")
         
-        # 根据element_id或position删除元素
+        # 删除元素
         if element_id:
-            result = self.ppt_manager.delete_element_by_id(
-                presentation, slide_index, element_id
-            )
-        elif position is not None:
-            result = self.ppt_manager.delete_element_by_position(
-                presentation, slide_index, position
+            result = self.ppt_manager.delete_element(
+                presentation=presentation,
+                slide_index=slide_index,
+                element_id=element_id
             )
         else:
-            return {"success": False, "message": "缺少element_id或position参数"}
+            return {"success": False, "message": "缺少element_id参数"}
         
         return result
     
     def _execute_resize_element(self, presentation: Any, slide_index: int, operation: Dict[str, Any]) -> Dict[str, Any]:
         """
-        执行调整元素大小操作
+        执行调整元素位置和大小操作
         
         Args:
             presentation: 演示文稿对象
@@ -208,26 +188,33 @@ class PPTOperationExecutor:
             操作结果
         """
         element_id = operation.get("element_id")
-        position = operation.get("position")
-        width = operation.get("width")
-        height = operation.get("height")
+        content = operation.get("content", {})
         
-        if width is None and height is None:
-            return {"success": False, "message": "缺少width或height参数"}
+        if not isinstance(content, dict):
+            return {"success": False, "message": "content参数必须是字典类型"}
         
-        # 根据element_id或position调整元素大小
+        left = content.get("left")
+        top = content.get("top")
+        width = content.get("width")
+        height = content.get("height")
+        
+        if left is None and top is None and width is None and height is None:
+            return {"success": False, "message": "缺少位置或大小参数"}
+        
+        # 调整元素位置和大小
         if element_id:
-            result = self.ppt_manager.resize_element_by_id(
-                presentation, slide_index, element_id, width, height
+            result = self.ppt_manager.adjust_element_position(
+                presentation=presentation,
+                slide_index=slide_index,
+                element_id=element_id,
+                left=left,
+                top=top,
+                width=width,
+                height=height
             )
-        elif position is not None:
-            result = self.ppt_manager.resize_element_by_position(
-                presentation, slide_index, position, width, height
-            )
+            return result
         else:
-            return {"success": False, "message": "缺少element_id或position参数"}
-        
-        return result
+            return {"success": False, "message": "缺少element_id参数"}
     
     def _execute_move_element(self, presentation: Any, slide_index: int, operation: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -242,90 +229,30 @@ class PPTOperationExecutor:
             操作结果
         """
         element_id = operation.get("element_id")
-        position = operation.get("position")
-        left = operation.get("left")
-        top = operation.get("top")
+        content = operation.get("content", {})
+        
+        if not isinstance(content, dict):
+            return {"success": False, "message": "content参数必须是字典类型"}
+        
+        left = content.get("left")
+        top = content.get("top")
         
         if left is None and top is None:
             return {"success": False, "message": "缺少left或top参数"}
         
-        # 根据element_id或position移动元素
+        # 移动元素
         if element_id:
-            result = self.ppt_manager.move_element_by_id(
-                presentation, slide_index, element_id, left, top
-            )
-        elif position is not None:
-            result = self.ppt_manager.move_element_by_position(
-                presentation, slide_index, position, left, top
+            result = self.ppt_manager.adjust_element_position(
+                presentation=presentation,
+                slide_index=slide_index,
+                element_id=element_id,
+                left=left,
+                top=top,
+                width=None,
+                height=None
             )
         else:
-            return {"success": False, "message": "缺少element_id或position参数"}
-        
-        return result
-    
-    def _execute_update_style(self, presentation: Any, slide_index: int, operation: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        执行更新样式操作
-        
-        Args:
-            presentation: 演示文稿对象
-            slide_index: 幻灯片索引
-            operation: 操作参数
-            
-        Returns:
-            操作结果
-        """
-        element_id = operation.get("element_id")
-        position = operation.get("position")
-        style_props = operation.get("style", {})
-        
-        if not style_props:
-            return {"success": False, "message": "缺少style参数"}
-        
-        # 根据element_id或position更新样式
-        if element_id:
-            result = self.ppt_manager.update_element_style_by_id(
-                presentation, slide_index, element_id, style_props
-            )
-        elif position is not None:
-            result = self.ppt_manager.update_element_style_by_position(
-                presentation, slide_index, position, style_props
-            )
-        else:
-            return {"success": False, "message": "缺少element_id或position参数"}
-        
-        return result
-    
-    def _execute_update_chart(self, presentation: Any, slide_index: int, operation: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        执行更新图表操作
-        
-        Args:
-            presentation: 演示文稿对象
-            slide_index: 幻灯片索引
-            operation: 操作参数
-            
-        Returns:
-            操作结果
-        """
-        element_id = operation.get("element_id")
-        position = operation.get("position")
-        chart_data = operation.get("chart_data")
-        
-        if not chart_data:
-            return {"success": False, "message": "缺少chart_data参数"}
-        
-        # 根据element_id或position更新图表数据
-        if element_id:
-            result = self.ppt_manager.update_chart_by_id(
-                presentation, slide_index, element_id, chart_data
-            )
-        elif position is not None:
-            result = self.ppt_manager.update_chart_by_position(
-                presentation, slide_index, position, chart_data
-            )
-        else:
-            return {"success": False, "message": "缺少element_id或position参数"}
+            return {"success": False, "message": "缺少element_id参数"}
         
         return result
     
@@ -342,29 +269,66 @@ class PPTOperationExecutor:
             操作结果
         """
         element_id = operation.get("element_id")
-        position = operation.get("position")
-        image_path = operation.get("image_path")
+        content = operation.get("content")  # 图片路径
         
-        if not image_path:
-            return {"success": False, "message": "缺少image_path参数"}
+        if not content:
+            return {"success": False, "message": "缺少content参数（图片路径）"}
         
-        # 根据element_id或position更新图片
+        # 更新图片
         if element_id:
-            result = self.ppt_manager.update_image_by_id(
-                presentation, slide_index, element_id, image_path
-            )
-        elif position is not None:
-            result = self.ppt_manager.update_image_by_position(
-                presentation, slide_index, position, image_path
+            result = self.ppt_manager.replace_image(
+                presentation=presentation,
+                slide_index=slide_index,
+                element_id=element_id,
+                image_path=content
             )
         else:
-            return {"success": False, "message": "缺少element_id或position参数"}
+            return {"success": False, "message": "缺少element_id参数"}
         
         return result
 
+    def _execute_adjust_font_size(self, presentation: Any, slide_index: int, operation: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        执行字体大小调整操作
+        
+        Args:
+            presentation: 演示文稿对象
+            slide_index: 幻灯片索引
+            operation: 操作参数
+            
+        Returns:
+            操作结果
+        """
+        element_id = operation.get("element_id")
+        content = operation.get("content")  # 字体大小值
+        
+        if content is None:
+            return {"success": False, "message": "缺少content参数（字体大小）"}
+        
+        try:
+            # 将字体大小转换为整数
+            font_size = int(content)
+            
+            # 更新字体大小
+            if element_id:
+                result = self.ppt_manager.adjust_text_font_size(
+                    presentation=presentation,
+                    slide_index=slide_index,
+                    element_id=element_id,
+                    font_size=font_size
+                )
+            else:
+                return {"success": False, "message": "缺少element_id参数"}
+            
+            return result
+        except ValueError:
+            return {"success": False, "message": f"无效的字体大小值: {content}"}
+        except Exception as e:
+            return {"success": False, "message": f"调整字体大小时出错: {str(e)}"}
+
 
 class PPTOperationHelper:
-    """PPT操作辅助工具类，提供静态方法"""
+    """PPT操作辅助工具类，提供创建标准操作指令的静态方法"""
     
     @staticmethod
     def create_operation(operation_type: str, element_id: str, content: Any = None) -> Dict[str, Any]:
