@@ -149,7 +149,7 @@ class PPTFinalizerAgent(BaseAgent):
             error_msg = "找不到presentation对象，无法保存PPT"
             logger.error(error_msg)
             state.record_failure(error_msg)
-        return None
+            return None
                 
         # 获取已生成的幻灯片列表
         generated_slides = getattr(state, "generated_slides", [])
