@@ -10,6 +10,7 @@ PPT模板分析Agent模块
 import logging
 import os
 import json
+import asyncio
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 
@@ -256,25 +257,13 @@ class PPTAnalysisAgent(BaseAgent):
                 all_image_indices.append((i, image_path))
                 slides_json_map[i] = slide_json
         
-        # 处理每个批次的图像
-        batch_results = []
-        
-        for i in range(0, len(all_image_indices), batch_size):
-            # 获取当前批次的图像
-            batch_indices = all_image_indices[i:i+batch_size]
-            
-            # 收集当前批次的幻灯片JSON
-            batch_slides_json = [slides_json_map[idx] for idx, _ in batch_indices if idx in slides_json_map]
-            
-            # 收集当前批次的图像路径
-            batch_image_paths = [path for _, path in batch_indices]
-            
-            # 分析当前批次
-            batch_result = await self._analyze_batch(batch_image_paths, batch_slides_json)
-            
-            # 添加批次分析结果
-            if batch_result:
-                batch_results.append(batch_result)
+        # 根据配置决定使用串行或并行处理
+        if self.use_parallel:
+            logger.info(f"使用并行处理分析 {len(all_image_indices)} 张幻灯片图像")
+            batch_results = await self._analyze_batch_parallel(all_image_indices, slides_json_map)
+        else:
+            logger.info(f"使用串行处理分析 {len(all_image_indices)} 张幻灯片图像")
+            batch_results = await self._analyze_batch_serial(all_image_indices, slides_json_map, batch_size)
         
         # 合并所有批次的结果
         return self._merge_batch_results(batch_results, presentation_json)
@@ -371,17 +360,11 @@ class PPTAnalysisAgent(BaseAgent):
         """
         if not results:
             logger.warning("没有任何分析结果可合并")
-            return {"slideLayouts": [], "visualFeatures": {}, "recommendations": {}}
+            return {"slideLayouts": []}
         
         # 初始化合并结果
         merged_result = {
-            "slideLayouts": [],
-            "visualFeatures": {
-                "dominantColors": [],
-                "fontFamilies": [],
-                "layoutTypes": set()
-            },
-            "recommendations": {}
+            "slideLayouts": []
         }
         
         # 合并所有批次的结果
@@ -390,35 +373,11 @@ class PPTAnalysisAgent(BaseAgent):
             layouts = result.get("slideLayouts", [])
             if layouts:
                 merged_result["slideLayouts"].extend(layouts)
-            
-            # 合并视觉特征
-            visual_features = result.get("visualFeatures", {})
-            if visual_features:
-                # 合并主色
-                dominant_colors = visual_features.get("dominantColors", [])
-                merged_result["visualFeatures"]["dominantColors"].extend(dominant_colors or [])
-                
-                # 合并字体
-                font_families = visual_features.get("fontFamilies", [])
-                merged_result["visualFeatures"]["fontFamilies"].extend(font_families or [])
-                
-                # 合并布局类型
-                layout_types = visual_features.get("layoutTypes", [])
-                if layout_types:
-                    merged_result["visualFeatures"]["layoutTypes"].update(layout_types)
-            
-            # 合并建议
-            recommendations = result.get("recommendations", {})
-            if recommendations:
-                # 对于重复的键，使用较新的值
-                merged_result["recommendations"].update(recommendations)
         
-        # 将layoutTypes从集合转换回列表
-        merged_result["visualFeatures"]["layoutTypes"] = list(merged_result["visualFeatures"]["layoutTypes"])
-        
-        # 去重主色和字体
-        merged_result["visualFeatures"]["dominantColors"] = list(set(merged_result["visualFeatures"]["dominantColors"]))
-        merged_result["visualFeatures"]["fontFamilies"] = list(set(merged_result["visualFeatures"]["fontFamilies"]))
+        # 根据slide_index排序slideLayouts
+        if merged_result["slideLayouts"]:
+            merged_result["slideLayouts"].sort(key=lambda x: x.get("slide_index", float('inf')))
+            logger.info(f"已将 {len(merged_result['slideLayouts'])} 个幻灯片布局按slide_index排序")
         
         return merged_result
     
@@ -430,4 +389,122 @@ class PPTAnalysisAgent(BaseAgent):
             state: 工作流状态
         """
         state.add_checkpoint("ppt_analyzer_completed")
-        logger.info("添加检查点: ppt_analyzer_completed") 
+        logger.info("添加检查点: ppt_analyzer_completed")
+    
+    async def _analyze_batch_parallel(self, all_image_indices: List[Tuple[int, str]], 
+                                slides_json_map: Dict[int, Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """
+        并行分析多个幻灯片图像
+        
+        Args:
+            all_image_indices: 图像索引和路径元组的列表 [(index, path), ...]
+            slides_json_map: 幻灯片索引到JSON结构的映射
+            
+        Returns:
+            分析结果列表
+        """
+        # 配置最大协程数
+        max_workers = self.max_workers or len(all_image_indices)
+        max_workers = min(max_workers, len(all_image_indices))
+        
+        logger.info(f"使用 {max_workers} 个协程并行分析幻灯片图像")
+        
+        # 创建分析任务
+        analysis_tasks = []
+        
+        for idx, image_path in all_image_indices:
+            slide_json = slides_json_map.get(idx, {})
+            # 创建单个图像分析任务
+            task = self._analyze_single_image_task(image_path, [slide_json])
+            analysis_tasks.append(task)
+        
+        # 并行执行所有分析任务
+        results = []
+        for i in range(0, len(analysis_tasks), max_workers):
+            batch = analysis_tasks[i:i+max_workers]
+            logger.info(f"执行第 {i//max_workers + 1} 批图像分析任务，共 {len(batch)} 个任务")
+            batch_results = await asyncio.gather(*batch)
+            # 过滤掉空结果
+            valid_results = [result for result in batch_results if result]
+            results.extend(valid_results)
+        
+        logger.info(f"完成 {len(results)} 个幻灯片图像的并行分析")
+        return results
+    
+    async def _analyze_single_image_task(self, image_path: str, slides_json: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        """
+        分析单个幻灯片图像的任务
+        
+        Args:
+            image_path: 图像路径
+            slides_json: 幻灯片JSON结构列表
+            
+        Returns:
+            分析结果
+        """
+        try:
+            logger.info(f"开始分析图像: {image_path}")
+            
+            # 构建提示词
+            template_info = {"slides": slides_json}
+            prompt = self._build_analysis_prompt([image_path], template_info)
+            
+            # 使用视觉模型分析图像
+            response = await self.model_helper.analyze_image_with_retry(
+                model=self.vision_model,
+                prompt=prompt,
+                image_path=image_path,
+                max_retries=self.max_retries
+            )
+            
+            # 解析视觉模型响应
+            analysis_result = self.model_helper.parse_json_response(response)
+            
+            if not analysis_result:
+                logger.error(f"视觉模型返回的JSON无法解析: {image_path}")
+                return {"slideLayouts": [], "visualFeatures": {}, "recommendations": {}}
+            
+            logger.info(f"成功分析图像: {image_path}")
+            return analysis_result
+            
+        except Exception as e:
+            logger.error(f"分析图像 {image_path} 时出错: {str(e)}")
+            return None
+    
+    async def _analyze_batch_serial(self, all_image_indices: List[Tuple[int, str]], 
+                                slides_json_map: Dict[int, Dict[str, Any]], batch_size: int) -> List[Dict[str, Any]]:
+        """
+        串行分析多个幻灯片图像
+        
+        Args:
+            all_image_indices: 图像索引和路径元组的列表 [(index, path), ...]
+            slides_json_map: 幻灯片索引到JSON结构的映射
+            batch_size: 批处理大小
+            
+        Returns:
+            分析结果列表
+        """
+        logger.info(f"使用串行处理分析 {len(all_image_indices)} 张幻灯片图像")
+        
+        # 处理每个批次的图像
+        batch_results = []
+        
+        for i in range(0, len(all_image_indices), batch_size):
+            # 获取当前批次的图像
+            batch_indices = all_image_indices[i:i+batch_size]
+            
+            # 收集当前批次的幻灯片JSON
+            batch_slides_json = [slides_json_map[idx] for idx, _ in batch_indices if idx in slides_json_map]
+            
+            # 收集当前批次的图像路径
+            batch_image_paths = [path for _, path in batch_indices]
+            
+            # 分析当前批次
+            batch_result = await self._analyze_batch(batch_image_paths, batch_slides_json)
+            
+            # 添加批次分析结果
+            if batch_result:
+                batch_results.append(batch_result)
+                
+        logger.info(f"完成 {len(batch_results)} 批次的串行分析")
+        return batch_results 
