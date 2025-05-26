@@ -182,11 +182,11 @@ class CacheManager:
         Returns:
             缓存的解析结果，如果不存在则返回None
         """
-        # 提取标题作为缓存键
-        title = self._extract_title_from_markdown(raw_md)
+        # 使用MD5哈希作为缓存键
+        cache_key = self.generate_cache_key(raw_md)
         
         # 从缓存加载
-        return self.load_from_cache("markdown", title)
+        return self.load_from_cache("markdown", cache_key)
     
     def save_markdown_cache(self, raw_md: str, content_structure: Dict[str, Any]) -> Path:
         """
@@ -199,15 +199,11 @@ class CacheManager:
         Returns:
             缓存文件路径
         """
-        # 如果content_structure中有标题，优先使用
-        title = content_structure.get("title")
-        
-        # 如果没有从结构中获取到标题，则从原始Markdown中提取
-        if not title:
-            title = self._extract_title_from_markdown(raw_md)
+        # 使用MD5哈希作为缓存键
+        cache_key = self.generate_cache_key(raw_md)
         
         # 保存到缓存
-        return self.save_to_cache("markdown", title, content_structure)
+        return self.save_to_cache("markdown", cache_key, content_structure)
     
     def get_ppt_analysis_cache(self, ppt_path: str) -> Optional[Dict[str, Any]]:
         """
