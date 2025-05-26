@@ -335,6 +335,10 @@ class PPTAnalysisAgent(BaseAgent):
         
         # 构建上下文
         context = {
+            # 添加模板信息和图像相关的变量
+            "template_info": template_info,  # 添加模板信息对象
+            "has_images": len(image_paths) > 0,  # 添加是否有图像的标志
+            "image_indices": template_info.get("slides", []),  # 添加幻灯片JSON结构数据
             "template_info_json": template_info_json,
             "image_count": len(image_paths),
             # 添加内容类型变量到上下文中

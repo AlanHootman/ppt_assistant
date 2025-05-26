@@ -5,13 +5,13 @@
 PPT分析器Agent提示词配置
 """
 
-# from config.prompts.content_types import (
-#     SEMANTIC_TYPES,
-#     RELATION_TYPES,
-#     CONTENT_STRUCTURES,
-#     SEMANTIC_TYPE_GUIDELINES,
-#     RELATION_TYPE_GUIDELINES
-# )
+from config.prompts.content_types import (
+    SEMANTIC_TYPES,
+    RELATION_TYPES,
+    CONTENT_STRUCTURES,
+    SEMANTIC_TYPE_GUIDELINES,
+    RELATION_TYPE_GUIDELINES
+)
 
 TEMPLATE_ANALYSIS_PROMPT = """
 你是专业的PPT模板分析专家，需要分析以下PPT模板的布局和设计特点，从而帮助内容规划模块更好地匹配内容与布局。
@@ -27,12 +27,12 @@ TEMPLATE_ANALYSIS_PROMPT = """
 # 2. 输入信息与分析策略
 {% if template_info %}
 ## 2.1 模板信息
-{{ template_info | tojson(indent=2) }}
+{{ template_info_json }}
 {% endif %}
 
 {% if has_images %}
 ## 2.2 幻灯片图像信息
-下面是模板中的几页幻灯片图像及其对应的JSON结构。每张图像对应模板中的一个幻灯片，图像文件名包含它在原始PPT中的索引信息。
+下面是模板中的{{ image_count }}张幻灯片图像及其对应的JSON结构。每张图像对应模板中的一个幻灯片，图像文件名包含它在原始PPT中的索引信息。
 - **图像分析策略**：通过视觉分析图像获取布局的整体结构、风格特点和用途描述(layout_description)
 - **JSON分析策略**：通过解析JSON数据获取元素的详细信息，包括元素类型、数量和层次结构
 {% endif %}
