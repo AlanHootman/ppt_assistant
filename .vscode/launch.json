@@ -28,7 +28,8 @@
                 "worker",
                 "--loglevel=info",
                 "--concurrency=1",
-                "--pool=solo"
+                "--pool=solo",
+                "-Q", "celery,template_analysis,ppt_generation"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
@@ -54,14 +55,15 @@
             }
         },
         {
-            "name": "运行PPT工作流(自定义)",
+            "name": "测试PPT生成API",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/run_workflow.py",
+            "program": "${workspaceFolder}/tests/test_api_ppt_generation.py",
             "args": [
-                "--markdown", "${input:markdownFile}",
-                "--template", "${input:templateFile}",
-                "--output_dir", "${input:outputDir}"
+                "--template", "tests/testfiles/黄色小清新文艺工作总结ppt模板.pptx",
+                "--markdown", "tests/testfiles/技术思维五导教学内容.md",
+                "--download",
+                "--output", "workspace/output/test_api_output.pptx"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
@@ -70,15 +72,14 @@
             }
         },
         {
-            "name": "运行PPT离线解析器",
+            "name": "测试模板管理API",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/scripts/ppt_analyzer_offline.py",
+            "program": "${workspaceFolder}/tests/test_api_template_management.py",
             "args": [
-                "analyze",
-                "tests/testfiles/黄色小清新文艺工作总结ppt模板.pptx",
-                "-o", "workspace/cache/ppt_analysis",
-                "-f"
+                "full-test",
+                "--template", "tests/testfiles/蓝绿色商务简约年终工作总结汇报PPT模板.pptx",
+                "--no-delete"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,
@@ -87,13 +88,22 @@
             }
         },
         {
-            "name": "运行所有测试",
+            "name": "测试模板上传API",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/tests/run_tests.py",
+            "program": "${workspaceFolder}/tests/test_api_template_management.py",
+            "args": [
+                "upload",
+                "--template", "${input:selectPptTemplate}",
+                "--name", "测试上传模板${input:templateSuffix}",
+                "--description", "通过VSCode调试菜单上传的测试模板",
+                "--tags", "测试,API,VSCode"
+            ],
             "console": "integratedTerminal",
             "justMyCode": false,
-            "purpose": ["debug-test"]
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
         },
         {
             "name": "运行当前测试文件",
@@ -123,19 +133,35 @@
             "id": "markdownFile",
             "type": "promptString",
             "description": "Markdown文件路径",
-            "default": "tests/testfiles/MCP介绍.md"
+            "default": "tests/testfiles/技术思维五导教学内容.md"
         },
         {
             "id": "templateFile",
             "type": "promptString",
             "description": "PPT模板文件路径",
-            "default": "tests/testfiles/Iphone16Pro.pptx"
+            "default": "tests/testfiles/黄色小清新文艺工作总结ppt模板.pptx"
         },
         {
             "id": "outputDir",
             "type": "promptString",
             "description": "输出目录",
             "default": "workspace/output"
+        },
+        {
+            "id": "selectPptTemplate",
+            "type": "pickString",
+            "description": "选择PPT模板文件",
+            "options": [
+                "tests/testfiles/黄色小清新文艺工作总结ppt模板.pptx",
+                "tests/testfiles/蓝绿色商务简约年终工作总结汇报PPT模板.pptx",
+                "tests/testfiles/Iphone16Pro.pptx"
+            ]
+        },
+        {
+            "id": "templateSuffix",
+            "type": "promptString",
+            "description": "模板名称后缀",
+            "default": ""
         }
     ]
 } 
