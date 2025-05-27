@@ -99,7 +99,8 @@ def analyze_template_task(self, template_data: dict):
         
         # 保存分析结果到缓存系统
         ppt_path = Path(template_data["file_path"])
-        cache_path = cache_manager.save_ppt_analysis_cache(str(ppt_path), analysis_result)
+        template_id = template_data.get("template_id")
+        cache_path = cache_manager.save_ppt_analysis_cache(str(ppt_path), analysis_result, template_id=template_id)
         
         # 记录分析结果到MLflow
         if enable_tracking and tracker and HAS_MLFLOW:
