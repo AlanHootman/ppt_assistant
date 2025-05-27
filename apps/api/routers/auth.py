@@ -29,7 +29,7 @@ class UserResponse(BaseModel):
     is_active: bool
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 def verify_password(plain_password, hashed_password):
     """验证密码

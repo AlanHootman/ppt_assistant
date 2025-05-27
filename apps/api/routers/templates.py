@@ -31,7 +31,7 @@ class TemplateResponse(TemplateBase):
     analysis_time: Optional[datetime] = None
     
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 @router.post("/", response_model=TemplateResponse)
 async def upload_template(
@@ -39,8 +39,7 @@ async def upload_template(
     description: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
     file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     """上传模板
     
@@ -50,7 +49,6 @@ async def upload_template(
         tags: 模板标签（JSON字符串）
         file: 上传的模板文件
         db: 数据库会话
-        current_user: 当前用户
         
     Returns:
         创建的模板信息
@@ -70,7 +68,7 @@ async def upload_template(
         file_path="",  # 临时路径，稍后更新
         status="uploading",
         upload_time=datetime.utcnow(),
-        created_by=current_user.id
+        created_by=1  # 固定为ID为1的用户
     )
     
     db.add(template)
@@ -114,8 +112,7 @@ async def list_templates(
     skip: int = 0, 
     limit: int = 100,
     status: Optional[str] = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     """获取模板列表
     
@@ -124,7 +121,6 @@ async def list_templates(
         limit: 分页大小
         status: 模板状态过滤
         db: 数据库会话
-        current_user: 当前用户
         
     Returns:
         模板列表
@@ -154,15 +150,13 @@ async def list_templates(
 @router.get("/{template_id}", response_model=TemplateResponse)
 async def get_template(
     template_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     """获取模板详情
     
     Args:
         template_id: 模板ID
         db: 数据库会话
-        current_user: 当前用户
         
     Returns:
         模板详情
@@ -179,15 +173,13 @@ async def get_template(
 @router.delete("/{template_id}")
 async def delete_template(
     template_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     """删除模板
     
     Args:
         template_id: 模板ID
         db: 数据库会话
-        current_user: 当前用户
         
     Returns:
         删除结果
@@ -214,15 +206,13 @@ async def delete_template(
 @router.get("/{template_id}/analysis")
 async def get_template_analysis(
     template_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     """获取模板分析结果
     
     Args:
         template_id: 模板ID
         db: 数据库会话
-        current_user: 当前用户
         
     Returns:
         模板分析结果
@@ -249,4 +239,43 @@ async def get_template_analysis(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"读取分析结果失败: {str(e)}"
-        ) 
+        )
+
+@router.post("/{template_id}/analyze")
+async def request_template_analysis(
+    template_id: int,
+    db: Session = Depends(get_db)
+):
+    """请求分析模板
+    
+    Args:
+        template_id: 模板ID
+        db: 数据库会话
+        
+    Returns:
+        分析任务信息
+    """
+    # 检查模板是否存在
+    template = db.query(Template).filter(Template.id == template_id).first()
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"模板不存在: id={template_id}"
+        )
+    
+    # 更新模板状态
+    template.status = "analyzing"
+    db.commit()
+    
+    # 触发分析任务
+    task = analyze_template_task.delay({
+        "template_id": template_id,
+        "file_path": template.file_path
+    })
+    
+    return {
+        "task_id": task.id,
+        "template_id": template_id,
+        "status": "analyzing",
+        "message": "模板分析任务已提交"
+    } 

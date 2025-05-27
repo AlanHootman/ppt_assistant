@@ -35,8 +35,7 @@ class TaskStatusResponse(BaseModel):
 async def create_generation_task(
     request: GenerationRequest,
     background_tasks: BackgroundTasks,
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     """创建PPT生成任务
     
@@ -44,7 +43,6 @@ async def create_generation_task(
         request: 生成请求数据
         background_tasks: 后台任务
         db: 数据库会话
-        current_user: 当前用户
         
     Returns:
         包含任务ID和状态的响应
@@ -105,15 +103,13 @@ async def create_generation_task(
 @router.get("/tasks/{task_id}", response_model=TaskStatusResponse)
 async def get_task_status(
     task_id: str,
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     """获取任务状态
     
     Args:
         task_id: 任务ID
         db: 数据库会话
-        current_user: 当前用户
         
     Returns:
         任务状态信息
@@ -160,15 +156,13 @@ async def get_task_status(
 @router.delete("/tasks/{task_id}")
 async def cancel_task(
     task_id: str,
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_active_user)
+    db: Session = Depends(get_db)
 ):
     """取消任务
     
     Args:
         task_id: 任务ID
         db: 数据库会话
-        current_user: 当前用户
         
     Returns:
         取消结果

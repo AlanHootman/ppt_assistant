@@ -45,7 +45,7 @@ class TemplateManagerTester:
         if tags is None:
             tags = "测试,API"
         
-        url = f"{self.base_url}/api/templates/upload"
+        url = f"{self.base_url}/api/templates/"
         
         files = {
             'file': open(template_path, 'rb')
