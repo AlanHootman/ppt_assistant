@@ -9,9 +9,11 @@ Agent基类模块
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 
-from core.engine.state import AgentState
+# 使用TYPE_CHECKING避免循环导入
+if TYPE_CHECKING:
+    from core.engine.state import AgentState
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +32,7 @@ class BaseAgent(ABC):
         logger.info(f"初始化Agent: {self.name}")
     
     @abstractmethod
-    async def run(self, state: AgentState) -> AgentState:
+    async def run(self, state: "AgentState") -> "AgentState":
         """
         执行Agent的主要逻辑
         
@@ -42,7 +44,7 @@ class BaseAgent(ABC):
         """
         pass
     
-    def add_checkpoint(self, state: AgentState, checkpoint_name: Optional[str] = None) -> None:
+    def add_checkpoint(self, state: "AgentState", checkpoint_name: Optional[str] = None) -> None:
         """
         添加检查点，标记Agent执行完成
         
@@ -54,7 +56,7 @@ class BaseAgent(ABC):
         state.add_checkpoint(name)
         logger.debug(f"添加检查点: {name}")
     
-    def record_failure(self, state: AgentState, error_message: str) -> None:
+    def record_failure(self, state: "AgentState", error_message: str) -> None:
         """
         记录执行失败信息
         

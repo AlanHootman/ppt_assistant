@@ -5,18 +5,13 @@ import logging
 import traceback
 import json
 import hashlib
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 from datetime import datetime
 from pathlib import Path
 
 from core.engine.state import AgentState
 from core.engine.mocks import WorkflowMocks
 from core.engine.cache_manager import CacheManager
-from core.agents.markdown_agent import MarkdownAgent
-from core.agents.ppt_analysis_agent import PPTAnalysisAgent
-from core.agents.content_planning_agent import ContentPlanningAgent
-from core.agents.slide_generator_agent import SlideGeneratorAgent
-from core.agents.ppt_finalizer_agent import PPTFinalizerAgent
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -182,6 +177,9 @@ class NodeExecutor:
             return
             
         try:
+            # 延迟导入以避免循环导入问题
+            from core.agents.markdown_agent import MarkdownAgent
+            
             # 初始化Markdown解析Agent
             markdown_agent_config = self.config.get("agents", {}).get("markdown_agent", {})
             markdown_agent = MarkdownAgent(markdown_agent_config)
@@ -198,104 +196,11 @@ class NodeExecutor:
                 # 保存到缓存
                 self.cache_manager.save_markdown_cache(state.raw_md, state.content_structure)
                 
-                # 添加检查点
-                state.add_checkpoint("markdown_parser_completed")
-            else:
-                error_msg = "Markdown解析失败，未生成内容结构"
-                logger.error(error_msg)
-                state.record_failure(error_msg)
         except Exception as e:
-            error_msg = f"Markdown解析异常: {str(e)}"
+            error_msg = f"Markdown解析失败: {str(e)}"
             logger.error(error_msg)
-            logger.error(traceback.format_exc())
             state.record_failure(error_msg)
-    
-    async def _execute_slide_generator(self, state: AgentState) -> None:
-        """
-        执行幻灯片生成节点
-        
-        Args:
-            state: 当前状态
-        """
-        logger.info("执行幻灯片生成节点")
-        
-        try:
-            # 初始化幻灯片生成Agent
-            slide_generator_config = self.config.get("agents", {}).get("slide_generator", {})
-            slide_generator = SlideGeneratorAgent(slide_generator_config)
             
-            # 执行幻灯片生成
-            result = await slide_generator.run(state)
-            
-            # 检查结果，设置验证标记供下一步使用
-            state.validation_result = True  # 在 run 方法中已进行验证
-            state.has_more_content = False  # 标记没有更多内容需要处理
-            
-            # 添加检查点
-            state.add_checkpoint("slide_generator_completed")
-        except Exception as e:
-            error_msg = f"幻灯片生成失败: {str(e)}"
-            logger.error(error_msg)
-            logger.error(traceback.format_exc())
-            state.record_failure(error_msg)
-            state.validation_result = False
-    
-    async def _execute_next_slide_or_end(self, state: AgentState) -> None:
-        """
-        检查是否还有更多内容需要处理，更新状态
-        
-        Args:
-            state: 代理状态
-        """
-        try:
-            logger.info("执行幻灯片进度检查")
-            
-            # 确保状态中有必要的属性
-            if not hasattr(state, 'content_plan') or not state.content_plan:
-                # 移除使用decision_result的兼容代码
-                error_msg = "无法检查进度：缺少内容规划结果"
-                logger.error(error_msg)
-                state.record_failure(error_msg)
-                state.has_more_content = False
-                return
-            
-            # 直接使用content_plan
-            total_slides = len(state.content_plan)
-            
-            # 当前幻灯片已验证通过，将其添加到已生成列表中
-            if state.current_slide and state.validation_result:
-                if not hasattr(state, 'generated_slides') or state.generated_slides is None:
-                    state.generated_slides = []
-                
-                # 避免重复添加
-                slide_ids = [slide.get('section_index') for slide in state.generated_slides]
-                if (state.current_slide.get('section_index') not in slide_ids) and state.current_slide not in state.generated_slides:
-                    state.generated_slides.append(state.current_slide)
-                    logger.info(f"将验证通过的幻灯片添加到生成列表，当前共 {len(state.generated_slides)} 张")
-            
-            # 如果未设置当前章节索引，初始化为-1
-            if state.current_section_index is None:
-                state.current_section_index = -1
-            
-            # 更新到下一个章节索引
-            state.current_section_index += 1
-            next_index = state.current_section_index
-            
-            # 检查是否还有更多内容
-            if next_index < total_slides:
-                state.has_more_content = True
-                logger.info(f"还有更多内容需要处理, 下一章节索引: {next_index}/{total_slides-1}")
-            else:
-                state.has_more_content = False
-                logger.info("所有内容处理完成")
-            
-        except Exception as e:
-            error_msg = f"检查进度失败: {str(e)}"
-            logger.error(error_msg)
-            logger.error(traceback.format_exc())
-            state.record_failure(error_msg)
-            state.has_more_content = False
-    
     async def _execute_ppt_analyzer(self, state: AgentState) -> None:
         """
         执行PPT分析节点
@@ -310,7 +215,7 @@ class NodeExecutor:
             state.record_failure(error_msg)
             return
         
-        logger.info(f"执行PPT分析节点, 模板路径: {state.ppt_template_path}")
+        logger.info(f"执行PPT分析节点，模板路径: {state.ppt_template_path}")
         
         # 尝试从缓存获取分析结果
         cached_result = self.cache_manager.get_ppt_analysis_cache(state.ppt_template_path)
@@ -321,36 +226,29 @@ class NodeExecutor:
             # 添加检查点
             state.add_checkpoint("ppt_analyzer_completed")
             return
-        
+            
         try:
+            # 延迟导入以避免循环导入问题
+            from core.agents.ppt_analysis_agent import PPTAnalysisAgent
+            
             # 初始化PPT分析Agent
-            ppt_analyzer_config = self.config.get("agents", {}).get("ppt_analyzer", {})
-            ppt_analyzer = PPTAnalysisAgent(ppt_analyzer_config)
+            ppt_analysis_agent_config = self.config.get("agents", {}).get("ppt_analysis_agent", {})
+            ppt_analysis_agent = PPTAnalysisAgent(ppt_analysis_agent_config)
             
             # 执行分析
-            result = await ppt_analyzer.run(state)
+            result = await ppt_analysis_agent.run(state)
             
             # 检查结果
             if result and result.layout_features:
-                logger.info("PPT模板分析成功")
-                # 更新状态
-                state.layout_features = result.layout_features
-                
+                logger.info("PPT分析成功")
                 # 保存到缓存
-                self.cache_manager.save_ppt_analysis_cache(state.ppt_template_path, state.layout_features)
+                self.cache_manager.save_ppt_analysis_cache(state.ppt_template_path, result.layout_features)
                 
-                # 添加检查点
-                state.add_checkpoint("ppt_analyzer_completed")
-            else:
-                error_msg = "PPT模板分析失败，未生成布局特征"
-                logger.error(error_msg)
-                state.record_failure(error_msg)
         except Exception as e:
-            error_msg = f"PPT模板分析异常: {str(e)}"
+            error_msg = f"PPT分析失败: {str(e)}"
             logger.error(error_msg)
-            logger.error(traceback.format_exc())
             state.record_failure(error_msg)
-    
+            
     async def _execute_content_planner(self, state: AgentState) -> None:
         """
         执行内容规划节点
@@ -358,9 +256,15 @@ class NodeExecutor:
         Args:
             state: 当前状态
         """
-        # 检查有效性
-        if not state.content_structure or not state.layout_features:
-            error_msg = "缺少内容结构或布局特征，无法执行内容规划"
+        # 检查依赖
+        if not state.content_structure:
+            error_msg = "缺少Markdown解析结果"
+            logger.error(error_msg)
+            state.record_failure(error_msg)
+            return
+            
+        if not state.layout_features:
+            error_msg = "缺少PPT模板分析结果"
             logger.error(error_msg)
             state.record_failure(error_msg)
             return
@@ -368,81 +272,153 @@ class NodeExecutor:
         logger.info("执行内容规划节点")
         
         # 尝试从缓存获取规划结果
+        cache_key = f"{hash(str(state.content_structure))}-{hash(str(state.layout_features))}"
         cached_result = self.cache_manager.get_content_plan_cache(
-            state.content_structure, 
+            state.content_structure,
             state.layout_features
         )
         
         if cached_result:
             logger.info("使用缓存的内容规划结果")
-            state.content_plan = cached_result
+            state.planned_content = cached_result
+            state.current_slide_index = 0
             # 添加检查点
             state.add_checkpoint("content_planner_completed")
             return
-        
+            
         try:
+            # 延迟导入以避免循环导入问题
+            from core.agents.content_planning_agent import ContentPlanningAgent
+            
             # 初始化内容规划Agent
-            content_planner_config = self.config.get("agents", {}).get("content_planner", {})
-            content_planner = ContentPlanningAgent(content_planner_config)
+            content_planning_agent_config = self.config.get("agents", {}).get("content_planning_agent", {})
+            content_planning_agent = ContentPlanningAgent(content_planning_agent_config)
             
             # 执行规划
-            result = await content_planner.run(state)
+            result = await content_planning_agent.run(state)
             
             # 检查结果
-            if result and result.content_plan:
+            if result and result.planned_content:
                 logger.info("内容规划成功")
-                # 更新状态
-                state.content_plan = result.content_plan
+                # 初始化幻灯片索引
+                state.current_slide_index = 0
                 
                 # 保存到缓存
                 self.cache_manager.save_content_plan_cache(
                     state.content_structure,
                     state.layout_features,
-                    state.content_plan
+                    result.planned_content
                 )
                 
-                # 添加检查点
-                state.add_checkpoint("content_planner_completed")
-            else:
-                error_msg = "内容规划失败，未生成规划结果"
-                logger.error(error_msg)
-                state.record_failure(error_msg)
-                state.planning_failed = True
         except Exception as e:
-            error_msg = f"内容规划异常: {str(e)}"
+            error_msg = f"内容规划失败: {str(e)}"
             logger.error(error_msg)
-            logger.error(traceback.format_exc())
             state.record_failure(error_msg)
-            state.planning_failed = True
-    
-    async def _execute_ppt_finalizer(self, state: AgentState) -> None:
+            
+    async def _execute_slide_generator(self, state: AgentState) -> None:
         """
-        执行PPT清理与保存节点
+        执行幻灯片生成节点
         
         Args:
             state: 当前状态
         """
-        logger.info("执行PPT清理与保存节点")
+        # 检查依赖
+        if not state.planned_content:
+            error_msg = "缺少内容规划结果"
+            logger.error(error_msg)
+            state.record_failure(error_msg)
+            return
+            
+        if state.current_slide_index is None or state.current_slide_index >= len(state.planned_content.get("slides", [])):
+            error_msg = "无效的幻灯片索引"
+            logger.error(error_msg)
+            state.record_failure(error_msg)
+            return
+        
+        current_index = state.current_slide_index
+        total_slides = len(state.planned_content.get("slides", []))
+        logger.info(f"执行幻灯片生成节点: 第 {current_index+1}/{total_slides} 张幻灯片")
         
         try:
-            # 初始化PPT清理与保存Agent
-            ppt_finalizer_config = self.config.get("agents", {}).get("ppt_finalizer", {})
-            ppt_finalizer = PPTFinalizerAgent(ppt_finalizer_config)
+            # 延迟导入以避免循环导入问题
+            from core.agents.slide_generator_agent import SlideGeneratorAgent
             
-            # 执行清理与保存
-            result = await ppt_finalizer.run(state)
+            # 初始化幻灯片生成Agent
+            slide_generator_config = self.config.get("agents", {}).get("slide_generator_agent", {})
+            slide_generator_agent = SlideGeneratorAgent(slide_generator_config)
+            
+            # 执行生成
+            result = await slide_generator_agent.run(state)
+            
+            # 检查结果
+            if result:
+                logger.info(f"幻灯片 {current_index+1}/{total_slides} 生成成功")
+                
+        except Exception as e:
+            error_msg = f"幻灯片生成失败: {str(e)}"
+            logger.error(error_msg)
+            state.record_failure(error_msg)
+            
+    async def _execute_next_slide_or_end(self, state: AgentState) -> None:
+        """
+        执行下一张幻灯片或结束决策节点
+        
+        Args:
+            state: 当前状态
+        """
+        # 检查依赖
+        if state.current_slide_index is None or not state.planned_content:
+            error_msg = "无效的状态，缺少幻灯片索引或内容规划"
+            logger.error(error_msg)
+            state.record_failure(error_msg)
+            return
+        
+        total_slides = len(state.planned_content.get("slides", []))
+        current_index = state.current_slide_index
+        
+        # 检查是否所有幻灯片都已生成
+        if current_index >= total_slides - 1:
+            logger.info(f"所有幻灯片 ({total_slides} 张) 已生成完成，准备进入最终整合阶段")
+            state.add_checkpoint("all_slides_generated")
+            return
+        
+        # 还有更多幻灯片需要生成，增加索引
+        state.current_slide_index += 1
+        next_index = state.current_slide_index
+        logger.info(f"准备生成下一张幻灯片: {next_index + 1}/{total_slides}")
+        
+    async def _execute_ppt_finalizer(self, state: AgentState) -> None:
+        """
+        执行PPT最终整合节点
+        
+        Args:
+            state: 当前状态
+        """
+        # 检查依赖
+        if not state.slides_content or not state.ppt_template_path:
+            error_msg = "缺少幻灯片内容或模板路径"
+            logger.error(error_msg)
+            state.record_failure(error_msg)
+            return
+            
+        logger.info("执行PPT最终整合节点")
+        
+        try:
+            # 延迟导入以避免循环导入问题
+            from core.agents.ppt_finalizer_agent import PPTFinalizerAgent
+            
+            # 初始化PPT整合Agent
+            ppt_finalizer_config = self.config.get("agents", {}).get("ppt_finalizer_agent", {})
+            ppt_finalizer_agent = PPTFinalizerAgent(ppt_finalizer_config)
+            
+            # 执行整合
+            result = await ppt_finalizer_agent.run(state)
             
             # 检查结果
             if result and result.output_ppt_path:
-                logger.info(f"PPT清理与保存成功，文件路径: {result.output_ppt_path}")
-                # 添加检查点
-                state.add_checkpoint("ppt_finalizer_completed")
-            else:
-                error_msg = "PPT清理与保存失败，未生成输出文件"
-                logger.error(error_msg)
-                state.record_failure(error_msg)
+                logger.info(f"PPT整合成功，输出路径: {result.output_ppt_path}")
+                
         except Exception as e:
-            error_msg = f"PPT清理与保存异常: {str(e)}"
+            error_msg = f"PPT整合失败: {str(e)}"
             logger.error(error_msg)
-            logger.error(traceback.format_exc())
             state.record_failure(error_msg) 

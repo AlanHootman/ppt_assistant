@@ -61,5 +61,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
+        # 允许额外字段，这样就不会因为环境变量中存在未在类中定义的字段而报错
+        extra = "allow"
 
 settings = Settings() 

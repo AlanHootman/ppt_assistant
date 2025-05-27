@@ -7,8 +7,7 @@ celery_app = Celery(
     backend=settings.CELERY_RESULT_BACKEND,
     include=[
         "apps.api.tasks.ppt_generation",
-        "apps.api.tasks.template_analysis",
-        "apps.api.tasks.file_processing"
+        "apps.api.tasks.template_analysis"
     ]
 )
 
@@ -26,8 +25,7 @@ celery_app.conf.update(
     worker_max_tasks_per_child=1000,
     task_routes={
         "apps.api.tasks.ppt_generation.*": {"queue": "ppt_generation"},
-        "apps.api.tasks.template_analysis.*": {"queue": "template_analysis"},
-        "apps.api.tasks.file_processing.*": {"queue": "file_processing"},
+        "apps.api.tasks.template_analysis.*": {"queue": "template_analysis"}
     },
     task_annotations={
         "*": {"rate_limit": "10/s"},
