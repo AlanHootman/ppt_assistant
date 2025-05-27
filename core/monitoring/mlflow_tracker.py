@@ -72,11 +72,12 @@ class MLflowTracker:
         logger.info(f"工作流运行已开始: {self.active_run.info.run_id}")
         return self.active_run
     
-    def end_workflow_run(self, status="completed"):
+    def end_workflow_run(self, status="FINISHED"):
         """结束工作流运行
         
         Args:
-            status: 运行状态 (completed, failed, interrupted)
+            status: 运行状态 (FINISHED, FAILED, KILLED, RUNNING, SCHEDULED)
+            MLflow仅支持这些状态值，不支持其他自定义值
         """
         if not self.active_run:
             logger.warning("没有活动的工作流运行可结束")

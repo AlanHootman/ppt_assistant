@@ -4,6 +4,7 @@ from core.agents.ppt_analysis_agent import PPTAnalysisAgent
 from apps.api.services.file_service import FileService
 from core.engine.state import AgentState
 from core.engine.cache_manager import CacheManager
+from config.settings import settings
 from pathlib import Path
 import asyncio
 import json
@@ -134,7 +135,11 @@ def analyze_template_task(self, template_data: dict):
                 logger.warning(f"记录分析结果到MLflow失败: {str(e)}")
         
         # 生成预览图
-        preview_images = generate_template_previews(template_data["file_path"], template_data["template_id"])
+        preview_images = generate_template_previews(
+            template_data["file_path"], 
+            template_data["template_id"],
+            analysis_result
+        )
         
         # 更新完成状态
         redis_service.update_task_status(
@@ -149,7 +154,7 @@ def analyze_template_task(self, template_data: dict):
         
         # 结束MLflow跟踪
         if enable_tracking and tracker:
-            tracker.end_workflow_run("completed")
+            tracker.end_workflow_run("FINISHED")
         
         return {
             "analysis_result": analysis_result,
@@ -179,22 +184,67 @@ def analyze_template_task(self, template_data: dict):
         if enable_tracking and tracker and HAS_MLFLOW:
             try:
                 mlflow.log_param("error_message", str(e))
-                tracker.end_workflow_run("failed")
+                tracker.end_workflow_run("FAILED")
             except Exception as log_error:
                 logger.warning(f"记录失败到MLflow失败: {str(log_error)}")
         
         raise self.retry(countdown=30, max_retries=2)
 
-def generate_template_previews(template_path: str, template_id: int) -> list:
-    """生成模板预览图
+def generate_template_previews(template_path: str, template_id: int, analysis_result: dict = None) -> list:
+    """生成模板预览图，将渲染好的PPT图片移动到对应template_id目录下
     
     Args:
         template_path: 模板文件路径
         template_id: 模板ID
+        analysis_result: 分析结果，包含slideImages字段
         
     Returns:
         预览图URL列表
     """
-    # TODO: 实现PPT转图片的逻辑
-    # 这里简单返回一个模拟预览图列表
-    return [f"/workspace/cache/ppt_analysis/{template_id}/preview_{i}.png" for i in range(3)] 
+    import shutil
+    import os
+    from pathlib import Path
+    
+    # 如果没有分析结果或者不包含slideImages，返回空列表
+    if not analysis_result or "slideImages" not in analysis_result:
+        logger.warning(f"没有找到PPT渲染图片数据，template_id={template_id}")
+        return []
+    
+    # 获取图片路径列表
+    slide_images = analysis_result.get("slideImages", [])
+    if not slide_images:
+        logger.warning(f"PPT渲染图片列表为空，template_id={template_id}")
+        return []
+    
+    # 确保目标目录存在
+    target_dir = Path(settings.WORKSPACE_DIR) / "cache" / "ppt_analysis" / str(template_id)
+    target_dir.mkdir(parents=True, exist_ok=True)
+    
+    # 存储新的图片路径
+    new_image_paths = []
+    
+    # 处理每个图片
+    for i, image_path in enumerate(slide_images):
+        if not image_path or not os.path.exists(image_path):
+            logger.warning(f"图片路径不存在: {image_path}")
+            continue
+        
+        # 构建新的文件名和路径
+        image_filename = f"slide_{i+1}.png"
+        target_path = target_dir / image_filename
+        
+        try:
+            # 移动图片文件
+            shutil.copy2(image_path, target_path)
+            
+            # 记录新路径
+            new_path = f"/workspace/cache/ppt_analysis/{template_id}/{image_filename}"
+            new_image_paths.append(new_path)
+            
+            # 删除原文件
+            os.remove(image_path)
+            logger.info(f"已移动并删除原图片: {image_path} -> {target_path}")
+        except Exception as e:
+            logger.error(f"移动图片时出错: {str(e)}")
+    
+    return new_image_paths
