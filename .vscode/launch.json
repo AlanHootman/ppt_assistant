@@ -97,7 +97,8 @@
                 "--template", "${input:selectPptTemplate}",
                 "--name", "测试上传模板${input:templateSuffix}",
                 "--description", "通过VSCode调试菜单上传的测试模板",
-                "--tags", "测试,API,VSCode"
+                "--tags", "测试,API,VSCode",
+                "--enable-tracking"
             ],
             "console": "integratedTerminal",
             "justMyCode": false,

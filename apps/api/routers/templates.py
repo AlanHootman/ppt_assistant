@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form, Query
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from apps.api.models import get_db
@@ -39,15 +39,17 @@ async def upload_template(
     description: Optional[str] = Form(None),
     tags: Optional[str] = Form(None),
     file: UploadFile = File(...),
+    enable_tracking: bool = Form(False),
     db: Session = Depends(get_db)
 ):
-    """上传模板
+    """上传PPT模板
     
     Args:
         name: 模板名称
         description: 模板描述
-        tags: 模板标签（JSON字符串）
+        tags: 模板标签（以逗号分隔）
         file: 上传的模板文件
+        enable_tracking: 是否启用MLflow跟踪功能
         db: 数据库会话
         
     Returns:
@@ -93,7 +95,8 @@ async def upload_template(
         
         analyze_template_task.delay({
             "template_id": template.id,
-            "file_path": template.file_path
+            "file_path": template.file_path,
+            "enable_tracking": enable_tracking
         })
         
         return template
@@ -244,12 +247,14 @@ async def get_template_analysis(
 @router.post("/{template_id}/analyze")
 async def request_template_analysis(
     template_id: int,
+    enable_tracking: bool = Query(False, description="是否启用MLflow跟踪功能"),
     db: Session = Depends(get_db)
 ):
     """请求分析模板
     
     Args:
         template_id: 模板ID
+        enable_tracking: 是否启用MLflow跟踪功能
         db: 数据库会话
         
     Returns:
@@ -270,7 +275,8 @@ async def request_template_analysis(
     # 触发分析任务
     task = analyze_template_task.delay({
         "template_id": template_id,
-        "file_path": template.file_path
+        "file_path": template.file_path,
+        "enable_tracking": enable_tracking
     })
     
     return {

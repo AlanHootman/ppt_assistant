@@ -21,7 +21,7 @@ class TemplateManagerTester:
             'Accept': 'application/json',
         }
     
-    def upload_template(self, template_path, name=None, description=None, tags=None):
+    def upload_template(self, template_path, name=None, description=None, tags=None, enable_tracking=False):
         """上传模板
         
         Args:
@@ -29,6 +29,7 @@ class TemplateManagerTester:
             name: 模板名称
             description: 模板描述
             tags: 模板标签，逗号分隔
+            enable_tracking: 是否启用MLflow跟踪功能
             
         Returns:
             响应JSON
@@ -54,10 +55,11 @@ class TemplateManagerTester:
         data = {
             'name': name,
             'description': description,
-            'tags': tags
+            'tags': tags,
+            'enable_tracking': 'true' if enable_tracking else 'false'
         }
         
-        print(f"上传模板: {name}")
+        print(f"上传模板: {name}" + (" (启用MLflow跟踪)" if enable_tracking else ""))
         response = requests.post(url, headers=self.headers, data=data, files=files)
         response.raise_for_status()
         return response.json()
@@ -146,17 +148,21 @@ class TemplateManagerTester:
         response.raise_for_status()
         return response.json()
     
-    def request_analysis(self, template_id):
+    def request_analysis(self, template_id, enable_tracking=False):
         """请求重新分析模板
         
         Args:
             template_id: 模板ID
+            enable_tracking: 是否启用MLflow跟踪功能
             
         Returns:
             响应JSON
         """
         url = f"{self.base_url}/api/templates/{template_id}/analyze"
-        print(f"请求重新分析模板: ID={template_id}")
+        if enable_tracking:
+            url += "?enable_tracking=true"
+            
+        print(f"请求重新分析模板: ID={template_id}" + (" (启用MLflow跟踪)" if enable_tracking else ""))
         response = requests.post(url, headers=self.headers)
         response.raise_for_status()
         return response.json()
@@ -178,7 +184,8 @@ def run_template_management_test(args):
             args.template, 
             name=args.name,
             description=args.description,
-            tags=args.tags
+            tags=args.tags,
+            enable_tracking=args.enable_tracking
         )
         print("\n上传结果:")
         print(json.dumps(result, indent=2, ensure_ascii=False))
@@ -234,7 +241,7 @@ def run_template_management_test(args):
             print("错误: 请求分析需要指定--id参数")
             return
             
-        result = tester.request_analysis(args.id)
+        result = tester.request_analysis(args.id, enable_tracking=args.enable_tracking)
         print("\n请求分析结果:")
         print(json.dumps(result, indent=2, ensure_ascii=False))
         
@@ -252,7 +259,8 @@ def run_template_management_test(args):
             args.template,
             name="API测试模板",
             description="通过API自动化测试上传的模板",
-            tags="测试,API,自动化"
+            tags="测试,API,自动化",
+            enable_tracking=args.enable_tracking
         )
         template_id = upload_result['id']
         print(f"\n模板上传成功，ID: {template_id}")
@@ -262,7 +270,7 @@ def run_template_management_test(args):
         print("\n获取模板详情成功")
         
         # 3. 请求分析模板
-        analyze_result = tester.request_analysis(template_id)
+        analyze_result = tester.request_analysis(template_id, enable_tracking=args.enable_tracking)
         task_id = analyze_result.get('task_id')
         print(f"\n请求分析成功，分析任务ID: {task_id}")
         
@@ -301,6 +309,8 @@ if __name__ == "__main__":
     parser.add_argument("--description", help="模板描述(用于上传、更新)")
     parser.add_argument("--tags", help="模板标签,逗号分隔(用于上传、更新)")
     parser.add_argument("--no-delete", action="store_true", help="完整测试时不删除创建的模板")
+    parser.add_argument("--enable-tracking", action="store_true", dest="enable_tracking", 
+                       help="启用MLflow跟踪功能，记录模板分析过程")
     
     args = parser.parse_args()
     run_template_management_test(args) 
