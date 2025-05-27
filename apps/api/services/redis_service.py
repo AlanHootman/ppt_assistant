@@ -25,7 +25,7 @@ class RedisService:
         
         self.redis_client.setex(
             key, 
-            timedelta(hours=24).total_seconds(),  # 24小时过期
+            int(timedelta(hours=24).total_seconds()),  # 24小时过期，转换为整数
             json.dumps(current_data)
         )
     
@@ -75,7 +75,7 @@ class RedisService:
         key = "templates:list"
         self.redis_client.setex(
             key,
-            expire_seconds,
+            int(expire_seconds),  # 确保过期时间是整数
             json.dumps(templates)
         )
     
