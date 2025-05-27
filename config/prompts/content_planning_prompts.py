@@ -177,10 +177,13 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
 11. **content_match_details.element_mapping必须详细记录section中每个元素与layout中content_elements的精确对应关系：**
     - 每个映射项包含section_element（内容元素）和layout_element（布局元素）两部分
     - section_element对于简单元素只需保留content内容(字符串)，对于复杂元素(如feature_group)可保留必要结构(如title和description)
-    - layout_element只需包含position和current_text两个关键属性，current_text超过10个字则省略内容
+    - **layout_element结构必须严格遵循JSON格式规范，只包含两个键值对："position"和"current_text"，两者必须使用正确的JSON语法（冒号分隔键值，逗号分隔属性）**
+    - **layout_element.position必须是一个有效的字符串，描述元素在幻灯片中的位置**
+    - **layout_element.current_text必须是一个有效的字符串，表示元素的当前文本内容**
     - 对于特殊结构（如feature_group），需要将每个子项映射到对应的布局元素组合（如title和description）
     - 映射关系必须一一对应，确保每个内容元素都有对应的布局元素，反之亦然
 12. **第一页幻灯片（封面页）的element_mapping必须包含标题、副标题及其他封面元素（如有）的映射关系**
+13. **生成的所有JSON数据必须符合严格的JSON语法规范，不得有任何格式错误**
 
 # 6. 输出格式
 必须按以下JSON格式返回你的规划：

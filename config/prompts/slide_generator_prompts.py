@@ -45,6 +45,12 @@ content_json.content_match_details.element_mapping提供了内容和布局元素
    - 对于feature_group等复杂结构，分别处理title和description
    - 对于列表类型，将数组内容整合处理
 
+4. **处理格式问题**:
+   - **确认layout_element包含正确的position和current_text字段**
+   - **如果发现position或current_text字段格式不正确，尝试解析并修复**
+   - **对于字段值包含嵌套引号的情况，正确处理并提取有效内容**
+   - **忽略格式错误的mapping项，转而使用语义匹配**
+
 ## 2. 语义结构匹配（当element_mapping不完整或匹配失败时）
 当无法通过element_mapping找到精确匹配时，使用语义匹配：
 
