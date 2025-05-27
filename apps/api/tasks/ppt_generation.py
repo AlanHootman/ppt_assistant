@@ -82,7 +82,7 @@ def generate_ppt_task(self, task_data: dict):
         final_data = {
             "status": "completed",
             "progress": 100,
-            "file_url": f"/static/output/{task_id}/presentation.pptx",
+            "file_url": f"/workspace/output/{task_id}/presentation.pptx",
             "preview_images": preview_images,
             "completed_at": datetime.utcnow().isoformat()
         }
@@ -123,4 +123,4 @@ def generate_preview_images(ppt_path: str) -> list:
     # TODO: 实现PPT转图片的逻辑
     # 这里简单返回一个模拟预览图列表
     task_id = os.path.basename(os.path.dirname(ppt_path))
-    return [f"/static/output/{task_id}/preview_{i}.png" for i in range(3)] 
+    return [f"/workspace/output/{task_id}/preview_{i}.png" for i in range(3)] 

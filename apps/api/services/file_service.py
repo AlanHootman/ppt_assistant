@@ -5,18 +5,21 @@ from pathlib import Path
 from typing import Optional, Dict
 from fastapi import UploadFile
 from apps.api.config import settings
+from core.engine.cache_manager import CacheManager
 
 class FileService:
     """文件管理服务，处理模板文件和生成的PPT文件"""
     
     def __init__(self):
+        self.workspace_dir = settings.WORKSPACE_DIR
         self.upload_dir = settings.UPLOAD_DIR
-        self.static_dir = settings.STATIC_DIR
-        self.templates_dir = self.static_dir / "templates"
-        self.outputs_dir = self.static_dir / "output"
+        self.cache_dir = settings.CACHE_DIR
+        self.ppt_analysis_dir = self.cache_dir / "ppt_analysis"
+        self.output_dir = settings.OUTPUT_DIR
+        self.cache_manager = CacheManager()
         
         # 确保目录存在
-        for dir_path in [self.upload_dir, self.templates_dir, self.outputs_dir]:
+        for dir_path in [self.upload_dir, self.ppt_analysis_dir, self.output_dir]:
             dir_path.mkdir(parents=True, exist_ok=True)
     
     async def save_template_file(self, file: UploadFile, template_id: int) -> Dict[str, str]:
@@ -30,11 +33,11 @@ class FileService:
             包含文件路径和目录路径的字典
         """
         # 创建模板目录
-        template_dir = self.templates_dir / str(template_id)
+        template_dir = self.ppt_analysis_dir / str(template_id)
         template_dir.mkdir(exist_ok=True)
         
         # 保存原始文件
-        file_path = template_dir / "template.pptx"
+        file_path = template_dir / f"{file.filename}"
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
@@ -52,7 +55,7 @@ class FileService:
         Returns:
             是否成功删除
         """
-        template_dir = self.templates_dir / str(template_id)
+        template_dir = self.ppt_analysis_dir / str(template_id)
         if template_dir.exists():
             shutil.rmtree(template_dir)
             return True
@@ -67,8 +70,15 @@ class FileService:
         Returns:
             模板文件路径，如果不存在则返回None
         """
-        file_path = self.templates_dir / str(template_id) / "template.pptx"
-        return str(file_path) if file_path.exists() else None
+        template_dir = self.ppt_analysis_dir / str(template_id)
+        if not template_dir.exists():
+            return None
+            
+        # 查找.pptx文件
+        for file in template_dir.glob("*.pptx"):
+            return str(file)
+        
+        return None
     
     def get_template_preview_path(self, template_id: int, slide_index: int = 0) -> Optional[str]:
         """获取模板预览图路径
@@ -80,7 +90,7 @@ class FileService:
         Returns:
             预览图路径，如果不存在则返回None
         """
-        preview_path = self.templates_dir / str(template_id) / f"preview_{slide_index}.png"
+        preview_path = self.ppt_analysis_dir / str(template_id) / f"preview_{slide_index}.png"
         return str(preview_path) if preview_path.exists() else None
     
     def create_task_output_dir(self, task_id: str) -> str:
@@ -92,7 +102,7 @@ class FileService:
         Returns:
             输出目录路径
         """
-        output_dir = self.outputs_dir / task_id
+        output_dir = self.output_dir / task_id
         output_dir.mkdir(parents=True, exist_ok=True)
         return str(output_dir)
     
@@ -106,7 +116,7 @@ class FileService:
         Returns:
             文件路径，如果不存在则返回None
         """
-        file_path = self.outputs_dir / task_id / filename
+        file_path = self.output_dir / task_id / filename
         return str(file_path) if file_path.exists() else None
     
     def get_task_preview_images(self, task_id: str) -> list:
@@ -118,14 +128,14 @@ class FileService:
         Returns:
             预览图URL列表
         """
-        output_dir = self.outputs_dir / task_id
+        output_dir = self.output_dir / task_id
         if not output_dir.exists():
             return []
         
         preview_images = []
         for file in output_dir.glob("preview_*.png"):
             # 将文件路径转换为URL路径
-            url_path = f"/static/output/{task_id}/{file.name}"
+            url_path = f"/workspace/output/{task_id}/{file.name}"
             preview_images.append(url_path)
         
         # 按照幻灯片索引排序

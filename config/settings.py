@@ -50,6 +50,14 @@ class Settings:
         # 配置文件目录
         self.CONFIG_DIR = self.BASE_DIR / "config"
         
+        # 上传文件目录
+        self.UPLOAD_DIR = self.WORKSPACE_DIR / "uploads"
+        self.UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # 数据库目录
+        self.DB_DIR = self.WORKSPACE_DIR / "db"
+        self.DB_DIR.mkdir(parents=True, exist_ok=True)
+        
         # LLM模型配置
         self.OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
         

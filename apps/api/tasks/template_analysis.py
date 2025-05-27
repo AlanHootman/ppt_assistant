@@ -3,6 +3,8 @@ from apps.api.services.redis_service import RedisService
 from core.agents.ppt_analysis_agent import PPTAnalysisAgent
 from apps.api.services.file_service import FileService
 from core.engine.state import AgentState
+from core.engine.cache_manager import CacheManager
+from pathlib import Path
 import asyncio
 import json
 import os
@@ -22,6 +24,7 @@ def analyze_template_task(self, template_data: dict):
     task_id = self.request.id
     redis_service = RedisService()
     file_service = FileService()
+    cache_manager = CacheManager()
     
     try:
         # 更新任务状态
@@ -60,14 +63,9 @@ def analyze_template_task(self, template_data: dict):
         # 获取分析结果
         analysis_result = updated_state.layout_features
         
-        # 获取模板目录
-        template_dir = os.path.join(file_service.templates_dir, str(template_data['template_id']))
-        os.makedirs(template_dir, exist_ok=True)
-        
-        # 保存分析结果
-        analysis_file_path = os.path.join(template_dir, "analysis.json")
-        with open(analysis_file_path, 'w', encoding='utf-8') as f:
-            json.dump(analysis_result, f, ensure_ascii=False, indent=2)
+        # 保存分析结果到缓存系统
+        ppt_path = Path(template_data["file_path"])
+        cache_path = cache_manager.save_ppt_analysis_cache(str(ppt_path), analysis_result)
         
         # 生成预览图
         preview_images = generate_template_previews(template_data["file_path"], template_data["template_id"])
@@ -78,14 +76,14 @@ def analyze_template_task(self, template_data: dict):
             status="completed",
             progress=100,
             message="模板分析完成",
-            analysis_file_path=analysis_file_path,
+            analysis_file_path=str(cache_path),
             preview_images=preview_images,
             completed_at=datetime.utcnow().isoformat()
         )
         
         return {
             "analysis_result": analysis_result,
-            "analysis_file_path": analysis_file_path,
+            "analysis_file_path": str(cache_path),
             "preview_images": preview_images,
             "template_id": template_data['template_id']
         }
@@ -121,4 +119,4 @@ def generate_template_previews(template_path: str, template_id: int) -> list:
     """
     # TODO: 实现PPT转图片的逻辑
     # 这里简单返回一个模拟预览图列表
-    return [f"/static/templates/{template_id}/preview_{i}.png" for i in range(3)] 
+    return [f"/workspace/cache/ppt_analysis/{template_id}/preview_{i}.png" for i in range(3)] 

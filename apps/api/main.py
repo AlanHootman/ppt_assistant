@@ -48,17 +48,17 @@ async def add_process_time_header(request: Request, call_next):
     response.headers["X-Process-Time"] = str(process_time)
     return response
 
-# 全局异常处理
+# 添加全局异常处理
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    logger.exception(f"全局异常: {str(exc)}")
+    logger.error(f"全局异常: {str(exc)}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": "内部服务器错误", "message": str(exc)}
+        content={"detail": "服务器内部错误，请联系管理员"}
     )
 
-# 挂载静态文件
-app.mount("/static", StaticFiles(directory=str(settings.STATIC_DIR)), name="static")
+# 挂载工作空间目录作为静态文件服务
+app.mount("/workspace", StaticFiles(directory=str(settings.WORKSPACE_DIR)), name="workspace")
 
 # 路由前缀
 api_prefix = "/api"
