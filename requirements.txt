@@ -2,6 +2,7 @@
 langchain>=0.1.0
 langgraph>=0.0.62
 pydantic>=2.0.0
+pydantic-settings>=2.0.0
 python-dotenv>=1.0.0
 PyYAML>=6.0
 pytest>=7.0.0
@@ -9,6 +10,16 @@ pytest-asyncio>=0.21.0
 # 模型服务
 openai>=1.0.0
 python-pptx>=0.6.21
+# Web框架和服务
+fastapi>=0.95.0
+uvicorn>=0.22.0
+sqlalchemy>=2.0.0
+celery>=5.3.0
+redis>=4.5.0
+passlib>=1.7.4
+bcrypt>=4.0.0
+python-jose>=3.3.0
+python-multipart>=0.0.5
 # 其他依赖
 pdf2image
 jinja2
