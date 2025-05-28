@@ -90,7 +90,7 @@ class FileService:
         Returns:
             预览图路径，如果不存在则返回None
         """
-        preview_path = self.ppt_analysis_dir / str(template_id) / f"preview_{slide_index}.png"
+        preview_path = self.ppt_analysis_dir / str(template_id) / f"slide_{slide_index}.png"
         return str(preview_path) if preview_path.exists() else None
     
     def create_task_output_dir(self, task_id: str) -> str:
@@ -133,11 +133,11 @@ class FileService:
             return []
         
         preview_images = []
-        for file in output_dir.glob("preview_*.png"):
+        for file in output_dir.glob("slide_*.png"):
             # 将文件路径转换为URL路径
             url_path = f"/workspace/output/{task_id}/{file.name}"
             preview_images.append(url_path)
         
         # 按照幻灯片索引排序
-        preview_images.sort(key=lambda x: int(x.split("preview_")[1].split(".")[0]))
+        preview_images.sort(key=lambda x: int(x.split("slide_")[1].split(".")[0]))
         return preview_images 
