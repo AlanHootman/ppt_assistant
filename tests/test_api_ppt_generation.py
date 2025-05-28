@@ -148,15 +148,21 @@ class PPTAssistantAPITester:
     
     def _on_ws_message(self, ws, message):
         """WebSocket消息处理"""
-        data = json.loads(message)
-        progress = data.get('progress', 0)
-        status = data.get('status', '')
-        step = data.get('current_step', '')
-        desc = data.get('step_description', '')
-        
-        print(f"任务进度: {progress}%, 状态: {status}, 步骤: {step}")
-        if desc:
-            print(f"描述: {desc}")
+        print(f"收到WebSocket消息: {message[:200]}...")
+        try:
+            data = json.loads(message)
+            progress = data.get('progress', 0)
+            status = data.get('status', '')
+            step = data.get('current_step', '')
+            desc = data.get('step_description', '')
+            
+            print(f"任务进度: {progress}%, 状态: {status}, 步骤: {step}")
+            if desc:
+                print(f"描述: {desc}")
+        except json.JSONDecodeError as e:
+            print(f"JSON解析错误: {e}, 原始消息: {message[:100]}...")
+        except Exception as e:
+            print(f"处理WebSocket消息时发生错误: {str(e)}")
     
     def _on_ws_error(self, ws, error):
         """WebSocket错误处理"""
@@ -179,17 +185,28 @@ class PPTAssistantAPITester:
             task_id: 任务ID
         """
         ws_url = f"ws://localhost:8000/api/v1/ws/tasks/{task_id}"
+        print(f"连接到WebSocket: {ws_url}")
         self.ws = websocket.WebSocketApp(
             ws_url,
             on_open=self._on_ws_open,
             on_message=self._on_ws_message,
             on_error=self._on_ws_error,
-            on_close=self._on_ws_close
+            on_close=self._on_ws_close,
+            on_ping=self._on_ws_ping,
+            on_pong=self._on_ws_pong
         )
         
-        ws_thread = threading.Thread(target=self.ws.run_forever)
+        ws_thread = threading.Thread(
+            target=lambda: self.ws.run_forever(
+                ping_interval=30,
+                ping_timeout=10,
+                skip_utf8_validation=True
+            )
+        )
         ws_thread.daemon = True
         ws_thread.start()
+        
+        time.sleep(1)
         
         return ws_thread
     
@@ -198,6 +215,14 @@ class PPTAssistantAPITester:
         if self.ws and self.ws_running:
             self.ws.close()
             self.ws_running = False
+    
+    def _on_ws_ping(self, ws, message):
+        """处理收到的ping消息"""
+        print("收到服务器ping")
+    
+    def _on_ws_pong(self, ws, message):
+        """处理收到的pong消息"""
+        print("收到服务器pong")
 
 def run_generate_ppt_test(args):
     """运行PPT生成测试"""
@@ -246,6 +271,10 @@ def run_generate_ppt_test(args):
     if not args.no_websocket:
         print("连接WebSocket获取实时进度...")
         ws_thread = tester.connect_ws(task_id)
+        
+        # 给WebSocket连接一些时间来建立和接收初始消息
+        print(f"等待WebSocket连接建立 ({args.ws_wait}秒)...")
+        time.sleep(args.ws_wait)
     
     # 定期轮询任务状态
     max_wait_time = args.timeout  # 最长等待时间(秒)
@@ -303,11 +332,19 @@ if __name__ == "__main__":
     parser.add_argument("--output", help="输出文件路径")
     parser.add_argument("--download", action="store_true", help="下载生成的PPT文件")
     parser.add_argument("--no-websocket", action="store_true", help="不使用WebSocket获取实时进度")
+    parser.add_argument("--debug-websocket", action="store_true", help="启用WebSocket调试日志")
+    parser.add_argument("--ws-wait", type=int, default=5, help="WebSocket连接后的初始等待时间(秒)")
     
     args = parser.parse_args()
     
     # 检查参数：如果没有提供template_id，则template是必需的
     if args.template_id is None and args.template is None:
         parser.error("必须提供 --template 或 --template-id 参数")
+    
+    # 启用WebSocket调试
+    if args.debug_websocket:
+        import logging
+        websocket.enableTrace(True)
+        logging.basicConfig(level=logging.DEBUG)
         
     run_generate_ppt_test(args) 
