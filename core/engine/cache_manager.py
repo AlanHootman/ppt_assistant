@@ -205,74 +205,67 @@ class CacheManager:
         # 保存到缓存
         return self.save_to_cache("markdown", cache_key, content_structure)
     
-    def get_ppt_analysis_cache(self, ppt_path: str, template_id: Optional[int] = None) -> Optional[Dict[str, Any]]:
+    def get_ppt_analysis_cache(self, ppt_path: str) -> Optional[Dict[str, Any]]:
         """
         获取PPT分析缓存
         
         Args:
             ppt_path: PPT文件路径
-            template_id: 模板ID，用于确定读取路径
             
         Returns:
             缓存的分析结果，如果不存在则返回None
         """
-        # 使用模板名称作为缓存键
-        template_name = Path(ppt_path).stem
+        # 从PPT路径获取目录和文件名
+        ppt_file = Path(ppt_path)
+        ppt_dir = ppt_file.parent
+        template_name = ppt_file.stem
         
-        if template_id is not None:
-            # 尝试从template_id目录中加载
-            template_dir = self.cache_dir / "ppt_analysis" / str(template_id)
-            cache_path = template_dir / f"{template_name}_analysis.json"
-            
-            if cache_path.exists():
-                try:
-                    with open(cache_path, 'r', encoding='utf-8') as f:
-                        data = json.load(f)
-                    
-                    logger.info(f"已加载PPT分析缓存: ppt_analysis/{template_id}/{template_name}")
-                    return data
-                except Exception as e:
-                    logger.error(f"加载PPT分析缓存失败: ppt_analysis/{template_id}/{template_name} - {str(e)}")
-                    return None
+        # 在PPT同目录下查找分析文件
+        cache_path = ppt_dir / f"{template_name}_analysis.json"
         
-        # 如果没有提供template_id或者特定目录下不存在，从常规缓存加载
-        return self.load_from_cache("ppt_analysis", template_name)
+        # 检查分析文件是否存在
+        if cache_path.exists():
+            try:
+                with open(cache_path, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                
+                logger.info(f"已加载PPT分析缓存: {cache_path}")
+                return data
+            except Exception as e:
+                logger.error(f"加载PPT分析缓存失败: {cache_path} - {str(e)}")
+                return None
+        
+        logger.debug(f"PPT分析缓存不存在: {cache_path}")
+        return None
     
-    def save_ppt_analysis_cache(self, ppt_path: str, layout_features: Dict[str, Any], template_id: Optional[int] = None) -> Path:
+    def save_ppt_analysis_cache(self, ppt_path: str, layout_features: Dict[str, Any]) -> Path:
         """
         保存PPT分析缓存
         
         Args:
             ppt_path: PPT文件路径
             layout_features: 分析出的布局特征
-            template_id: 模板ID，用于确定保存路径
             
         Returns:
             缓存文件路径
         """
-        # 使用模板名称作为缓存键
-        template_name = Path(ppt_path).stem
+        # 从PPT路径获取目录和文件名
+        ppt_file = Path(ppt_path)
+        ppt_dir = ppt_file.parent
+        template_name = ppt_file.stem
         
-        if template_id is not None:
-            # 确保ppt_analysis/{template_id}目录存在
-            template_dir = self.cache_dir / "ppt_analysis" / str(template_id)
-            template_dir.mkdir(parents=True, exist_ok=True)
+        # 在PPT同目录下保存分析文件
+        cache_path = ppt_dir / f"{template_name}_analysis.json"
+        
+        try:
+            with open(cache_path, 'w', encoding='utf-8') as f:
+                json.dump(layout_features, f, ensure_ascii=False, indent=2)
             
-            # 在template_id目录下保存分析结果
-            cache_path = template_dir / f"{template_name}_analysis.json"
-            
-            try:
-                with open(cache_path, 'w', encoding='utf-8') as f:
-                    json.dump(layout_features, f, ensure_ascii=False, indent=2)
-                
-                logger.info(f"已保存PPT分析缓存: ppt_analysis/{template_id}/{template_name}")
-                return cache_path
-            except Exception as e:
-                logger.error(f"保存PPT分析缓存失败: ppt_analysis/{template_id}/{template_name} - {str(e)}")
-                raise
-        else:
-            # 保持原有行为，如果没有提供template_id
-            return self.save_to_cache("ppt_analysis", template_name, layout_features)
+            logger.info(f"已保存PPT分析缓存: {cache_path}")
+            return cache_path
+        except Exception as e:
+            logger.error(f"保存PPT分析缓存失败: {cache_path} - {str(e)}")
+            raise
     
     def get_content_plan_cache(self, content_structure: Dict[str, Any], layout_features: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
