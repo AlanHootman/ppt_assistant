@@ -44,7 +44,7 @@
             "program": "${workspaceFolder}/run_workflow.py",
             "args": [
                 "--markdown", "tests/testfiles/技术思维五导教学内容.md",
-                "--template", "tests/testfiles/黄色小清新文艺工作总结ppt模板.pptx",
+                "--template", "${input:selectPptTemplate}",
                 "--output_dir", "workspace/output",
                 "--trace"
             ],
@@ -55,13 +55,30 @@
             }
         },
         {
-            "name": "测试PPT生成API",
+            "name": "测试PPT生成API (上传模板)",
             "type": "python",
             "request": "launch",
             "program": "${workspaceFolder}/tests/test_api_ppt_generation.py",
             "args": [
-                "--template", "tests/testfiles/黄色小清新文艺工作总结ppt模板.pptx",
-                "--markdown", "tests/testfiles/技术思维五导教学内容.md",
+                "--template", "${input:selectPptTemplate}",
+                "--markdown", "${input:selectMarkdownFile}",
+                "--download",
+                "--output", "workspace/output/test_api_output.pptx"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "测试PPT生成API (使用模板ID)",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/tests/test_api_ppt_generation.py",
+            "args": [
+                "--template-id", "${input:templateId}",
+                "--markdown", "${input:selectMarkdownFile}",
                 "--download",
                 "--output", "workspace/output/test_api_output.pptx"
             ],
@@ -78,7 +95,7 @@
             "program": "${workspaceFolder}/tests/test_api_template_management.py",
             "args": [
                 "full-test",
-                "--template", "tests/testfiles/蓝绿色商务简约年终工作总结汇报PPT模板.pptx",
+                "--template", "${input:selectPptTemplate}",
                 "--no-delete"
             ],
             "console": "integratedTerminal",
@@ -163,6 +180,20 @@
             "type": "promptString",
             "description": "模板名称后缀",
             "default": ""
+        },
+        {
+            "id": "templateId",
+            "type": "promptString",
+            "description": "请输入要使用的模板ID (确保API服务已启动并已上传模板)",
+            "default": "1"
+        },
+        {
+            "id": "selectMarkdownFile",
+            "type": "pickString",
+            "description": "选择Markdown文件",
+            "options": [
+                "tests/testfiles/技术思维五导教学内容.md"
+            ]
         }
     ]
 } 
