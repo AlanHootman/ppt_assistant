@@ -127,13 +127,18 @@ class WorkflowEngine:
             raw_md: 原始Markdown文本
             ppt_template_path: PPT模板路径
             output_dir: 输出目录
-            kwargs: 允许传递额外的参数到AgentState
+            kwargs: 允许传递额外的参数，但会过滤掉progress_callback
             
         Returns:
             执行结果 (AgentState object)
         """
         state = None
         try:
+            # 从kwargs中提取progress_callback，确保它不会传递给AgentState
+            progress_callback = kwargs.pop('progress_callback', None)
+            if progress_callback and hasattr(self.node_executor, 'set_progress_callback'):
+                self.node_executor.set_progress_callback(progress_callback)
+            
             # 初始化状态
             state = AgentState(
                 session_id=session_id,

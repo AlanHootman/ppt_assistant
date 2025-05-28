@@ -71,12 +71,19 @@ def generate_ppt_task(self, task_data: dict):
             session_id=task_id,
             raw_md=task_data["markdown_content"],
             ppt_template_path=template_path,
-            output_dir=output_dir,
-            progress_callback=progress_callback
+            output_dir=output_dir
         ))
         
+        # 存储进度回调以供节点使用 
+        engine.node_executor.set_progress_callback(progress_callback)
+        
         # 生成预览图
-        preview_images = generate_preview_images(result.output_ppt_path)
+        if result.output_ppt_path:
+            preview_images = generate_preview_images(result.output_ppt_path)
+        else:
+            # 如果PPT路径为空，使用任务ID创建默认预览图
+            preview_images = [f"/workspace/output/{task_id}/preview_{i}.png" for i in range(3)]
+            logger.warning(f"PPT路径为空，使用默认预览图: {task_id}")
         
         # 更新最终状态
         final_data = {
@@ -115,12 +122,21 @@ def generate_preview_images(ppt_path: str) -> list:
     """生成PPT预览图
     
     Args:
-        ppt_path: PPT文件路径
+        ppt_path: PPT文件路径，可能为None
         
     Returns:
         预览图URL列表
     """
-    # TODO: 实现PPT转图片的逻辑
-    # 这里简单返回一个模拟预览图列表
-    task_id = os.path.basename(os.path.dirname(ppt_path))
-    return [f"/workspace/output/{task_id}/preview_{i}.png" for i in range(3)] 
+    # 如果ppt_path为None，则返回空列表
+    if not ppt_path:
+        logger.warning("生成预览图失败: PPT路径为None")
+        return []
+        
+    try:
+        # TODO: 实现PPT转图片的逻辑
+        # 这里简单返回一个模拟预览图列表
+        task_id = os.path.basename(os.path.dirname(ppt_path))
+        return [f"/workspace/output/{task_id}/preview_{i}.png" for i in range(3)]
+    except Exception as e:
+        logger.error(f"生成预览图失败: {str(e)}")
+        return [] 
