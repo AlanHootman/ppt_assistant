@@ -1,7 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import homeRoutes from './home.routes'
 import adminRoutes from './admin.routes'
-import { useAuthStore } from '@/stores/auth'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -17,25 +16,10 @@ const router = createRouter({
   ]
 })
 
-// 路由守卫 - 管理后台需要登录
+// 路由守卫 - 设置页面标题
 router.beforeEach((to, from, next) => {
   // 设置页面标题
   document.title = to.meta.title ? `${to.meta.title} - PPT助手` : 'PPT助手'
-  
-  // 检查是否需要登录
-  if (to.meta.requiresAuth) {
-    const authStore = useAuthStore()
-    
-    if (!authStore.isLoggedIn) {
-      // 保存原始跳转URL
-      next({
-        name: 'admin-login',
-        query: { redirect: to.fullPath }
-      })
-      return
-    }
-  }
-  
   next()
 })
 

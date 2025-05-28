@@ -1,0 +1,153 @@
+<template>
+  <div class="template-selector">
+    <h2 class="title">选择模板</h2>
+    
+    <div class="template-list">
+      <el-row :gutter="20">
+        <el-col v-for="template in templates" :key="template.id" :span="8">
+          <div 
+            class="template-card" 
+            :class="{ 'active': isSelected(template) }"
+            @click="selectTemplate(template)"
+          >
+            <div class="template-image">
+              <img :src="template.preview_url" :alt="template.name" />
+            </div>
+            <div class="template-info">
+              <h3 class="template-name">{{ template.name }}</h3>
+              <div class="template-tags">
+                <el-tag 
+                  v-for="tag in template.tags" 
+                  :key="tag" 
+                  size="small" 
+                  class="tag"
+                >
+                  {{ tag }}
+                </el-tag>
+              </div>
+            </div>
+          </div>
+        </el-col>
+      </el-row>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
+import { useTemplateStore, type Template } from '@/stores/template'
+
+const templateStore = useTemplateStore()
+const templates = ref<Template[]>([])
+const loading = ref(false)
+const error = ref<string | null>(null)
+
+// 获取模板列表
+async function fetchTemplates() {
+  loading.value = true
+  error.value = null
+  
+  try {
+    const result = await templateStore.fetchTemplates()
+    templates.value = result.items
+  } catch (err) {
+    console.error('获取模板列表失败:', err)
+    error.value = '获取模板列表失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+// 选择模板
+function selectTemplate(template: Template) {
+  templateStore.setCurrentTemplate(template)
+}
+
+// 判断模板是否被选中
+function isSelected(template: Template) {
+  return templateStore.currentTemplate?.id === template.id
+}
+
+// 恢复选中的模板
+async function restoreSelectedTemplate() {
+  await templateStore.restoreSelectedTemplate()
+}
+
+onMounted(async () => {
+  await fetchTemplates()
+  await restoreSelectedTemplate()
+})
+</script>
+
+<style scoped>
+.template-selector {
+  margin-bottom: 20px;
+}
+
+.title {
+  font-size: 1.2rem;
+  margin-bottom: 15px;
+  color: #303133;
+}
+
+.template-list {
+  margin-bottom: 20px;
+}
+
+.template-card {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  transition: all 0.3s;
+  cursor: pointer;
+  margin-bottom: 20px;
+  border: 2px solid transparent;
+}
+
+.template-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.template-card.active {
+  border-color: #409eff;
+}
+
+.template-image {
+  width: 100%;
+  height: 160px;
+  overflow: hidden;
+}
+
+.template-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+
+.template-card:hover .template-image img {
+  transform: scale(1.05);
+}
+
+.template-info {
+  padding: 10px 15px;
+}
+
+.template-name {
+  font-size: 1rem;
+  margin: 0 0 10px 0;
+  color: #303133;
+}
+
+.template-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.tag {
+  margin-right: 5px;
+}
+</style> 

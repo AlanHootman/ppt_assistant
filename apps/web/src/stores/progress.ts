@@ -3,7 +3,7 @@ import { ref } from 'vue'
 import { nanoid } from 'nanoid'
 
 // 进度消息接口
-interface ProgressMessage {
+export interface ProgressMessage {
   id: string
   time: Date
   step: string
@@ -12,54 +12,74 @@ interface ProgressMessage {
 }
 
 // 预览图片接口
-interface PreviewImage {
+export interface PreviewImage {
   id: string
   url: string
   time: Date
 }
 
-// 任务状态枚举
-type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | null
+// 任务状态类型
+export type TaskStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled'
 
 export const useProgressStore = defineStore('progress', () => {
-  const taskStatus = ref<TaskStatus>(null)
+  // 任务状态
+  const taskStatus = ref<TaskStatus | null>(null)
+  // 进度消息列表
   const progressMessages = ref<ProgressMessage[]>([])
+  // 预览图片列表
   const previewImages = ref<PreviewImage[]>([])
+  // 是否正在生成
   const isGenerating = ref(false)
   
+  /**
+   * 更新任务进度
+   */
   function updateTaskProgress(progressData: any) {
     // 更新任务状态
     if (progressData.status) {
       taskStatus.value = progressData.status
     }
     
-    // 添加新的进度消息
-    if (progressData.step_description) {
-      progressMessages.value.push({
+    // 添加进度消息
+    if (progressData.message) {
+      const message: ProgressMessage = {
         id: nanoid(),
         time: new Date(),
-        step: progressData.current_step,
-        message: progressData.step_description,
-        progress: progressData.progress
-      })
+        step: progressData.step || '处理中',
+        message: progressData.message,
+        progress: progressData.progress || 0
+      }
+      progressMessages.value.push(message)
     }
     
-    // 更新预览图
-    if (progressData.preview_data && progressData.preview_data.images) {
-      previewImages.value = [
-        ...previewImages.value,
-        ...progressData.preview_data.images.map((img: string) => ({
-          id: nanoid(),
-          url: img,
-          time: new Date()
-        }))
-      ]
+    // 添加预览图片
+    if (progressData.preview_url) {
+      const preview: PreviewImage = {
+        id: nanoid(),
+        url: progressData.preview_url,
+        time: new Date()
+      }
+      previewImages.value.push(preview)
     }
-    
-    // 更新生成状态
-    isGenerating.value = progressData.status === 'processing'
   }
   
+  /**
+   * 设置任务状态
+   */
+  function setTaskStatus(status: TaskStatus) {
+    taskStatus.value = status
+  }
+  
+  /**
+   * 设置是否正在生成
+   */
+  function setIsGenerating(value: boolean) {
+    isGenerating.value = value
+  }
+  
+  /**
+   * 重置进度状态
+   */
   function resetProgress() {
     taskStatus.value = null
     progressMessages.value = []
@@ -70,9 +90,11 @@ export const useProgressStore = defineStore('progress', () => {
   return { 
     taskStatus, 
     progressMessages, 
-    previewImages,
-    isGenerating,
+    previewImages, 
+    isGenerating, 
     updateTaskProgress,
+    setTaskStatus,
+    setIsGenerating,
     resetProgress
   }
 }) 

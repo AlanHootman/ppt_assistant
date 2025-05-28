@@ -1,5 +1,32 @@
-import { get, post, del } from '../http'
+import { get, post, del } from './index'
 import type { ApiResponse, TaskStatus, GeneratePptRequest } from '@/types/api'
+
+// PPT任务创建请求参数
+export interface CreatePptTaskRequest {
+  template_id: number
+  markdown_content: string
+  title?: string
+  client_id: string
+}
+
+// PPT任务信息
+export interface PptTask {
+  task_id: string
+  template_id: number
+  status: string
+  created_at: string
+  updated_at: string
+  output_file_url?: string
+  progress?: number
+}
+
+// 模板查询参数
+export interface TemplateQueryParams {
+  page?: number
+  limit?: number
+  status?: string
+  tags?: string[]
+}
 
 // 创建PPT生成任务
 export function createPptTask(data: GeneratePptRequest) {
@@ -47,4 +74,58 @@ export function getTaskPreviews(taskId: string) {
 // 下载生成的PPT
 export function downloadPpt(taskId: string) {
   window.location.href = `/api/v1/files/ppt/${taskId}/download`
+}
+
+/**
+ * PPT API服务
+ */
+export const pptApi = {
+  /**
+   * 创建PPT生成任务
+   */
+  createTask: (data: CreatePptTaskRequest) => {
+    return post<{ task_id: string }>('/tasks', data)
+  },
+
+  /**
+   * 获取任务详情
+   */
+  getTaskById: (taskId: string) => {
+    return get<PptTask>(`/tasks/${taskId}`)
+  },
+
+  /**
+   * 取消任务
+   */
+  cancelTask: (taskId: string) => {
+    return post(`/tasks/${taskId}/cancel`)
+  },
+
+  /**
+   * 获取任务进度
+   */
+  getTaskProgress: (taskId: string) => {
+    return get(`/tasks/${taskId}/progress`)
+  },
+
+  /**
+   * 获取任务下载地址
+   */
+  getTaskDownloadUrl: (taskId: string) => {
+    return get<{ download_url: string }>(`/tasks/${taskId}/download`)
+  },
+
+  /**
+   * 获取模板列表
+   */
+  getTemplates: (params?: TemplateQueryParams) => {
+    return get('/templates', params)
+  },
+
+  /**
+   * 获取模板详情
+   */
+  getTemplateById: (templateId: number) => {
+    return get(`/templates/${templateId}`)
+  }
 } 
