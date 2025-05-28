@@ -42,7 +42,7 @@ class PPTAssistantAPITester:
         if template_name is None:
             template_name = os.path.basename(template_path).split('.')[0]
         
-        url = f"{self.base_url}/api/v1/templates/upload"
+        url = f"{self.base_url}/api/v1/templates/"
         
         files = {
             'file': open(template_path, 'rb')
@@ -106,11 +106,29 @@ class PPTAssistantAPITester:
             'markdown_content': markdown_content
         }
         
-        response = requests.post(url, headers=self.headers, json=payload)
-        response.raise_for_status()
-        json_data = response.json()
-        # 返回data部分
-        return json_data['data'] if 'data' in json_data else json_data
+        print(f"发送请求到: {url}")
+        print(f"请求载荷: {json.dumps(payload)[:200]}...")
+        
+        try:
+            response = requests.post(url, headers=self.headers, json=payload)
+            print(f"响应状态码: {response.status_code}")
+            print(f"响应内容: {response.text[:500]}")
+            
+            response.raise_for_status()
+            json_data = response.json()
+            # 返回data部分
+            return json_data['data'] if 'data' in json_data else json_data
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP错误: {e}")
+            if response.content:
+                print(f"错误详情: {response.text}")
+            raise
+        except json.JSONDecodeError:
+            print(f"JSON解析错误，响应不是有效的JSON: {response.text}")
+            raise
+        except Exception as e:
+            print(f"生成PPT时发生错误: {str(e)}")
+            raise
     
     def get_task_status(self, task_id):
         """获取任务状态
@@ -185,13 +203,7 @@ def run_generate_ppt_test(args):
     """运行PPT生成测试"""
     tester = PPTAssistantAPITester(args.base_url)
     
-    # 1. 获取模板文件路径
-    template_path = args.template
-    if not os.path.exists(template_path):
-        print(f"错误: 模板文件不存在: {template_path}")
-        return
-    
-    # 2. 获取Markdown文件内容
+    # 获取Markdown文件内容
     markdown_path = args.markdown
     if not os.path.exists(markdown_path):
         print(f"错误: Markdown文件不存在: {markdown_path}")
@@ -200,28 +212,42 @@ def run_generate_ppt_test(args):
     with open(markdown_path, 'r', encoding='utf-8') as f:
         markdown_content = f.read()
     
-    # 3. 上传模板(如果指定)
+    # 处理模板ID或上传模板
     template_id = args.template_id
     if template_id is None:
+        # 验证模板文件路径
+        template_path = args.template
+        if not os.path.exists(template_path):
+            print(f"错误: 模板文件不存在: {template_path}")
+            return
+            
         print("上传模板文件...")
         template_response = tester.upload_template(template_path)
-        template_id = template_response['id']
+        # 根据API响应格式获取模板ID
+        if 'template_id' in template_response:
+            template_id = template_response['template_id']
+        elif 'id' in template_response:
+            template_id = template_response['id']
+        else:
+            print(f"错误: 无法从响应中获取模板ID: {template_response}")
+            return
+            
         print(f"模板上传成功，ID: {template_id}")
     else:
         print(f"使用已有模板，ID: {template_id}")
     
-    # 4. 请求生成PPT
+    # 请求生成PPT
     print("开始生成PPT...")
     generation_response = tester.generate_ppt(template_id, markdown_content)
     task_id = generation_response['task_id']
     print(f"PPT生成任务已创建，任务ID: {task_id}")
     
-    # 5. 连接WebSocket获取实时进度
+    # 连接WebSocket获取实时进度
     if not args.no_websocket:
         print("连接WebSocket获取实时进度...")
         ws_thread = tester.connect_ws(task_id)
     
-    # 6. 定期轮询任务状态
+    # 定期轮询任务状态
     max_wait_time = args.timeout  # 最长等待时间(秒)
     wait_time = 0
     interval = 5  # 查询间隔(秒)
@@ -236,11 +262,11 @@ def run_generate_ppt_test(args):
         if status in ['completed', 'failed']:
             break
     
-    # 7. 断开WebSocket连接
+    # 断开WebSocket连接
     if not args.no_websocket:
         tester.disconnect_ws()
     
-    # 8. 输出最终结果
+    # 输出最终结果
     final_status = tester.get_task_status(task_id)
     print("\n最终任务状态:")
     print(json.dumps(final_status, indent=2, ensure_ascii=False))
@@ -270,7 +296,7 @@ def run_generate_ppt_test(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="PPT助手API测试工具")
     parser.add_argument("--base-url", default="http://localhost:8000", help="API服务基础URL")
-    parser.add_argument("--template", required=True, help="PPT模板文件路径")
+    parser.add_argument("--template", help="PPT模板文件路径")
     parser.add_argument("--markdown", required=True, help="Markdown内容文件路径")
     parser.add_argument("--template-id", help="已有模板ID，指定则不上传新模板")
     parser.add_argument("--timeout", type=int, default=600, help="最长等待时间(秒)")
@@ -279,4 +305,9 @@ if __name__ == "__main__":
     parser.add_argument("--no-websocket", action="store_true", help="不使用WebSocket获取实时进度")
     
     args = parser.parse_args()
+    
+    # 检查参数：如果没有提供template_id，则template是必需的
+    if args.template_id is None and args.template is None:
+        parser.error("必须提供 --template 或 --template-id 参数")
+        
     run_generate_ppt_test(args) 
