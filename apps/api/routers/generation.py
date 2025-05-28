@@ -11,7 +11,7 @@ from pydantic import BaseModel
 import uuid
 from datetime import datetime
 
-router = APIRouter()
+router = APIRouter(prefix="/ppt")
 redis_service = RedisService()
 
 class GenerationRequest(BaseModel):
@@ -31,7 +31,7 @@ class TaskStatusResponse(BaseModel):
     updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
-@router.post("/tasks", response_model=Dict[str, Any])
+@router.post("/generate", response_model=Dict[str, Any])
 async def create_generation_task(
     request: GenerationRequest,
     background_tasks: BackgroundTasks,

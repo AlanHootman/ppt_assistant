@@ -9,7 +9,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any
 from pydantic import BaseModel
 
-router = APIRouter()
+router = APIRouter(prefix="/auth")
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 class Token(BaseModel):

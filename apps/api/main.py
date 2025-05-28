@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import logging
 from apps.api.config import settings
 from apps.api.models import init_db
-from apps.api.routers import auth, templates, generation, websocket
+from apps.api.routers import auth, templates, generation, websocket, files
 import os
 import time
 
@@ -61,13 +61,14 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.mount("/workspace", StaticFiles(directory=str(settings.WORKSPACE_DIR)), name="workspace")
 
 # 路由前缀
-api_prefix = "/api"
+api_prefix = "/api/v1"
 
 # 注册路由
-app.include_router(auth.router, prefix=f"{api_prefix}/auth", tags=["认证"])
-app.include_router(templates.router, prefix=f"{api_prefix}", tags=["模板"])
-app.include_router(generation.router, prefix=f"{api_prefix}/generation", tags=["生成"])
+app.include_router(auth.router, prefix=api_prefix, tags=["认证"])
+app.include_router(templates.router, prefix=api_prefix, tags=["模板"])
+app.include_router(generation.router, prefix=api_prefix, tags=["生成"])
 app.include_router(websocket.router, tags=["WebSocket"])
+app.include_router(files.router, prefix=api_prefix, tags=["文件"])
 
 @app.on_event("startup")
 async def startup_event():
