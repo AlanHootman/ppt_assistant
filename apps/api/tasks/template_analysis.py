@@ -99,8 +99,11 @@ def analyze_template_task(self, template_data: dict):
         state = AgentState(session_id=task_id)
         state.ppt_template_path = template_data["file_path"]
         
+        # 设置进度回调到节点执行器
+        agent.node_executor.set_progress_callback(progress_callback)
+        
         # 执行模板分析
-        updated_state = asyncio.run(agent.run(state))
+        updated_state = asyncio.run(agent.run(state, progress_callback=progress_callback))
         
         # 获取分析结果
         analysis_result = updated_state.layout_features

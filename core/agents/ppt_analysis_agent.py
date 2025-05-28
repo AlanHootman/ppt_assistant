@@ -108,21 +108,30 @@ class PPTAnalysisAgent(BaseAgent):
         # 布局用途检测器
         self.layout_detector = LayoutUsageDetector()
         
+        # 初始化节点执行器，用于进度回调
+        from core.engine.node_executor import NodeExecutor
+        self.node_executor = NodeExecutor(config)
+        
         logger.info(f"初始化PPTAnalysisAgent，使用模型: {self.vision_model}，批次大小: {self.batch_size}，"
                    f"最大重试次数: {self.max_retries}，并行处理: {'启用' if self.use_parallel else '禁用'}，"
                    f"最大协程数: {self.max_workers or '自动'}")
     
-    async def run(self, state: AgentState) -> AgentState:
+    async def run(self, state: AgentState, progress_callback=None) -> AgentState:
         """
         执行PPT模板分析
         
         Args:
             state: 当前工作流状态
+            progress_callback: 进度回调函数
             
         Returns:
             更新后的状态
         """
         logger.info("开始分析PPT模板")
+        
+        # 设置进度回调
+        if progress_callback and hasattr(self, 'node_executor'):
+            self.node_executor.set_progress_callback(progress_callback)
         
         # 检查是否有PPT模板路径
         if not state.ppt_template_path:
@@ -168,6 +177,10 @@ class PPTAnalysisAgent(BaseAgent):
         """
         logger.info(f"分析PPT模板: {template_path}")
         
+        # 报告进度
+        if hasattr(self, 'node_executor') and hasattr(self.node_executor, 'report_progress'):
+            self.node_executor.report_progress("ppt_analyzer", 15, "正在加载PPT文件")
+        
         # 创建临时目录用于存储渲染的幻灯片图像
         session_dir = PPTAgentHelper.setup_temp_session_dir(state.session_id, "template_images")
         
@@ -176,11 +189,19 @@ class PPTAnalysisAgent(BaseAgent):
         if not presentation:
             raise ValueError(f"无法加载PPT文件: {template_path}")
         
+        # 报告进度
+        if hasattr(self, 'node_executor') and hasattr(self.node_executor, 'report_progress'):
+            self.node_executor.report_progress("ppt_analyzer", 25, "正在分析PPT结构")
+        
         # 2. 获取PPT文件的基本信息
         presentation_json = self.ppt_manager.get_presentation_json(presentation, include_details=True)
         
         # 3. 获取所有布局信息
         layouts_json = self.ppt_manager.get_layouts_json(presentation)
+        
+        # 报告进度
+        if hasattr(self, 'node_executor') and hasattr(self.node_executor, 'report_progress'):
+            self.node_executor.report_progress("ppt_analyzer", 35, "正在渲染PPT幻灯片")
         
         # 4. 渲染PPT为图片以供分析
         image_paths = self.ppt_manager.render_presentation(
@@ -203,8 +224,16 @@ class PPTAnalysisAgent(BaseAgent):
                 }
                 available_layouts.append(layout_info)
         
+        # 报告进度
+        if hasattr(self, 'node_executor') and hasattr(self.node_executor, 'report_progress'):
+            self.node_executor.report_progress("ppt_analyzer", 50, "正在使用视觉模型分析幻灯片")
+        
         # 5. 使用视觉模型分析渲染的图片
         visual_analysis = await self._analyze_slides_with_vision(image_paths, presentation_json)
+        
+        # 报告进度
+        if hasattr(self, 'node_executor') and hasattr(self.node_executor, 'report_progress'):
+            self.node_executor.report_progress("ppt_analyzer", 80, "正在整合分析结果")
         
         # 6. 组合分析结果
         template_name = template_path.stem

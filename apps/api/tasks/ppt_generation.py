@@ -66,16 +66,17 @@ def generate_ppt_task(self, task_data: dict):
                 "preview_data": preview_data
             })
         
+        # 设置进度回调到节点执行器
+        engine.node_executor.set_progress_callback(progress_callback)
+        
         # 执行PPT生成工作流
         result = asyncio.run(engine.run_async(
             session_id=task_id,
             raw_md=task_data["markdown_content"],
             ppt_template_path=template_path,
-            output_dir=output_dir
+            output_dir=output_dir,
+            progress_callback=progress_callback
         ))
-        
-        # 存储进度回调以供节点使用 
-        engine.node_executor.set_progress_callback(progress_callback)
         
         # 生成预览图
         if result.output_ppt_path:
