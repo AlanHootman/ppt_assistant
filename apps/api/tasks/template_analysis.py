@@ -11,6 +11,8 @@ import json
 import os
 from datetime import datetime
 import logging
+from apps.api.models.database import Template
+from apps.api.models import SessionLocal
 
 # 导入MLflow跟踪功能
 try:
@@ -157,6 +159,14 @@ def analyze_template_task(self, template_data: dict):
             completed_at=datetime.utcnow().isoformat()
         )
         
+        # 更新数据库中的模板状态
+        update_template_status_in_db(
+            template_id=template_data.get("template_id"),
+            status="ready",
+            analysis_path=str(cache_path),
+            analysis_time=datetime.utcnow()
+        )
+        
         # 结束MLflow跟踪
         if enable_tracking and tracker:
             tracker.end_workflow_run("FINISHED")
@@ -185,6 +195,12 @@ def analyze_template_task(self, template_data: dict):
         redis_service.update_task_status(task_id, **error_data)
         redis_service.publish_task_update(task_id, error_data)
         
+        # 更新数据库中的模板状态为失败
+        update_template_status_in_db(
+            template_id=template_data.get("template_id"),
+            status="failed"
+        )
+        
         # 记录失败到MLflow
         if enable_tracking and tracker and HAS_MLFLOW:
             try:
@@ -194,6 +210,36 @@ def analyze_template_task(self, template_data: dict):
                 logger.warning(f"记录失败到MLflow失败: {str(log_error)}")
         
         raise self.retry(countdown=30, max_retries=2)
+
+def update_template_status_in_db(template_id: int, status: str, analysis_path: str = None, analysis_time: datetime = None):
+    """更新数据库中的模板状态
+    
+    Args:
+        template_id: 模板ID
+        status: 新状态
+        analysis_path: 分析结果路径
+        analysis_time: 分析完成时间
+    """
+    try:
+        # 创建数据库会话
+        with SessionLocal() as db:
+            # 查询模板
+            template = db.query(Template).filter(Template.id == template_id).first()
+            if template:
+                # 更新状态
+                template.status = status
+                if analysis_path:
+                    template.analysis_path = analysis_path
+                if analysis_time:
+                    template.analysis_time = analysis_time
+                
+                # 提交更改
+                db.commit()
+                logger.info(f"已更新模板状态: template_id={template_id}, status={status}")
+            else:
+                logger.warning(f"模板不存在: template_id={template_id}")
+    except Exception as e:
+        logger.error(f"更新模板状态失败: template_id={template_id}, error={str(e)}")
 
 def generate_template_previews(template_path: str, template_id: int, analysis_result: dict = None) -> list:
     """生成模板预览图，将渲染好的PPT图片移动到对应template_id目录下

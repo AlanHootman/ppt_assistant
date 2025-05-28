@@ -123,32 +123,28 @@ class RedisService:
         return templates_data
     
     def invalidate_template_cache(self):
-        """清除模板缓存"""
-        pattern = "templates:*"
-        keys = self.redis_client.keys(pattern)
-        if keys:
-            self.redis_client.delete(*keys)
+        """清除模板列表缓存"""
+        key = "templates:list"
+        self.redis_client.delete(key)
     
     def get_template_analysis_task_id(self, template_id: int) -> Optional[str]:
-        """获取模板最近的分析任务ID
+        """获取模板分析任务ID
         
         Args:
             template_id: 模板ID
             
         Returns:
-            分析任务ID，如果不存在则返回None
+            任务ID，如果不存在则返回None
         """
         key = f"template:{template_id}:analysis_task"
-        task_id = self.redis_client.get(key)
-        return task_id.decode('utf-8') if task_id else None
-        
-    def save_template_analysis_task_id(self, template_id: int, task_id: str, expire_seconds: int = 86400):
-        """保存模板分析任务ID
+        return self.redis_client.get(key)
+    
+    def save_template_analysis_task_id(self, template_id: int, task_id: str):
+        """保存模板ID和分析任务ID的关联
         
         Args:
             template_id: 模板ID
-            task_id: 分析任务ID
-            expire_seconds: 过期时间（秒）
+            task_id: 任务ID
         """
         key = f"template:{template_id}:analysis_task"
-        self.redis_client.setex(key, expire_seconds, task_id) 
+        self.redis_client.set(key, task_id) 
