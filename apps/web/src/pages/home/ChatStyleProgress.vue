@@ -64,8 +64,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import dayjs from 'dayjs'
-import { useProgressStore, type ProgressMessage, type PreviewImage } from '@/stores/progress'
-import { useTaskProgress } from '@/composables/useTaskProgress'
+import { useProgressStore, type ProgressMessage, type PreviewImage } from '../../stores/progress'
+import { useTaskProgress } from '../../composables/useTaskProgress'
 
 const progressStore = useProgressStore()
 const { retryTask } = useTaskProgress()

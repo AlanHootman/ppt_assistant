@@ -28,7 +28,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useEditorStore } from '@/stores/editor'
+import { useEditorStore } from '../../stores/editor'
 
 const editorStore = useEditorStore()
 

@@ -30,10 +30,10 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useClientStore } from '@/stores/client'
-import { useProgressStore } from '@/stores/progress'
-import { useEditorStore } from '@/stores/editor'
-import { useTaskProgress } from '@/composables/useTaskProgress'
+import { useClientStore } from '../../stores/client'
+import { useProgressStore } from '../../stores/progress'
+import { useEditorStore } from '../../stores/editor'
+import { useTaskProgress } from '../../composables/useTaskProgress'
 import { ElMessage } from 'element-plus'
 
 const clientStore = useClientStore()

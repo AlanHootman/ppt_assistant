@@ -37,18 +37,14 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, getCurrentInstance } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { useProgressStore } from '@/stores/progress'
-import { useTaskProgress } from '@/composables/useTaskProgress'
+import { useProgressStore } from '../../stores/progress'
+import { useTaskProgress } from '../../composables/useTaskProgress'
 
-// 导入组件
-import TemplateSelector from './TemplateSelector.vue'
-import EditorPanel from './EditorPanel.vue'
-import GenerationControls from './GenerationControls.vue'
-import ChatStyleProgress from './ChatStyleProgress.vue'
-import DownloadPanel from './DownloadPanel.vue'
+// 获取应用实例
+const app = getCurrentInstance()
+const ElMessage = app?.appContext.config.globalProperties.$message
 
 const router = useRouter()
 const progressStore = useProgressStore()
@@ -72,11 +68,12 @@ async function startGeneration() {
     const taskId = await createPptTask()
     
     if (taskId) {
-      ElMessage.success('开始生成PPT，请稍候...')
+      // 使用条件方式调用 ElMessage
+      ElMessage ? ElMessage.success('开始生成PPT，请稍候...') : console.log('开始生成PPT，请稍候...')
     }
   } catch (error) {
     console.error('生成PPT失败:', error)
-    ElMessage.error('生成PPT失败，请重试')
+    ElMessage ? ElMessage.error('生成PPT失败，请重试') : console.log('生成PPT失败，请重试')
   }
 }
 

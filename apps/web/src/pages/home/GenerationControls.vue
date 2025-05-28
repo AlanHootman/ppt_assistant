@@ -25,10 +25,10 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useProgressStore } from '@/stores/progress'
-import { useTemplateStore } from '@/stores/template'
-import { useEditorStore } from '@/stores/editor'
-import { useTaskProgress } from '@/composables/useTaskProgress'
+import { useProgressStore } from '../../stores/progress'
+import { useTemplateStore } from '../../stores/template'
+import { useEditorStore } from '../../stores/editor'
+import { useTaskProgress } from '../../composables/useTaskProgress'
 import { ElMessage } from 'element-plus'
 
 const emit = defineEmits(['generate'])
@@ -64,12 +64,9 @@ function handleGenerate() {
 // 处理取消按钮点击
 async function handleCancel() {
   if (progressStore.taskStatus && ['processing', 'pending'].includes(progressStore.taskStatus)) {
-    const taskId = await cancelTask(progressStore.taskStatus)
-    if (taskId) {
-      ElMessage.success('已取消生成任务')
-    } else {
-      ElMessage.error('取消任务失败')
-    }
+    await cancelTask()
+    // 不需要检查返回值，因为 cancelTask 没有返回值
+    // cancelTask 内部已经处理了消息提示
   }
 }
 </script>

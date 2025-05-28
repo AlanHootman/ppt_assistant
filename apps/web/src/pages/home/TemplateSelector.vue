@@ -35,7 +35,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { useTemplateStore, type Template } from '@/stores/template'
+import { useTemplateStore, type Template } from '../../stores/template'
 
 const templateStore = useTemplateStore()
 const templates = ref<Template[]>([])
