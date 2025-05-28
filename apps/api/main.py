@@ -67,7 +67,7 @@ api_prefix = "/api/v1"
 app.include_router(auth.router, prefix=api_prefix, tags=["认证"])
 app.include_router(templates.router, prefix=api_prefix, tags=["模板"])
 app.include_router(generation.router, prefix=api_prefix, tags=["生成"])
-app.include_router(websocket.router, tags=["WebSocket"])
+app.include_router(websocket.router, prefix=api_prefix, tags=["WebSocket"])
 app.include_router(files.router, prefix=api_prefix, tags=["文件"])
 
 @app.on_event("startup")

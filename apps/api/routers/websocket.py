@@ -3,9 +3,14 @@ from apps.api.services.websocket_service import websocket_manager
 import logging
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/v1")
 
-@router.websocket("/ws/tasks/{task_id}")
+# 创建路由器，指定前缀和标签
+router = APIRouter(
+    prefix="/ws",
+    tags=["websocket"]
+)
+
+@router.websocket("/tasks/{task_id}")
 async def websocket_task_updates(websocket: WebSocket, task_id: str):
     """任务更新WebSocket端点
     
