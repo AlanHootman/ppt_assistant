@@ -73,25 +73,27 @@ def analyze_template_task(self, template_data: dict):
         })
         
         # 进度回调函数
-        def progress_callback(progress: int, message: str):
+        def progress_callback(step: str, progress: int, description: str, preview_data: dict = None):
             redis_service.update_task_status(
                 task_id, 
                 progress=progress, 
-                message=message
+                message=description
             )
             
             # 发送WebSocket消息
             redis_service.publish_task_update(task_id, {
                 "status": "analyzing",
                 "progress": progress,
-                "message": message
+                "message": description,
+                "current_step": step,
+                "preview_data": preview_data
             })
             
             # 记录进度到MLflow
             if enable_tracking and tracker and HAS_MLFLOW:
                 try:
                     mlflow.log_metric(f"progress", progress)
-                    mlflow.log_param(f"status_message", message)
+                    mlflow.log_param(f"status_message", description)
                 except Exception as e:
                     logger.warning(f"记录进度到MLflow失败: {str(e)}")
         

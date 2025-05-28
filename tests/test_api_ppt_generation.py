@@ -83,11 +83,37 @@ class PPTAssistantAPITester:
             响应JSON
         """
         url = f"{self.base_url}/api/v1/templates/{template_id}"
-        response = requests.get(url, headers=self.headers)
-        response.raise_for_status()
-        json_data = response.json()
-        # 返回template对象
-        return json_data['data']['template'] if 'data' in json_data and 'template' in json_data['data'] else json_data
+        try:
+            print(f"获取模板详情: ID={template_id}，URL={url}")
+            response = requests.get(url, headers=self.headers)
+            
+            # 打印响应状态和内容以便调试
+            print(f"响应状态码: {response.status_code}")
+            if response.content:
+                print(f"响应内容摘要: {response.text[:200]}...")
+            
+            # 即使发生错误也先获取响应内容
+            json_data = response.json() if response.content else {}
+            
+            # 然后再检查HTTP状态
+            response.raise_for_status()
+            
+            # 处理正常返回情况
+            if 'data' in json_data and 'template' in json_data['data']:
+                return json_data['data']['template']
+            else:
+                return json_data
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP错误: {e}")
+            if response.content:
+                print(f"错误详情: {response.text}")
+            raise
+        except json.JSONDecodeError:
+            print(f"JSON解析错误，响应不是有效的JSON: {response.text}")
+            raise
+        except Exception as e:
+            print(f"获取模板详情时发生错误: {str(e)}")
+            raise
     
     def generate_ppt(self, template_id, markdown_content):
         """生成PPT
@@ -258,6 +284,39 @@ def run_generate_ppt_test(args):
             return
             
         print(f"模板上传成功，ID: {template_id}")
+        
+        # 等待模板分析完成
+        print("等待模板分析完成...")
+        max_wait_time = args.template_timeout  # 使用命令行参数中的值
+        wait_time = 0
+        interval = 5  # 查询间隔(秒)
+        template_ready = False
+        
+        while wait_time < max_wait_time:
+            try:
+                # 获取模板详情
+                template_details = tester.get_template_details(template_id)
+                status = template_details.get('status', '')
+                print(f"模板状态: {status}, 已等待 {wait_time} 秒")
+                
+                if status == 'ready':
+                    template_ready = True
+                    print("模板分析完成，可以继续生成PPT")
+                    break
+                elif status == 'failed':
+                    print("模板分析失败，无法继续")
+                    return
+                    
+                time.sleep(interval)
+                wait_time += interval
+            except Exception as e:
+                print(f"获取模板状态时出错: {str(e)}")
+                time.sleep(interval)
+                wait_time += interval
+        
+        if not template_ready:
+            print(f"等待模板分析超时 ({max_wait_time} 秒)，请稍后重试")
+            return
     else:
         print(f"使用已有模板，ID: {template_id}")
     
@@ -328,7 +387,8 @@ if __name__ == "__main__":
     parser.add_argument("--template", help="PPT模板文件路径")
     parser.add_argument("--markdown", required=True, help="Markdown内容文件路径")
     parser.add_argument("--template-id", help="已有模板ID，指定则不上传新模板")
-    parser.add_argument("--timeout", type=int, default=600, help="最长等待时间(秒)")
+    parser.add_argument("--timeout", type=int, default=600, help="PPT生成过程最长等待时间(秒)")
+    parser.add_argument("--template-timeout", type=int, default=300, help="模板分析完成最长等待时间(秒)")
     parser.add_argument("--output", help="输出文件路径")
     parser.add_argument("--download", action="store_true", help="下载生成的PPT文件")
     parser.add_argument("--no-websocket", action="store_true", help="不使用WebSocket获取实时进度")
