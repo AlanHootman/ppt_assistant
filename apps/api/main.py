@@ -65,7 +65,7 @@ api_prefix = "/api"
 
 # 注册路由
 app.include_router(auth.router, prefix=f"{api_prefix}/auth", tags=["认证"])
-app.include_router(templates.router, prefix=f"{api_prefix}/templates", tags=["模板"])
+app.include_router(templates.router, prefix=f"{api_prefix}", tags=["模板"])
 app.include_router(generation.router, prefix=f"{api_prefix}/generation", tags=["生成"])
 app.include_router(websocket.router, tags=["WebSocket"])
 

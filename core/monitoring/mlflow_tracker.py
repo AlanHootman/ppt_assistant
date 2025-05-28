@@ -89,11 +89,31 @@ class MLflowTracker:
         
         mlflow.log_param("workflow_end_time", end_time)
         mlflow.log_metric("workflow_duration", duration)
-        mlflow.log_param("workflow_status", status)
+        
+        # 状态映射，确保使用MLflow支持的状态值
+        status_map = {
+            "completed": "FINISHED",
+            "finished": "FINISHED",
+            "success": "FINISHED",
+            "failed": "FAILED",
+            "error": "FAILED",
+            "interrupted": "KILLED",
+            "killed": "KILLED",
+            "running": "RUNNING",
+            "scheduled": "SCHEDULED",
+        }
+        
+        # 将状态转换为MLflow支持的状态
+        mlflow_status = status_map.get(status.lower(), status)
+        if mlflow_status not in ["FINISHED", "FAILED", "KILLED", "RUNNING", "SCHEDULED"]:
+            logger.warning(f"不支持的MLflow状态值: {status}，将使用FINISHED")
+            mlflow_status = "FINISHED"
+        
+        mlflow.log_param("workflow_status", status)  # 记录原始状态
         
         # 结束运行
-        mlflow.end_run(status=status)
-        logger.info(f"工作流运行已结束: 状态={status}, 持续时间={duration:.2f}秒")
+        mlflow.end_run(status=mlflow_status)
+        logger.info(f"工作流运行已结束: 状态={status}, MLflow状态={mlflow_status}, 持续时间={duration:.2f}秒")
         self.active_run = None
     
     def log_node_execution(self, node_name, node_type, inputs, outputs, state_before, state_after, artifacts=None):

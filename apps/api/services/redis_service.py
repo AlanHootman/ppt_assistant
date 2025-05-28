@@ -73,10 +73,28 @@ class RedisService:
             expire_seconds: 缓存过期时间（秒）
         """
         key = "templates:list"
+        
+        # 将ORM对象转换为可序列化的字典
+        serializable_templates = []
+        for template in templates:
+            template_dict = {
+                "id": template.id,
+                "name": template.name,
+                "description": template.description,
+                "tags": template.tags,
+                "file_path": template.file_path,
+                "preview_path": template.preview_path,
+                "analysis_path": template.analysis_path,
+                "status": template.status,
+                "upload_time": template.upload_time.isoformat() if template.upload_time else None,
+                "analysis_time": template.analysis_time.isoformat() if template.analysis_time else None
+            }
+            serializable_templates.append(template_dict)
+        
         self.redis_client.setex(
             key,
             int(expire_seconds),  # 确保过期时间是整数
-            json.dumps(templates)
+            json.dumps(serializable_templates)
         )
     
     def get_cached_template_list(self) -> Optional[list]:
@@ -87,11 +105,50 @@ class RedisService:
         """
         key = "templates:list"
         data = self.redis_client.get(key)
-        return json.loads(data) if data else None
+        
+        if not data:
+            return None
+            
+        # 解析JSON数据
+        templates_data = json.loads(data)
+        
+        # 处理日期时间字段
+        for template in templates_data:
+            # 将ISO格式字符串转回datetime对象
+            if template.get('upload_time'):
+                template['upload_time'] = datetime.fromisoformat(template['upload_time'])
+            if template.get('analysis_time') and template['analysis_time']:
+                template['analysis_time'] = datetime.fromisoformat(template['analysis_time'])
+                
+        return templates_data
     
     def invalidate_template_cache(self):
         """清除模板缓存"""
         pattern = "templates:*"
         keys = self.redis_client.keys(pattern)
         if keys:
-            self.redis_client.delete(*keys) 
+            self.redis_client.delete(*keys)
+    
+    def get_template_analysis_task_id(self, template_id: int) -> Optional[str]:
+        """获取模板最近的分析任务ID
+        
+        Args:
+            template_id: 模板ID
+            
+        Returns:
+            分析任务ID，如果不存在则返回None
+        """
+        key = f"template:{template_id}:analysis_task"
+        task_id = self.redis_client.get(key)
+        return task_id.decode('utf-8') if task_id else None
+        
+    def save_template_analysis_task_id(self, template_id: int, task_id: str, expire_seconds: int = 86400):
+        """保存模板分析任务ID
+        
+        Args:
+            template_id: 模板ID
+            task_id: 分析任务ID
+            expire_seconds: 过期时间（秒）
+        """
+        key = f"template:{template_id}:analysis_task"
+        self.redis_client.setex(key, expire_seconds, task_id) 

@@ -62,7 +62,9 @@ class TemplateManagerTester:
         print(f"上传模板: {name}" + (" (启用MLflow跟踪)" if enable_tracking else ""))
         response = requests.post(url, headers=self.headers, data=data, files=files)
         response.raise_for_status()
-        return response.json()
+        json_data = response.json()
+        # 返回data部分数据
+        return json_data['data'] if 'data' in json_data else json_data
     
     def list_templates(self):
         """获取模板列表
@@ -72,9 +74,35 @@ class TemplateManagerTester:
         """
         url = f"{self.base_url}/api/templates"
         print("获取模板列表")
-        response = requests.get(url, headers=self.headers)
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = requests.get(url, headers=self.headers)
+            
+            # 打印响应状态和内容以便调试
+            print(f"响应状态码: {response.status_code}")
+            print(f"响应内容: {response.text[:200]}...")
+            
+            # 即使发生错误也先获取响应内容
+            json_data = response.json() if response.content else {}
+            
+            # 然后再检查HTTP状态
+            response.raise_for_status()
+            
+            # 处理正常返回情况
+            if 'data' in json_data and 'templates' in json_data['data']:
+                return json_data['data']['templates']
+            else:
+                return json_data
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP错误: {e}")
+            if response.content:
+                print(f"错误详情: {response.text}")
+            raise
+        except json.JSONDecodeError:
+            print(f"JSON解析错误，响应不是有效的JSON: {response.text}")
+            raise
+        except Exception as e:
+            print(f"获取模板列表时发生错误: {str(e)}")
+            raise
     
     def get_template(self, template_id):
         """获取模板详情
@@ -87,9 +115,35 @@ class TemplateManagerTester:
         """
         url = f"{self.base_url}/api/templates/{template_id}"
         print(f"获取模板详情: ID={template_id}")
-        response = requests.get(url, headers=self.headers)
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = requests.get(url, headers=self.headers)
+            
+            # 打印响应状态和内容以便调试
+            print(f"响应状态码: {response.status_code}")
+            print(f"响应内容: {response.text[:200]}...")
+            
+            # 即使发生错误也先获取响应内容
+            json_data = response.json() if response.content else {}
+            
+            # 然后再检查HTTP状态
+            response.raise_for_status()
+            
+            # 处理正常返回情况
+            if 'data' in json_data and 'template' in json_data['data']:
+                return json_data['data']['template']
+            else:
+                return json_data
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP错误: {e}")
+            if response.content:
+                print(f"错误详情: {response.text}")
+            raise
+        except json.JSONDecodeError:
+            print(f"JSON解析错误，响应不是有效的JSON: {response.text}")
+            raise
+        except Exception as e:
+            print(f"获取模板详情时发生错误: {str(e)}")
+            raise
     
     def update_template(self, template_id, name=None, description=None, tags=None):
         """更新模板信息
@@ -114,9 +168,35 @@ class TemplateManagerTester:
             data['tags'] = tags
         
         print(f"更新模板: ID={template_id}")
-        response = requests.put(url, headers=self.headers, json=data)
-        response.raise_for_status()
-        return response.json()
+        try:
+            response = requests.put(url, headers=self.headers, json=data)
+            
+            # 打印响应状态和内容以便调试
+            print(f"响应状态码: {response.status_code}")
+            print(f"响应内容: {response.text[:200]}...")
+            
+            # 即使发生错误也先获取响应内容
+            json_data = response.json() if response.content else {}
+            
+            # 然后再检查HTTP状态
+            response.raise_for_status()
+            
+            # 处理正常返回情况
+            if 'data' in json_data and 'template' in json_data['data']:
+                return json_data['data']['template']
+            else:
+                return json_data
+        except requests.exceptions.HTTPError as e:
+            print(f"HTTP错误: {e}")
+            if response.content:
+                print(f"错误详情: {response.text}")
+            raise
+        except json.JSONDecodeError:
+            print(f"JSON解析错误，响应不是有效的JSON: {response.text}")
+            raise
+        except Exception as e:
+            print(f"更新模板时发生错误: {str(e)}")
+            raise
     
     def delete_template(self, template_id):
         """删除模板
@@ -146,7 +226,9 @@ class TemplateManagerTester:
         print(f"获取模板分析结果: ID={template_id}")
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
-        return response.json()
+        json_data = response.json()
+        # 返回analysis对象
+        return json_data['data']['analysis'] if 'data' in json_data and 'analysis' in json_data['data'] else json_data
     
     def request_analysis(self, template_id, enable_tracking=False):
         """请求重新分析模板
@@ -165,7 +247,9 @@ class TemplateManagerTester:
         print(f"请求重新分析模板: ID={template_id}" + (" (启用MLflow跟踪)" if enable_tracking else ""))
         response = requests.post(url, headers=self.headers)
         response.raise_for_status()
-        return response.json()
+        json_data = response.json()
+        # 返回data部分
+        return json_data['data'] if 'data' in json_data else json_data
 
 def run_template_management_test(args):
     """运行模板管理测试"""
@@ -262,7 +346,7 @@ def run_template_management_test(args):
             tags="测试,API,自动化",
             enable_tracking=args.enable_tracking
         )
-        template_id = upload_result['id']
+        template_id = upload_result['template_id']
         print(f"\n模板上传成功，ID: {template_id}")
         
         # 2. 获取模板详情

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form, Query
+from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile, Form, Query, BackgroundTasks
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from apps.api.models import get_db
@@ -11,10 +11,18 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 import json
 from datetime import datetime
+import logging
 
-router = APIRouter()
+# 创建路由器，指定前缀和标签
+router = APIRouter(
+    prefix="/templates",
+    tags=["templates"]
+)
+
 redis_service = RedisService()
 file_service = FileService()
+
+logger = logging.getLogger(__name__)
 
 class TemplateBase(BaseModel):
     name: str
@@ -33,7 +41,12 @@ class TemplateResponse(TemplateBase):
     class Config:
         from_attributes = True
 
-@router.post("/", response_model=TemplateResponse)
+class ApiResponse(BaseModel):
+    code: int = 200
+    message: str
+    data: Optional[Dict[str, Any]] = None
+
+@router.post("/", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
 async def upload_template(
     name: str = Form(...),
     description: Optional[str] = Form(None),
@@ -93,13 +106,22 @@ async def upload_template(
         template.status = "analyzing"
         db.commit()
         
-        analyze_template_task.delay({
+        task = analyze_template_task.delay({
             "template_id": template.id,
             "file_path": template.file_path,
             "enable_tracking": enable_tracking
         })
         
-        return template
+        return ApiResponse(
+            code=201,
+            message="模板上传成功，正在进行分析",
+            data={
+                "template_id": template.id,
+                "name": template.name,
+                "status": template.status,
+                "task_id": task.id
+            }
+        )
     
     except Exception as e:
         # 发生异常时，将模板状态设为失败
@@ -110,7 +132,20 @@ async def upload_template(
             detail=f"模板上传失败: {str(e)}"
         )
 
-@router.get("/", response_model=List[TemplateResponse])
+# 添加别名路由，支持/upload端点
+@router.post("/upload", response_model=ApiResponse, status_code=status.HTTP_201_CREATED)
+async def upload_template_alias(
+    name: str = Form(...),
+    description: Optional[str] = Form(None),
+    tags: Optional[str] = Form(None),
+    file: UploadFile = File(...),
+    enable_tracking: bool = Form(False),
+    db: Session = Depends(get_db)
+):
+    """上传模板的别名路由，保持与测试用例兼容"""
+    return await upload_template(name, description, tags, file, enable_tracking, db)
+
+@router.get("/", response_model=ApiResponse)
 async def list_templates(
     skip: int = 0, 
     limit: int = 100,
@@ -128,29 +163,76 @@ async def list_templates(
     Returns:
         模板列表
     """
-    # 尝试从缓存获取
-    if not status and skip == 0 and limit == 100:
-        cached_templates = redis_service.get_cached_template_list()
-        if cached_templates:
-            return cached_templates
-    
-    # 构建查询
-    query = db.query(Template)
-    
-    # 应用状态过滤
-    if status:
-        query = query.filter(Template.status == status)
-    
-    # 执行查询
-    templates = query.offset(skip).limit(limit).all()
-    
-    # 如果是默认查询，缓存结果
-    if not status and skip == 0 and limit == 100:
-        redis_service.cache_template_list(templates)
-    
-    return templates
+    try:
+        # 尝试从缓存获取
+        if not status and skip == 0 and limit == 100:
+            cached_templates = redis_service.get_cached_template_list()
+            if cached_templates:
+                logger.info("从缓存中获取模板列表")
+                return ApiResponse(
+                    code=200,
+                    message="获取成功",
+                    data={
+                        "total": len(cached_templates),
+                        "page": 1,
+                        "limit": limit,
+                        "templates": cached_templates
+                    }
+                )
+        
+        # 构建查询
+        query = db.query(Template)
+        
+        # 应用状态过滤
+        if status:
+            query = query.filter(Template.status == status)
+        
+        # 获取总数
+        total = query.count()
+        
+        # 执行查询
+        templates = query.offset(skip).limit(limit).all()
+        
+        # 序列化模板对象
+        serializable_templates = []
+        for template in templates:
+            template_dict = {
+                "id": template.id,
+                "name": template.name,
+                "description": template.description,
+                "file_path": template.file_path,
+                "preview_path": template.preview_path,
+                "analysis_path": template.analysis_path,
+                "status": template.status,
+                "tags": template.tags,
+                "upload_time": template.upload_time.isoformat() if template.upload_time else None,
+                "analysis_time": template.analysis_time.isoformat() if template.analysis_time else None
+            }
+            serializable_templates.append(template_dict)
+        
+        # 如果是默认查询，缓存结果
+        if not status and skip == 0 and limit == 100:
+            redis_service.cache_template_list(templates)
+        
+        return ApiResponse(
+            code=200,
+            message="获取成功",
+            data={
+                "total": total,
+                "page": skip // limit + 1 if limit > 0 else 1,
+                "limit": limit,
+                "templates": serializable_templates
+            }
+        )
+    except Exception as e:
+        # 记录详细错误信息
+        logger.error(f"获取模板列表失败: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取模板列表失败: {str(e)}"
+        )
 
-@router.get("/{template_id}", response_model=TemplateResponse)
+@router.get("/{template_id}", response_model=ApiResponse)
 async def get_template(
     template_id: int,
     db: Session = Depends(get_db)
@@ -164,16 +246,47 @@ async def get_template(
     Returns:
         模板详情
     """
-    template = db.query(Template).filter(Template.id == template_id).first()
-    if not template:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"模板不存在: id={template_id}"
+    try:
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"模板不存在: id={template_id}"
+            )
+        
+        # 构造响应数据，确保模板对象能够正确序列化
+        template_data = {
+            "id": template.id,
+            "name": template.name,
+            "description": template.description,
+            "file_path": template.file_path,
+            "preview_path": template.preview_path,
+            "analysis_path": template.analysis_path,
+            "status": template.status,
+            "tags": template.tags,
+            "upload_time": template.upload_time.isoformat() if template.upload_time else None,
+            "analysis_time": template.analysis_time.isoformat() if template.analysis_time else None,
+        }
+        
+        return ApiResponse(
+            code=200,
+            message="获取成功",
+            data={
+                "template": template_data
+            }
         )
-    
-    return template
+    except HTTPException:
+        # 重新抛出HTTP异常
+        raise
+    except Exception as e:
+        # 记录详细错误信息
+        logger.error(f"获取模板详情失败: template_id={template_id}, 错误: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取模板详情失败: {str(e)}"
+        )
 
-@router.delete("/{template_id}")
+@router.delete("/{template_id}", response_model=ApiResponse)
 async def delete_template(
     template_id: int,
     db: Session = Depends(get_db)
@@ -204,9 +317,13 @@ async def delete_template(
     # 清除缓存
     redis_service.invalidate_template_cache()
     
-    return {"message": "模板已删除"}
+    return ApiResponse(
+        code=200,
+        message="模板删除成功",
+        data={}
+    )
 
-@router.get("/{template_id}/analysis")
+@router.get("/{template_id}/analysis", response_model=ApiResponse)
 async def get_template_analysis(
     template_id: int,
     db: Session = Depends(get_db)
@@ -237,14 +354,21 @@ async def get_template_analysis(
     try:
         with open(template.analysis_path, 'r', encoding='utf-8') as f:
             analysis_data = json.load(f)
-        return analysis_data
+        
+        return ApiResponse(
+            code=200,
+            message="获取成功",
+            data={
+                "analysis": analysis_data
+            }
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"读取分析结果失败: {str(e)}"
         )
 
-@router.post("/{template_id}/analyze")
+@router.post("/{template_id}/analyze", response_model=ApiResponse)
 async def request_template_analysis(
     template_id: int,
     enable_tracking: bool = Query(False, description="是否启用MLflow跟踪功能"),
@@ -279,9 +403,124 @@ async def request_template_analysis(
         "enable_tracking": enable_tracking
     })
     
-    return {
-        "task_id": task.id,
-        "template_id": template_id,
-        "status": "analyzing",
-        "message": "模板分析任务已提交"
-    } 
+    return ApiResponse(
+        code=200,
+        message="模板分析任务已提交",
+        data={
+            "task_id": task.id,
+            "template_id": template_id,
+            "status": "analyzing"
+        }
+    )
+
+@router.get("/{template_id}/status", response_model=ApiResponse)
+async def get_template_status(
+    template_id: int,
+    db: Session = Depends(get_db)
+):
+    """获取模板分析状态
+    
+    Args:
+        template_id: 模板ID
+        db: 数据库会话
+        
+    Returns:
+        模板分析状态
+    """
+    template = db.query(Template).filter(Template.id == template_id).first()
+    if not template:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"模板不存在: id={template_id}"
+        )
+    
+    # 获取分析任务状态
+    task_status = None
+    if template.status == "analyzing":
+        # 查找最近的分析任务
+        task_id = redis_service.get_template_analysis_task_id(template_id)
+        if task_id:
+            task_status = redis_service.get_task_status(task_id)
+    
+    return ApiResponse(
+        code=200,
+        message="获取成功",
+        data={
+            "template_id": template_id,
+            "status": template.status,
+            "progress": task_status.get("progress", 0) if task_status else 100,
+            "message": task_status.get("message", "") if task_status else "模板分析完成" if template.status == "ready" else ""
+        }
+    )
+
+@router.put("/{template_id}", response_model=ApiResponse)
+async def update_template(
+    template_id: int,
+    template_data: TemplateBase,
+    db: Session = Depends(get_db)
+):
+    """更新模板信息
+    
+    Args:
+        template_id: 模板ID
+        template_data: 要更新的模板数据
+        db: 数据库会话
+        
+    Returns:
+        更新后的模板信息
+    """
+    try:
+        # 查询模板
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"模板不存在: id={template_id}"
+            )
+        
+        # 更新模板信息
+        if template_data.name is not None:
+            template.name = template_data.name
+        if template_data.description is not None:
+            template.description = template_data.description
+        if template_data.tags is not None:
+            template.tags = template_data.tags
+        
+        # 保存更新
+        db.commit()
+        db.refresh(template)
+        
+        # 清除缓存
+        redis_service.invalidate_template_cache()
+        
+        # 构造响应数据
+        template_data = {
+            "id": template.id,
+            "name": template.name,
+            "description": template.description,
+            "file_path": template.file_path,
+            "preview_path": template.preview_path,
+            "analysis_path": template.analysis_path,
+            "status": template.status,
+            "tags": template.tags,
+            "upload_time": template.upload_time.isoformat() if template.upload_time else None,
+            "analysis_time": template.analysis_time.isoformat() if template.analysis_time else None,
+        }
+        
+        return ApiResponse(
+            code=200,
+            message="模板信息更新成功",
+            data={
+                "template": template_data
+            }
+        )
+    except HTTPException:
+        # 重新抛出HTTP异常
+        raise
+    except Exception as e:
+        # 记录详细错误信息
+        logger.error(f"更新模板信息失败: template_id={template_id}, 错误: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"更新模板信息失败: {str(e)}"
+        ) 

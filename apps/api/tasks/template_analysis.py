@@ -35,6 +35,11 @@ def analyze_template_task(self, template_data: dict):
     file_service = FileService()
     cache_manager = CacheManager()
     
+    # 保存任务ID与模板ID的关联
+    template_id = template_data.get("template_id")
+    if template_id:
+        redis_service.save_template_analysis_task_id(template_id, task_id)
+    
     # 初始化MLflow跟踪器
     tracker = None
     enable_tracking = template_data.get("enable_tracking", False) and HAS_MLFLOW

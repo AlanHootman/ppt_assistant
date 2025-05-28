@@ -56,7 +56,9 @@ class PPTAssistantAPITester:
         
         response = requests.post(url, headers=self.headers, data=data, files=files)
         response.raise_for_status()
-        return response.json()
+        json_data = response.json()
+        # 返回data部分数据
+        return json_data['data'] if 'data' in json_data else json_data
     
     def list_templates(self):
         """获取模板列表
@@ -67,7 +69,9 @@ class PPTAssistantAPITester:
         url = f"{self.base_url}/api/templates"
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
-        return response.json()
+        json_data = response.json()
+        # 返回templates列表
+        return json_data['data']['templates'] if 'data' in json_data and 'templates' in json_data['data'] else json_data
     
     def get_template_details(self, template_id):
         """获取模板详情
@@ -81,7 +85,9 @@ class PPTAssistantAPITester:
         url = f"{self.base_url}/api/templates/{template_id}"
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
-        return response.json()
+        json_data = response.json()
+        # 返回template对象
+        return json_data['data']['template'] if 'data' in json_data and 'template' in json_data['data'] else json_data
     
     def generate_ppt(self, template_id, markdown_content):
         """生成PPT
@@ -102,7 +108,9 @@ class PPTAssistantAPITester:
         
         response = requests.post(url, headers=self.headers, json=payload)
         response.raise_for_status()
-        return response.json()
+        json_data = response.json()
+        # 返回data部分
+        return json_data['data'] if 'data' in json_data else json_data
     
     def get_task_status(self, task_id):
         """获取任务状态
@@ -116,7 +124,9 @@ class PPTAssistantAPITester:
         url = f"{self.base_url}/api/tasks/{task_id}"
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
-        return response.json()
+        json_data = response.json()
+        # 返回data部分
+        return json_data['data'] if 'data' in json_data else json_data
     
     def _on_ws_message(self, ws, message):
         """WebSocket消息处理"""
