@@ -46,7 +46,7 @@ class TemplateManagerTester:
         if tags is None:
             tags = "测试,API"
         
-        url = f"{self.base_url}/api/templates/"
+        url = f"{self.base_url}/api/v1/templates/"
         
         files = {
             'file': open(template_path, 'rb')
@@ -72,7 +72,7 @@ class TemplateManagerTester:
         Returns:
             响应JSON
         """
-        url = f"{self.base_url}/api/templates"
+        url = f"{self.base_url}/api/v1/templates"
         print("获取模板列表")
         try:
             response = requests.get(url, headers=self.headers)
@@ -113,7 +113,7 @@ class TemplateManagerTester:
         Returns:
             响应JSON
         """
-        url = f"{self.base_url}/api/templates/{template_id}"
+        url = f"{self.base_url}/api/v1/templates/{template_id}"
         print(f"获取模板详情: ID={template_id}")
         try:
             response = requests.get(url, headers=self.headers)
@@ -157,7 +157,7 @@ class TemplateManagerTester:
         Returns:
             响应JSON
         """
-        url = f"{self.base_url}/api/templates/{template_id}"
+        url = f"{self.base_url}/api/v1/templates/{template_id}"
         
         data = {}
         if name is not None:
@@ -207,7 +207,7 @@ class TemplateManagerTester:
         Returns:
             响应JSON
         """
-        url = f"{self.base_url}/api/templates/{template_id}"
+        url = f"{self.base_url}/api/v1/templates/{template_id}"
         print(f"删除模板: ID={template_id}")
         response = requests.delete(url, headers=self.headers)
         response.raise_for_status()
@@ -222,7 +222,7 @@ class TemplateManagerTester:
         Returns:
             响应JSON
         """
-        url = f"{self.base_url}/api/templates/{template_id}/analysis"
+        url = f"{self.base_url}/api/v1/templates/{template_id}/analysis"
         print(f"获取模板分析结果: ID={template_id}")
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
@@ -240,7 +240,7 @@ class TemplateManagerTester:
         Returns:
             响应JSON
         """
-        url = f"{self.base_url}/api/templates/{template_id}/analyze"
+        url = f"{self.base_url}/api/v1/templates/{template_id}/analyze"
         if enable_tracking:
             url += "?enable_tracking=true"
             

@@ -42,7 +42,7 @@ class PPTAssistantAPITester:
         if template_name is None:
             template_name = os.path.basename(template_path).split('.')[0]
         
-        url = f"{self.base_url}/api/templates/upload"
+        url = f"{self.base_url}/api/v1/templates/upload"
         
         files = {
             'file': open(template_path, 'rb')
@@ -66,7 +66,7 @@ class PPTAssistantAPITester:
         Returns:
             响应JSON
         """
-        url = f"{self.base_url}/api/templates"
+        url = f"{self.base_url}/api/v1/templates"
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
         json_data = response.json()
@@ -82,7 +82,7 @@ class PPTAssistantAPITester:
         Returns:
             响应JSON
         """
-        url = f"{self.base_url}/api/templates/{template_id}"
+        url = f"{self.base_url}/api/v1/templates/{template_id}"
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
         json_data = response.json()
@@ -99,7 +99,7 @@ class PPTAssistantAPITester:
         Returns:
             响应JSON
         """
-        url = f"{self.base_url}/api/ppt/generate"
+        url = f"{self.base_url}/api/v1/ppt/generate"
         
         payload = {
             'template_id': template_id,
@@ -121,7 +121,7 @@ class PPTAssistantAPITester:
         Returns:
             响应JSON
         """
-        url = f"{self.base_url}/api/tasks/{task_id}"
+        url = f"{self.base_url}/api/v1/ppt/tasks/{task_id}"
         response = requests.get(url, headers=self.headers)
         response.raise_for_status()
         json_data = response.json()
@@ -160,7 +160,7 @@ class PPTAssistantAPITester:
         Args:
             task_id: 任务ID
         """
-        ws_url = f"ws://localhost:8000/api/ws/tasks/{task_id}"
+        ws_url = f"ws://localhost:8000/api/v1/ws/tasks/{task_id}"
         self.ws = websocket.WebSocketApp(
             ws_url,
             on_open=self._on_ws_open,
