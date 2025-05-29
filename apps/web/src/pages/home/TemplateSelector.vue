@@ -2,7 +2,28 @@
   <div class="template-selector">
     <h2 class="title">选择模板</h2>
     
-    <div class="template-list">
+    <!-- 加载中状态 -->
+    <div v-if="loading" class="loading-container">
+      <el-icon class="loading-icon"><i class="el-icon-loading"></i></el-icon>
+      <p>正在加载模板...</p>
+    </div>
+    
+    <!-- 错误状态 -->
+    <div v-else-if="error" class="error-container">
+      <el-icon class="error-icon"><i class="el-icon-warning"></i></el-icon>
+      <p>{{ error }}</p>
+      <el-button type="primary" size="small" @click="fetchTemplates">重试</el-button>
+    </div>
+    
+    <!-- 空数据状态 -->
+    <div v-else-if="templates.length === 0" class="empty-container">
+      <el-icon class="empty-icon"><i class="el-icon-document"></i></el-icon>
+      <p>暂无可用模板</p>
+      <p class="empty-desc">请联系管理员上传模板或稍后再试</p>
+    </div>
+    
+    <!-- 模板列表 -->
+    <div v-else class="template-list">
       <el-row :gutter="20">
         <el-col v-for="template in templates" :key="template.id" :span="8">
           <div 
@@ -50,9 +71,13 @@ async function fetchTemplates() {
   try {
     const result = await templateStore.fetchTemplates()
     templates.value = result.items
+    
+    if (templates.value.length === 0) {
+      console.warn('未获取到模板数据')
+    }
   } catch (err) {
     console.error('获取模板列表失败:', err)
-    error.value = '获取模板列表失败'
+    error.value = '获取模板列表失败，请稍后重试'
   } finally {
     loading.value = false
   }
@@ -88,6 +113,38 @@ onMounted(async () => {
   font-size: 1.2rem;
   margin-bottom: 15px;
   color: #303133;
+}
+
+.loading-container,
+.error-container,
+.empty-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 0;
+  text-align: center;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.loading-icon,
+.error-icon,
+.empty-icon {
+  font-size: 32px;
+  margin-bottom: 16px;
+  color: #909399;
+}
+
+.error-icon {
+  color: #f56c6c;
+}
+
+.empty-desc {
+  color: #909399;
+  font-size: 0.9rem;
+  margin-top: 8px;
 }
 
 .template-list {
