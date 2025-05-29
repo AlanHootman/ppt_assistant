@@ -3,7 +3,6 @@ import { useProgressStore } from '@/stores/progress'
 import { useClientStore } from '@/stores/client'
 import WebSocketService from '@/services/websocket'
 import { pptApi } from '@/services/api/ppt.api'
-import { useWebSocket } from './useWebSocket'
 import { getClientId } from '@/utils/clientId'
 import { useEditorStore } from '@/stores/editor'
 import { useTemplateStore } from '@/stores/template'
@@ -14,13 +13,22 @@ export function useTaskProgress() {
   const clientStore = useClientStore()
   const editorStore = useEditorStore()
   const templateStore = useTemplateStore()
-  const { connectWebSocket, disconnectWebSocket } = useWebSocket()
   
   const loading = ref(false)
   const error = ref<string | null>(null)
   
   // 当前任务ID
   const currentTaskId = computed(() => clientStore.currentTaskId)
+  
+  // 连接WebSocket
+  function connectWebSocket(taskId: string) {
+    WebSocketService.connect(taskId)
+  }
+  
+  // 断开WebSocket连接
+  function disconnectWebSocket() {
+    WebSocketService.disconnect()
+  }
   
   // 初始化WebSocket连接
   function initWebSocket(taskId: string) {
@@ -80,7 +88,7 @@ export function useTaskProgress() {
       progressStore.setIsGenerating(true)
       
       // 连接WebSocket获取实时进度
-      connectWebSocket(taskId, handleProgressUpdate)
+      connectWebSocket(taskId)
       
       return taskId
     } catch (err: any) {
@@ -195,8 +203,19 @@ export function useTaskProgress() {
     if (data.status === 'failed') {
       disconnectWebSocket()
       progressStore.setIsGenerating(false)
-      error.value = data.message || '任务执行失败'
-      ElMessage.error(data.message || '任务执行失败')
+      
+      // 优先使用error字段中的错误信息
+      let errorMessage = '任务执行失败'
+      if (data.error && data.error.error_message) {
+        errorMessage = data.error.error_message
+      } else if (data.step_description) {
+        errorMessage = data.step_description
+      } else if (data.message) {
+        errorMessage = data.message
+      }
+      
+      error.value = errorMessage
+      ElMessage.error(errorMessage)
     }
   }
   
@@ -217,7 +236,7 @@ export function useTaskProgress() {
       if (taskData.status === 'processing' || taskData.status === 'pending') {
         progressStore.setTaskStatus(taskData.status)
         progressStore.setIsGenerating(true)
-        connectWebSocket(taskId, handleProgressUpdate)
+        connectWebSocket(taskId)
       } else if (taskData.status === 'completed') {
         progressStore.setTaskStatus('completed')
         progressStore.setIsGenerating(false)
