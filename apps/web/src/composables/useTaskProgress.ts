@@ -192,14 +192,7 @@ export function useTaskProgress() {
     // 更新任务状态和进度
     progressStore.updateTaskProgress(data)
     
-    // 如果任务完成，断开WebSocket连接
-    if (data.status === 'completed') {
-      disconnectWebSocket()
-      progressStore.setIsGenerating(false)
-      ElMessage.success('PPT生成完成！')
-    }
-    
-    // 如果任务失败，断开WebSocket连接
+    // 如果任务失败，立即断开WebSocket连接并重置状态
     if (data.status === 'failed') {
       disconnectWebSocket()
       progressStore.setIsGenerating(false)
@@ -216,6 +209,14 @@ export function useTaskProgress() {
       
       error.value = errorMessage
       ElMessage.error(errorMessage)
+      return // 错误状态直接返回，不处理完成逻辑
+    }
+    
+    // 只有在非错误状态下才处理完成逻辑
+    if (data.status === 'completed' && progressStore.taskStatus !== 'failed') {
+      disconnectWebSocket()
+      progressStore.setIsGenerating(false)
+      ElMessage.success('PPT生成完成！')
     }
   }
   
