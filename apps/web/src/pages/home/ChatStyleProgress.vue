@@ -1,6 +1,24 @@
 <template>
   <div class="chat-progress">
-    <h2 class="title">生成进度</h2>
+    <div class="header">
+      <h2 class="title">生成进度</h2>
+      <el-tooltip 
+        v-if="hasMessages || hasError"
+        effect="dark" 
+        placement="left"
+        :content="mlflowTooltipContent"
+        :disabled="!mlflowTooltipContent"
+      >
+        <el-button
+          type="info"
+          size="small"
+          circle
+          @click="openMlflowDashboard"
+          class="debug-button"
+          :icon="BugIcon"
+        />
+      </el-tooltip>
+    </div>
     
     <!-- 滚动容器 -->
     <div class="messages-container" ref="messagesContainer">
@@ -80,8 +98,11 @@ import { ref, computed, nextTick, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useProgressStore, type ProgressMessage, type PreviewImage } from '../../stores/progress'
 import { useTaskProgress } from '../../composables/useTaskProgress'
+import { useClientStore } from '../../stores/client'
+import { Setting as BugIcon } from '@element-plus/icons-vue'
 
 const progressStore = useProgressStore()
+const clientStore = useClientStore()
 const { createPptTask } = useTaskProgress()
 
 // 消息容器引用
@@ -109,6 +130,55 @@ const hasError = computed(() => progressStore.taskStatus === 'failed')
 const hasDetailedError = computed(() => {
   return hasError.value && taskError.value && taskError.value.has_error
 })
+
+// MLflow提示内容
+const mlflowTooltipContent = computed(() => {
+  const taskId = clientStore.currentTaskId
+  if (!taskId) return ''
+  
+  const totalMessages = progressMessages.value.length
+  const errorMessages = progressMessages.value.filter(m => m.isError).length
+  const lastStep = progressMessages.value[progressMessages.value.length - 1]?.step || '未知'
+  
+  return `调试信息 (Task ID: ${taskId.slice(0, 8)}...)
+• 总进度步骤: ${totalMessages}
+• 错误步骤: ${errorMessages}
+• 最后步骤: ${lastStep}
+• 状态: ${progressStore.taskStatus || '未知'}
+
+点击查看MLflow跟踪详情`
+})
+
+// 获取MLflow服务器URL
+function getMlflowUrl(): string {
+  // 开发环境检查
+  const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  
+  if (isDev) {
+    return 'http://127.0.0.1:5000'
+  }
+  
+  // 生产环境：使用当前域名，端口5000
+  const protocol = window.location.protocol
+  const hostname = window.location.hostname
+  return `${protocol}//${hostname}:5000`
+}
+
+// 打开MLflow仪表板
+function openMlflowDashboard() {
+  const mlflowUrl = getMlflowUrl()
+  const taskId = clientStore.currentTaskId
+  
+  // 构建带有任务ID过滤的URL（如果有任务ID）
+  let targetUrl = mlflowUrl
+  if (taskId) {
+    // MLflow实验查看URL，可以根据实际情况调整
+    targetUrl = `${mlflowUrl}/#/experiments`
+  }
+  
+  // 在新标签页中打开
+  window.open(targetUrl, '_blank', 'noopener,noreferrer')
+}
 
 // 自动滚动到底部
 function scrollToBottom() {
@@ -164,11 +234,27 @@ async function handleRetry() {
   overflow: hidden; /* 防止整体溢出 */
 }
 
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px; /* 减少底部间距 */
+}
+
 .title {
   font-size: 1.1rem; /* 减小标题字体 */
-  margin: 0 0 12px 0; /* 减少底部间距 */
+  margin: 0; /* 移除margin，在header中控制 */
   color: #303133;
   flex-shrink: 0; /* 标题不缩放 */
+}
+
+.debug-button {
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.debug-button:hover {
+  opacity: 1;
 }
 
 .messages-container {
