@@ -10,17 +10,38 @@ class WebSocketService {
   private reconnectTimer: number | null = null
   
   /**
+   * 获取WebSocket服务器URL
+   */
+  private getWebSocketBaseUrl(): string {
+    // 开发环境：使用后端API服务器地址
+    if (import.meta.env.DEV) {
+      return 'ws://localhost:8000'
+    }
+    
+    // 生产环境：使用当前域名，但协议改为ws/wss
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${window.location.host}`
+  }
+  
+  /**
    * 连接到WebSocket服务
    * @param taskId 任务ID
    */
   connect(taskId: string) {
+    // 如果已经连接到同一个任务，不需要重新连接
+    if (this.taskId === taskId && this.isConnected()) {
+      console.log('WebSocket already connected to this task')
+      return this.socket
+    }
+    
     this.taskId = taskId
     const clientId = getClientId()
     
     // 构建WebSocket URL
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsHost = window.location.host
-    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/ws/tasks/${taskId}?client_id=${clientId}`
+    const baseUrl = this.getWebSocketBaseUrl()
+    const wsUrl = `${baseUrl}/api/v1/ws/tasks/${taskId}?client_id=${clientId}`
+    
+    console.log('Connecting to WebSocket:', wsUrl)
     
     // 关闭现有连接
     this.disconnect()
@@ -31,7 +52,7 @@ class WebSocketService {
       
       // 连接打开
       this.socket.onopen = () => {
-        console.log('WebSocket connected')
+        console.log('WebSocket connected to:', wsUrl)
         this.reconnectAttempts = 0
       }
       
@@ -40,6 +61,12 @@ class WebSocketService {
         try {
           const data = JSON.parse(event.data)
           console.log('WebSocket message received:', data)
+          
+          // 过滤连接确认消息
+          if (data.type === 'connection_established') {
+            console.log('WebSocket connection established')
+            return
+          }
           
           // 更新进度
           const progressStore = useProgressStore()

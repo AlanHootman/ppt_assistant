@@ -16,6 +16,20 @@ export function useWebSocket() {
   let reconnectTimer: number | null = null
   
   /**
+   * 获取WebSocket服务器URL
+   */
+  function getWebSocketBaseUrl(): string {
+    // 开发环境：使用后端API服务器地址
+    if (import.meta.env.DEV) {
+      return 'ws://localhost:8000'
+    }
+    
+    // 生产环境：使用当前域名，但协议改为ws/wss
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+    return `${protocol}//${window.location.host}`
+  }
+  
+  /**
    * 连接WebSocket
    * @param taskId 任务ID
    * @param onUpdate 更新回调函数
@@ -23,6 +37,7 @@ export function useWebSocket() {
   function connectWebSocket(taskId: string, onUpdate: (data: any) => void) {
     // 如果已经连接到相同的任务，不需要重新连接
     if (isConnected.value && currentTaskId.value === taskId) {
+      console.log('WebSocket already connected to this task')
       return
     }
     
@@ -33,9 +48,10 @@ export function useWebSocket() {
     
     // 构建WebSocket URL
     const clientId = getClientId()
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsHost = window.location.host
-    const wsUrl = `${wsProtocol}//${wsHost}/api/v1/ws/tasks/${taskId}?client_id=${clientId}`
+    const baseUrl = getWebSocketBaseUrl()
+    const wsUrl = `${baseUrl}/api/v1/ws/tasks/${taskId}?client_id=${clientId}`
+    
+    console.log('Connecting to WebSocket:', wsUrl)
     
     try {
       // 创建WebSocket连接
@@ -46,7 +62,7 @@ export function useWebSocket() {
         isConnected.value = true
         currentTaskId.value = taskId
         reconnectAttempts.value = 0
-        console.log('WebSocket连接成功:', taskId)
+        console.log('WebSocket连接成功:', wsUrl)
       }
       
       // 接收消息
@@ -54,6 +70,13 @@ export function useWebSocket() {
         try {
           const data = JSON.parse(event.data)
           console.log('收到任务进度更新:', data)
+          
+          // 过滤连接确认消息
+          if (data.type === 'connection_established') {
+            console.log('WebSocket连接确认')
+            return
+          }
+          
           onUpdate(data)
         } catch (error) {
           console.error('解析WebSocket消息失败:', error)
