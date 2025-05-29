@@ -1,16 +1,17 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import homeRoutes from './home.routes'
-import adminRoutes from './admin.routes'
+// 暂时注释掉 adminRoutes，防止找不到相关组件
+// import adminRoutes from './admin.routes'
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     ...homeRoutes,
-    ...adminRoutes,
+    // ...adminRoutes // 暂时注释掉管理后台路由
     {
       path: '/:pathMatch(.*)*',
       name: 'not-found',
-      component: () => import('@/pages/error/NotFound.vue'),
+      component: () => import('../pages/error/NotFound.vue'),
       meta: { title: '页面未找到' }
     }
   ]

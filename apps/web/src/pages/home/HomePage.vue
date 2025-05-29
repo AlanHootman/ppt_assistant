@@ -4,7 +4,7 @@
       <div class="container">
         <h1 class="logo">PPT助手</h1>
         <div class="nav">
-          <el-button type="primary" size="small" @click="navigateToAdmin">管理后台</el-button>
+          <el-button type="primary" size="small" @click="navigateToAdmin" disabled title="管理后台功能正在开发中">管理后台</el-button>
         </div>
       </div>
     </header>
@@ -37,10 +37,17 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, computed, getCurrentInstance } from 'vue'
+import { onMounted, computed, getCurrentInstance, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useProgressStore } from '../../stores/progress'
 import { useTaskProgress } from '../../composables/useTaskProgress'
+
+// 导入组件
+const TemplateSelector = defineAsyncComponent(() => import('./TemplateSelector.vue'))
+const EditorPanel = defineAsyncComponent(() => import('./EditorPanel.vue'))
+const GenerationControls = defineAsyncComponent(() => import('./GenerationControls.vue'))
+const ChatStyleProgress = defineAsyncComponent(() => import('./ChatStyleProgress.vue'))
+const DownloadPanel = defineAsyncComponent(() => import('./DownloadPanel.vue'))
 
 // 获取应用实例
 const app = getCurrentInstance()
@@ -55,7 +62,9 @@ const taskCompleted = computed(() => progressStore.taskStatus === 'completed')
 
 // 导航到管理后台
 function navigateToAdmin() {
-  router.push('/admin')
+  // 暂时禁用管理后台功能
+  ElMessage ? ElMessage.info('管理后台功能正在开发中') : console.log('管理后台功能正在开发中')
+  // router.push('/admin')
 }
 
 // 开始生成PPT
