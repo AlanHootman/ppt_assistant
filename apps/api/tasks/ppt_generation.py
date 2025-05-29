@@ -111,6 +111,67 @@ def generate_ppt_task(self, task_data: dict):
             progress_callback=progress_callback
         ))
         
+        # 检查工作流执行结果，如果有失败记录，不执行完成逻辑
+        if result.failures:
+            # 工作流执行失败，获取最后一个错误信息
+            last_failure = result.failures[-1] if result.failures else "工作流执行失败"
+            logger.error(f"工作流执行失败: task_id={task_id}, error={last_failure}")
+            
+            # 构建失败状态
+            error_data = {
+                "status": "failed",
+                "current_step": "workflow_error",
+                "step_description": f"工作流执行失败: {last_failure}",
+                "progress": 0,
+                "updated_at": datetime.utcnow().isoformat(),
+                "error": {
+                    "has_error": True,
+                    "error_code": "WORKFLOW_EXECUTION_ERROR", 
+                    "error_message": last_failure,
+                    "can_retry": True
+                }
+            }
+            
+            # 更新Redis状态
+            redis_service.update_task_status(task_id, **error_data)
+            
+            # 发送WebSocket通知
+            websocket_data = {"task_id": task_id, **error_data}
+            redis_service.publish_task_update(task_id, websocket_data)
+            
+            # 抛出异常以终止任务
+            raise Exception(last_failure)
+        
+        # 检查是否有必要的输出文件
+        if not result.output_ppt_path or not os.path.exists(result.output_ppt_path):
+            error_msg = "PPT文件生成失败，输出文件不存在"
+            logger.error(f"{error_msg}: task_id={task_id}")
+            
+            # 构建失败状态
+            error_data = {
+                "status": "failed",
+                "current_step": "file_generation_error",
+                "step_description": error_msg,
+                "progress": 0,
+                "updated_at": datetime.utcnow().isoformat(),
+                "error": {
+                    "has_error": True,
+                    "error_code": "FILE_GENERATION_ERROR",
+                    "error_message": error_msg,
+                    "can_retry": True
+                }
+            }
+            
+            # 更新Redis状态
+            redis_service.update_task_status(task_id, **error_data)
+            
+            # 发送WebSocket通知
+            websocket_data = {"task_id": task_id, **error_data}
+            redis_service.publish_task_update(task_id, websocket_data)
+            
+            # 抛出异常以终止任务
+            raise Exception(error_msg)
+        
         # 生成预览图
         preview_images = []
         if result.output_ppt_path:
