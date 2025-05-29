@@ -39,11 +39,11 @@ export const useTemplateStore = defineStore('template', () => {
   /**
    * 获取模板列表
    */
-  async function fetchTemplates(page = 1, limit = 10) {
+  async function fetchTemplates(page = 1, limit = 10, statusFilter = 'ready') {
     try {
       const response = await axios.get<ApiResponse<TemplateListResponse>>(
         `${apiBaseUrl}/templates`,
-        { params: { page, limit } }
+        { params: { page, limit, status_filter: statusFilter } }
       )
       
       if (response.data.code === 200) {

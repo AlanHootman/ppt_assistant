@@ -65,14 +65,16 @@ class RedisService:
         self.pubsub.subscribe(channel)
         return self.pubsub
     
-    def cache_template_list(self, templates: list, expire_seconds: int = 300):
+    def cache_template_list(self, templates: list, status_filter: str = "ready", expire_seconds: int = 300):
         """缓存模板列表
         
         Args:
             templates: 模板列表
+            status_filter: 模板状态过滤器，默认为 ready
             expire_seconds: 缓存过期时间（秒）
         """
-        key = "templates:list"
+        # 根据状态过滤器确定缓存键
+        key = f"templates:list:{status_filter}"
         
         # 将ORM对象转换为可序列化的字典
         serializable_templates = []
@@ -109,13 +111,16 @@ class RedisService:
             json.dumps(serializable_templates)
         )
     
-    def get_cached_template_list(self) -> Optional[list]:
+    def get_cached_template_list(self, status_filter: str = "ready") -> Optional[list]:
         """获取缓存的模板列表
         
+        Args:
+            status_filter: 模板状态过滤器，默认为 ready
+            
         Returns:
             模板列表，如果缓存不存在则返回None
         """
-        key = "templates:list"
+        key = f"templates:list:{status_filter}"
         data = self.redis_client.get(key)
         
         if not data:
@@ -134,10 +139,21 @@ class RedisService:
                 
         return templates_data
     
-    def invalidate_template_cache(self):
-        """清除模板列表缓存"""
-        key = "templates:list"
-        self.redis_client.delete(key)
+    def invalidate_template_cache(self, status_filter: str = None):
+        """清除模板列表缓存
+        
+        Args:
+            status_filter: 特定状态的缓存，如果为 None，则清除所有状态的缓存
+        """
+        if status_filter:
+            key = f"templates:list:{status_filter}"
+            self.redis_client.delete(key)
+        else:
+            # 获取所有模板缓存键
+            pattern = "templates:list:*"
+            keys = self.redis_client.keys(pattern)
+            if keys:
+                self.redis_client.delete(*keys)
     
     def get_template_analysis_task_id(self, template_id: int) -> Optional[str]:
         """获取模板分析任务ID

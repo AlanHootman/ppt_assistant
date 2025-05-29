@@ -149,7 +149,7 @@ async def upload_template_alias(
 async def list_templates(
     skip: int = 0, 
     limit: int = 100,
-    status: Optional[str] = None,
+    status_filter: Optional[str] = Query("ready", description="模板状态过滤，多个状态用逗号分隔，例如'ready,analyzing'，传入all表示不过滤"),
     db: Session = Depends(get_db)
 ):
     """获取模板列表
@@ -157,16 +157,21 @@ async def list_templates(
     Args:
         skip: 分页起始位置
         limit: 分页大小
-        status: 模板状态过滤
+        status_filter: 模板状态过滤，多个状态用逗号分隔，例如'ready,analyzing'，传入all表示不过滤
         db: 数据库会话
         
     Returns:
         模板列表
     """
     try:
-        # 尝试从缓存获取
-        if not status and skip == 0 and limit == 100:
-            cached_templates = redis_service.get_cached_template_list()
+        # 解析状态过滤参数
+        filter_statuses = None
+        if status_filter and status_filter.lower() != "all":
+            filter_statuses = [s.strip() for s in status_filter.split(",")]
+        
+        # 尝试从缓存获取（只有在请求ready状态模板且使用默认分页时）
+        if filter_statuses == ["ready"] and skip == 0 and limit == 100:
+            cached_templates = redis_service.get_cached_template_list(status_filter="ready")
             if cached_templates:
                 logger.info("从缓存中获取模板列表")
                 return ApiResponse(
@@ -184,8 +189,8 @@ async def list_templates(
         query = db.query(Template)
         
         # 应用状态过滤
-        if status:
-            query = query.filter(Template.status == status)
+        if filter_statuses:
+            query = query.filter(Template.status.in_(filter_statuses))
         
         # 获取总数
         total = query.count()
@@ -222,9 +227,9 @@ async def list_templates(
                 logger.error(f"序列化模板对象失败: template_id={template.id}, error={str(e)}")
                 # 继续处理下一个模板，不中断整个列表的获取
         
-        # 如果是默认查询，缓存结果
-        if not status and skip == 0 and limit == 100:
-            redis_service.cache_template_list(templates)
+        # 如果是请求ready状态的模板且使用默认分页，缓存结果
+        if filter_statuses == ["ready"] and skip == 0 and limit == 100:
+            redis_service.cache_template_list(templates, status_filter="ready")
         
         return ApiResponse(
             code=200,
