@@ -100,7 +100,11 @@ async function restoreSelectedTemplate() {
 
 onMounted(async () => {
   await fetchTemplates()
-  await restoreSelectedTemplate()
+  
+  // 如果有模板列表但当前没有选中的模板，选择第一个
+  if (templates.value.length > 0 && !templateStore.currentTemplate) {
+    templateStore.setCurrentTemplate(templates.value[0])
+  }
 })
 </script>
 

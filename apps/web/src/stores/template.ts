@@ -94,23 +94,24 @@ export const useTemplateStore = defineStore('template', () => {
    */
   function setCurrentTemplate(template: Template) {
     currentTemplate.value = template
-    // 保存选择到localStorage
-    localStorage.setItem('selected_template_id', template.id.toString())
+    // 不再使用localStorage存储模板ID
   }
   
   /**
-   * 从localStorage恢复选中的模板
+   * 选择默认模板
    */
   async function restoreSelectedTemplate() {
-    const templateId = localStorage.getItem('selected_template_id')
-    
-    if (templateId) {
-      const id = parseInt(templateId)
-      const template = await fetchTemplateById(id)
-      
-      if (template) {
-        currentTemplate.value = template
+    // 如果模板列表为空，先获取模板列表
+    if (templates.value.length === 0) {
+      const result = await fetchTemplates()
+      // 如果获取到了模板，选择第一个
+      if (result.items.length > 0) {
+        currentTemplate.value = result.items[0]
+        return
       }
+    } else if (templates.value.length > 0 && !currentTemplate.value) {
+      // 如果已有模板列表但未选择模板，选择第一个
+      currentTemplate.value = templates.value[0]
     }
   }
   
