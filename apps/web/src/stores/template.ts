@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import axios from 'axios'
 
 // 模板接口
 export interface Template {
@@ -13,41 +14,50 @@ export interface Template {
   tags?: string[]
 }
 
+// API响应接口
+interface ApiResponse<T> {
+  code: number
+  message: string
+  data: T
+}
+
+interface TemplateListResponse {
+  total: number
+  page: number
+  limit: number
+  templates: Template[]
+}
+
 export const useTemplateStore = defineStore('template', () => {
   // 模板列表
   const templates = ref<Template[]>([])
   // 当前选中的模板
   const currentTemplate = ref<Template | null>(null)
+  // API基础URL
+  const apiBaseUrl = '/api/v1'
   
   /**
    * 获取模板列表
    */
   async function fetchTemplates(page = 1, limit = 10) {
     try {
-      // 这里应该调用API获取模板列表
-      // 暂时使用模拟数据
-      templates.value = [
-        {
-          id: 1,
-          name: "商务简约风",
-          preview_url: "/static/templates/1/preview.png",
-          upload_time: "2023-06-15T10:30:00Z",
-          status: "ready",
-          tags: ["商务", "简约", "专业"]
-        },
-        {
-          id: 2,
-          name: "教育主题模板",
-          preview_url: "/static/templates/2/preview.png",
-          upload_time: "2023-06-16T14:30:00Z",
-          status: "ready",
-          tags: ["教育", "课程", "学习"]
-        }
-      ]
+      const response = await axios.get<ApiResponse<TemplateListResponse>>(
+        `${apiBaseUrl}/templates`,
+        { params: { page, limit } }
+      )
       
-      return {
-        total: templates.value.length,
-        items: templates.value
+      if (response.data.code === 200) {
+        templates.value = response.data.data.templates
+        return {
+          total: response.data.data.total,
+          items: response.data.data.templates
+        }
+      } else {
+        console.error('获取模板列表失败:', response.data.message)
+        return {
+          total: 0,
+          items: []
+        }
       }
     } catch (error) {
       console.error('获取模板列表失败:', error)
@@ -63,27 +73,16 @@ export const useTemplateStore = defineStore('template', () => {
    */
   async function fetchTemplateById(id: number) {
     try {
-      // 这里应该调用API获取模板详情
-      // 暂时从列表中查找
-      const template = templates.value.find(t => t.id === id)
+      const response = await axios.get<ApiResponse<{ template: Template }>>(
+        `${apiBaseUrl}/templates/${id}`
+      )
       
-      if (template) {
-        return template
+      if (response.data.code === 200) {
+        return response.data.data.template
+      } else {
+        console.error('获取模板详情失败:', response.data.message)
+        return null
       }
-      
-      // 如果列表中没有，模拟API请求
-      const mockTemplate = {
-        id,
-        name: `模板 ${id}`,
-        preview_url: `/static/templates/${id}/preview.png`,
-        file_url: `/static/templates/${id}/template.pptx`,
-        description: "模板描述",
-        upload_time: new Date().toISOString(),
-        status: "ready",
-        tags: ["标签1", "标签2"]
-      }
-      
-      return mockTemplate
     } catch (error) {
       console.error('获取模板详情失败:', error)
       return null
