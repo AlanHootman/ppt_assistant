@@ -509,8 +509,8 @@ Authorization: Bearer {token}
 由于PPT生成和模板分析是耗时操作，API设计采用异步任务模式：
 
 1. 客户端发起请求后立即返回任务ID
-2. 客户端通过轮询或WebSocket获取任务进度和实时预览
-3. 任务完成后通过API获取结果或接收回调通知
+2. 客户端通过WebSocket获取任务进度和实时预览
+3. 任务完成后通过API获取结果或接收WebSocket通知
 
 ### 4.2 错误处理和重试机制
 
@@ -522,7 +522,7 @@ Authorization: Bearer {token}
 ### 4.3 实时预览功能
 
 1. 每次编辑完PPTX文件进行视觉校验时，系统会生成预览图，并保存到文件系统中
-2. 客户端可通过API获取已生成幻灯片的预览图
+2. 客户端可通过API获取已生成幻灯片的预览图，或通过WebSocket实时接收预览更新
 3. 预览图可用于给用户提供实时反馈，增强用户体验
 
 ### 4.4 安全考虑
@@ -536,6 +536,96 @@ Authorization: Bearer {token}
 
 1. 模板预览图和布局分析结果可以缓存，提高访问速度
 2. 生成的PPT和预览图可设置过期时间，避免存储空间无限增长
+
+### 4.6 WebSocket通信
+
+系统使用WebSocket实现实时进度更新和预览，以下是相关的API设计：
+
+#### 4.6.1 WebSocket连接
+
+- **接口**: `WebSocket /api/v1/ws/tasks/{task_id}?client_id={client_id}`
+- **描述**: 与特定任务建立WebSocket连接，接收实时更新
+- **参数**:
+  - `task_id`: 任务ID
+  - `client_id`: 客户端ID，用于识别连接（可选）
+
+#### 4.6.2 初始连接确认消息
+
+客户端连接成功后，服务器会发送一条连接确认消息：
+
+```json
+{
+  "type": "connection_established",
+  "task_id": "73981347-ef2a-472d-97cd-94d2327c178a",
+  "message": "WebSocket连接已建立"
+}
+```
+
+#### 4.6.3 任务状态更新消息
+
+服务器会在任务状态变化时发送更新消息：
+
+```json
+{
+  "task_id": "73981347-ef2a-472d-97cd-94d2327c178a",
+  "status": "processing",
+  "progress": 65,
+  "current_step": "slide_generation",
+  "step_description": "正在生成第3张幻灯片",
+  "updated_at": "2023-07-10T15:47:45Z"
+}
+```
+
+#### 4.6.4 任务完成消息
+
+任务完成时的消息格式：
+
+```json
+{
+  "task_id": "73981347-ef2a-472d-97cd-94d2327c178a",
+  "status": "completed",
+  "progress": 100,
+  "current_step": "completed",
+  "step_description": "PPT生成已完成",
+  "file_url": "/workspace/output/73981347-ef2a-472d-97cd-94d2327c178a/presentation.pptx",
+  "preview_images": [
+    {"slide_index": 0, "preview_url": "/workspace/output/73981347-ef2a-472d-97cd-94d2327c178a/preview_0.png"},
+    {"slide_index": 1, "preview_url": "/workspace/output/73981347-ef2a-472d-97cd-94d2327c178a/preview_1.png"},
+    {"slide_index": 2, "preview_url": "/workspace/output/73981347-ef2a-472d-97cd-94d2327c178a/preview_2.png"}
+  ],
+  "completed_at": "2023-07-10T15:50:12Z",
+  "updated_at": "2023-07-10T15:50:12Z"
+}
+```
+
+#### 4.6.5 任务失败消息
+
+任务失败时的消息格式：
+
+```json
+{
+  "task_id": "73981347-ef2a-472d-97cd-94d2327c178a",
+  "status": "failed",
+  "progress": 35,
+  "current_step": "error",
+  "step_description": "PPT生成失败: 无法处理复杂表格内容",
+  "updated_at": "2023-07-10T15:47:45Z",
+  "error": {
+    "has_error": true,
+    "error_code": "GENERATION_ERROR",
+    "error_message": "生成幻灯片时遇到问题：无法处理复杂表格内容",
+    "can_retry": true
+  }
+}
+```
+
+#### 4.6.6 心跳机制
+
+如果客户端发送ping消息，服务器会回复pong消息：
+
+```json
+{"type": "pong"}
+```
 
 ## 5. API变更管理
 

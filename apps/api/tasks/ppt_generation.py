@@ -26,14 +26,22 @@ def generate_ppt_task(self, task_data: dict):
     file_service = FileService()
     
     try:
+        # 准备初始状态数据
+        initial_status = {
+            "status": "processing",
+            "progress": 0,
+            "current_step": "initialization",
+            "step_description": "初始化PPT生成任务",
+            "created_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
+        }
+        
         # 更新任务状态
-        redis_service.update_task_status(
-            task_id, 
-            status="processing",
-            progress=0,
-            current_step="initialization",
-            step_description="初始化PPT生成任务"
-        )
+        redis_service.update_task_status(task_id, **initial_status)
+        
+        # 发送WebSocket通知（添加task_id用于WebSocket消息）
+        websocket_data = {"task_id": task_id, **initial_status}
+        redis_service.publish_task_update(task_id, websocket_data)
         
         # 创建工作流引擎
         engine = WorkflowEngine(enable_tracking=True)
@@ -48,23 +56,30 @@ def generate_ppt_task(self, task_data: dict):
         
         # 设置进度回调
         def progress_callback(step: str, progress: int, description: str, preview_data: dict = None):
-            redis_service.update_task_status(
-                task_id,
-                status="processing",
-                progress=progress,
-                current_step=step,
-                step_description=description,
-                preview_data=preview_data
-            )
-            
-            # 发送WebSocket消息
-            redis_service.publish_task_update(task_id, {
+            # 构建完整的进度数据
+            update_data = {
                 "status": "processing",
                 "progress": progress,
                 "current_step": step,
                 "step_description": description,
-                "preview_data": preview_data
-            })
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            # 如果有预览数据，添加到更新数据中
+            if preview_data:
+                if "preview_url" in preview_data:
+                    update_data["preview_url"] = preview_data["preview_url"]
+                if "preview_images" in preview_data:
+                    update_data["preview_images"] = preview_data["preview_images"]
+            
+            # 更新Redis中的任务状态
+            redis_service.update_task_status(task_id, **update_data)
+            
+            # 通过WebSocket发送更新（添加task_id用于WebSocket消息）
+            websocket_data = {"task_id": task_id, **update_data}
+            redis_service.publish_task_update(task_id, websocket_data)
+            
+            logger.info(f"任务进度更新: task_id={task_id}, step={step}, progress={progress}%, description={description}")
         
         # 设置进度回调到节点执行器
         engine.node_executor.set_progress_callback(progress_callback)
@@ -79,33 +94,51 @@ def generate_ppt_task(self, task_data: dict):
         ))
         
         # 生成预览图
+        preview_images = []
         if result.output_ppt_path:
             preview_images = generate_preview_images(result.output_ppt_path)
         else:
             # 如果PPT路径为空，使用任务ID创建默认预览图
-            preview_images = [f"/workspace/output/{task_id}/preview_{i}.png" for i in range(3)]
+            preview_images = [
+                {"slide_index": i, "preview_url": f"/workspace/output/{task_id}/preview_{i}.png"} 
+                for i in range(3)
+            ]
             logger.warning(f"PPT路径为空，使用默认预览图: {task_id}")
         
-        # 更新最终状态
+        # 构建完成状态
         final_data = {
             "status": "completed",
             "progress": 100,
+            "current_step": "completed",
+            "step_description": "PPT生成已完成",
             "file_url": f"/workspace/output/{task_id}/presentation.pptx",
             "preview_images": preview_images,
-            "completed_at": datetime.utcnow().isoformat()
+            "completed_at": datetime.utcnow().isoformat(),
+            "updated_at": datetime.utcnow().isoformat()
         }
         
+        # 更新Redis状态
         redis_service.update_task_status(task_id, **final_data)
-        redis_service.publish_task_update(task_id, final_data)
         
-        return final_data
+        # 发送WebSocket通知（添加task_id用于WebSocket消息）
+        websocket_data = {"task_id": task_id, **final_data}
+        redis_service.publish_task_update(task_id, websocket_data)
+        
+        logger.info(f"任务完成: task_id={task_id}")
+        
+        # 返回结果时也包含task_id
+        return {"task_id": task_id, **final_data}
         
     except Exception as e:
         logger.exception(f"PPT生成任务失败: {str(e)}")
         
-        # 错误处理
+        # 构建错误数据
         error_data = {
             "status": "failed",
+            "current_step": "error",
+            "step_description": f"PPT生成失败: {str(e)}",
+            "progress": 0,
+            "updated_at": datetime.utcnow().isoformat(),
             "error": {
                 "has_error": True,
                 "error_code": "GENERATION_ERROR",
@@ -114,9 +147,14 @@ def generate_ppt_task(self, task_data: dict):
             }
         }
         
+        # 更新Redis状态
         redis_service.update_task_status(task_id, **error_data)
-        redis_service.publish_task_update(task_id, error_data)
         
+        # 发送WebSocket通知（添加task_id用于WebSocket消息）
+        websocket_data = {"task_id": task_id, **error_data}
+        redis_service.publish_task_update(task_id, websocket_data)
+        
+        # 重试任务
         raise self.retry(countdown=60, max_retries=3)
 
 def generate_preview_images(ppt_path: str) -> list:
@@ -126,7 +164,7 @@ def generate_preview_images(ppt_path: str) -> list:
         ppt_path: PPT文件路径，可能为None
         
     Returns:
-        预览图URL列表
+        预览图URL列表，格式为 [{"slide_index": 0, "preview_url": "..."}, ...]
     """
     # 如果ppt_path为None，则返回空列表
     if not ppt_path:
@@ -137,7 +175,10 @@ def generate_preview_images(ppt_path: str) -> list:
         # TODO: 实现PPT转图片的逻辑
         # 这里简单返回一个模拟预览图列表
         task_id = os.path.basename(os.path.dirname(ppt_path))
-        return [f"/workspace/output/{task_id}/preview_{i}.png" for i in range(3)]
+        return [
+            {"slide_index": i, "preview_url": f"/workspace/output/{task_id}/preview_{i}.png"} 
+            for i in range(3)
+        ]
     except Exception as e:
         logger.error(f"生成预览图失败: {str(e)}")
         return [] 

@@ -16,7 +16,6 @@
     "markdown-it": "^13.0.1",
     "nanoid": "^4.0.2",
     "pinia": "^2.3.1",
-    "socket.io-client": "^4.8.1",
     "uuid": "^9.0.0",
     "vue": "^3.5.15",
     "vue-router": "^4.5.1"
