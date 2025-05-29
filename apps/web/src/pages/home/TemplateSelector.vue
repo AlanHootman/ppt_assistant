@@ -32,7 +32,11 @@
             @click="selectTemplate(template)"
           >
             <div class="template-image">
-              <img :src="template.preview_url" :alt="template.name" />
+              <img 
+                :src="template.preview_url || DEFAULT_TEMPLATE_IMAGE" 
+                :alt="template.name"
+                @error="handleImageError"
+              />
             </div>
             <div class="template-info">
               <h3 class="template-name">{{ template.name }}</h3>
@@ -57,6 +61,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useTemplateStore, type Template } from '../../stores/template'
+
+// 默认图片路径常量
+const DEFAULT_TEMPLATE_IMAGE = '/images/template-placeholder.svg'
 
 const templateStore = useTemplateStore()
 const templates = ref<Template[]>([])
@@ -91,6 +98,12 @@ function selectTemplate(template: Template) {
 // 判断模板是否被选中
 function isSelected(template: Template) {
   return templateStore.currentTemplate?.id === template.id
+}
+
+// 处理图片加载失败
+function handleImageError(event: Event) {
+  const target = event.target as HTMLImageElement
+  target.src = DEFAULT_TEMPLATE_IMAGE
 }
 
 // 恢复选中的模板
