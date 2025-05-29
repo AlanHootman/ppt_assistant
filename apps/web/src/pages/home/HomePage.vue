@@ -98,12 +98,14 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  overflow: hidden; /* 避免页面滚动 */
 }
 
 .header {
   background-color: #fff;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  padding: 15px 0;
+  padding: 8px 0; /* 减少顶部和底部的padding */
+  flex-shrink: 0; /* 不允许缩放 */
 }
 
 .header .container {
@@ -113,27 +115,35 @@ onMounted(() => {
 }
 
 .logo {
-  font-size: 1.5rem;
+  font-size: 1.3rem; /* 稍微减小字体 */
   color: #409eff;
   margin: 0;
 }
 
 .main-content {
   flex: 1;
-  padding: 30px 0;
+  padding: 15px 0; /* 减少上下padding */
+  overflow: hidden; /* 避免主内容区域滚动 */
+}
+
+.responsive-container {
+  height: 100%; /* 使用全部可用高度 */
 }
 
 .editor-panel, .preview-panel {
-  padding: 15px;
+  padding: 10px; /* 减少内边距 */
   flex: 1;
+  height: 100%; /* 使用全部高度 */
+  overflow: hidden; /* 避免面板滚动 */
 }
 
 .footer {
   background-color: #f5f7fa;
-  padding: 15px 0;
+  padding: 8px 0; /* 减少上下padding */
   text-align: center;
   color: #606266;
-  font-size: 0.9rem;
+  font-size: 0.8rem; /* 减小字体 */
+  flex-shrink: 0; /* 不允许缩放 */
 }
 
 @media (max-width: 768px) {

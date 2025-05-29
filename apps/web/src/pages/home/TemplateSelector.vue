@@ -123,12 +123,12 @@ onMounted(async () => {
 
 <style scoped>
 .template-selector {
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
 .title {
-  font-size: 1.2rem;
-  margin-bottom: 15px;
+  font-size: 1.1rem;
+  margin-bottom: 10px;
   color: #303133;
 }
 
@@ -139,18 +139,18 @@ onMounted(async () => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 40px 0;
+  padding: 20px 0;
   text-align: center;
   background-color: #f8f9fa;
-  border-radius: 8px;
-  margin-bottom: 20px;
+  border-radius: 6px;
+  margin-bottom: 15px;
 }
 
 .loading-icon,
 .error-icon,
 .empty-icon {
-  font-size: 32px;
-  margin-bottom: 16px;
+  font-size: 24px;
+  margin-bottom: 10px;
   color: #909399;
 }
 
@@ -160,28 +160,28 @@ onMounted(async () => {
 
 .empty-desc {
   color: #909399;
-  font-size: 0.9rem;
-  margin-top: 8px;
+  font-size: 0.85rem;
+  margin-top: 6px;
 }
 
 .template-list {
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
 .template-card {
   background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  box-shadow: 0 1px 8px 0 rgba(0, 0, 0, 0.08);
   overflow: hidden;
-  transition: all 0.3s;
+  transition: all 0.2s;
   cursor: pointer;
-  margin-bottom: 20px;
+  margin-bottom: 12px;
   border: 2px solid transparent;
 }
 
 .template-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1);
 }
 
 .template-card.active {
@@ -190,7 +190,7 @@ onMounted(async () => {
 
 .template-image {
   width: 100%;
-  height: 160px;
+  height: 100px;
   overflow: hidden;
 }
 
@@ -198,30 +198,32 @@ onMounted(async () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s;
+  transition: transform 0.2s;
 }
 
 .template-card:hover .template-image img {
-  transform: scale(1.05);
+  transform: scale(1.03);
 }
 
 .template-info {
-  padding: 10px 15px;
+  padding: 8px 12px;
 }
 
 .template-name {
-  font-size: 1rem;
-  margin: 0 0 10px 0;
+  font-size: 0.9rem;
+  margin: 0 0 6px 0;
   color: #303133;
+  line-height: 1.3;
 }
 
 .template-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 3px;
 }
 
 .tag {
-  margin-right: 5px;
+  margin-right: 3px;
+  font-size: 0.75rem;
 }
 </style> 

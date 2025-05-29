@@ -19,8 +19,15 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
   font-size: 16px;
   color: #333;
-  line-height: 1.6;
+  line-height: 1.5;
   background-color: #f5f7fa;
+  height: 100%;
+  overflow: hidden;
+}
+
+#app {
+  height: 100vh;
+  overflow: hidden;
 }
 
 a {
@@ -36,12 +43,14 @@ a:hover {
   width: 100%;
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0 0.8rem;
+  height: 100%;
 }
 
 .flex-row {
   display: flex;
   flex-direction: row;
+  height: 100%;
 }
 
 @media (max-width: 768px) {

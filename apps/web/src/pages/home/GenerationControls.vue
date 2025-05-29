@@ -2,7 +2,7 @@
   <div class="generation-controls">
     <el-button 
       type="primary" 
-      size="large" 
+      size="default" 
       @click="handleGenerate" 
       :loading="isGenerating"
       :disabled="isGenerating || !canGenerate"
@@ -14,7 +14,7 @@
     <el-button 
       v-if="isGenerating" 
       type="danger" 
-      size="large" 
+      size="default" 
       @click="handleCancel"
       class="cancel-button"
     >
@@ -74,18 +74,18 @@ async function handleCancel() {
 <style scoped>
 .generation-controls {
   display: flex;
-  gap: 15px;
-  margin-top: 20px;
+  gap: 10px;
+  margin-top: 15px;
 }
 
 .generate-button {
   flex: 2;
-  height: 48px;
-  font-size: 1.1rem;
+  height: 36px;
+  font-size: 1rem;
 }
 
 .cancel-button {
   flex: 1;
-  height: 48px;
+  height: 36px;
 }
 </style> 

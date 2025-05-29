@@ -11,7 +11,7 @@
     <el-input
       v-model="content"
       type="textarea"
-      :rows="15"
+      :rows="12"
       placeholder="请输入Markdown内容或粘贴已有文档..."
       resize="vertical"
       class="markdown-editor"
@@ -51,36 +51,36 @@ function clearContent() {
 
 <style scoped>
 .editor-panel {
-  margin-bottom: 20px;
+  margin-bottom: 15px;
 }
 
 .editor-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
 }
 
 .title {
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   color: #303133;
   margin: 0;
 }
 
 .editor-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
 .markdown-editor {
   font-family: monospace;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 
 .tip {
-  margin-top: 10px;
-  font-size: 0.85rem;
+  margin-top: 8px;
+  font-size: 0.8rem;
   color: #909399;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 </style> 
