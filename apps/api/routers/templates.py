@@ -196,19 +196,31 @@ async def list_templates(
         # 序列化模板对象
         serializable_templates = []
         for template in templates:
-            template_dict = {
-                "id": template.id,
-                "name": template.name,
-                "description": template.description,
-                "file_path": template.file_path,
-                "preview_path": template.preview_path,
-                "analysis_path": template.analysis_path,
-                "status": template.status,
-                "tags": template.tags,
-                "upload_time": template.upload_time.isoformat() if template.upload_time else None,
-                "analysis_time": template.analysis_time.isoformat() if template.analysis_time else None
-            }
-            serializable_templates.append(template_dict)
+            try:
+                # 解析标签，处理各种可能的异常情况
+                tags = []
+                if template.tags:
+                    try:
+                        if template.tags.strip():
+                            tags = json.loads(template.tags)
+                    except json.JSONDecodeError:
+                        # 如果JSON解析失败，使用空列表
+                        logger.warning(f"解析模板标签失败，使用空列表: template_id={template.id}, tags={template.tags}")
+                
+                template_dict = {
+                    "id": template.id,
+                    "name": template.name,
+                    "description": template.description,
+                    "file_url": template.file_path,
+                    "preview_url": template.preview_path,
+                    "status": template.status,
+                    "tags": tags,
+                    "upload_time": template.upload_time.isoformat() if template.upload_time else None,
+                }
+                serializable_templates.append(template_dict)
+            except Exception as e:
+                logger.error(f"序列化模板对象失败: template_id={template.id}, error={str(e)}")
+                # 继续处理下一个模板，不中断整个列表的获取
         
         # 如果是默认查询，缓存结果
         if not status and skip == 0 and limit == 100:
@@ -228,7 +240,7 @@ async def list_templates(
         # 记录详细错误信息
         logger.error(f"获取模板列表失败: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=f"获取模板列表失败: {str(e)}"
         )
 
@@ -255,17 +267,24 @@ async def get_template(
             )
         
         # 构造响应数据，确保模板对象能够正确序列化
+        tags = []
+        if template.tags:
+            try:
+                if template.tags.strip():
+                    tags = json.loads(template.tags)
+            except json.JSONDecodeError:
+                # 如果JSON解析失败，使用空列表
+                logger.warning(f"解析模板标签失败，使用空列表: template_id={template.id}, tags={template.tags}")
+                
         template_data = {
             "id": template.id,
             "name": template.name,
             "description": template.description,
-            "file_path": template.file_path,
-            "preview_path": template.preview_path,
-            "analysis_path": template.analysis_path,
+            "file_url": template.file_path,
+            "preview_url": template.preview_path,
             "status": template.status,
-            "tags": template.tags,
+            "tags": tags,
             "upload_time": template.upload_time.isoformat() if template.upload_time else None,
-            "analysis_time": template.analysis_time.isoformat() if template.analysis_time else None,
         }
         
         return ApiResponse(
@@ -282,7 +301,7 @@ async def get_template(
         # 记录详细错误信息
         logger.error(f"获取模板详情失败: template_id={template_id}, 错误: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=f"获取模板详情失败: {str(e)}"
         )
 
@@ -514,13 +533,10 @@ async def update_template(
                 "template": template_data
             }
         )
-    except HTTPException:
-        # 重新抛出HTTP异常
-        raise
     except Exception as e:
         # 记录详细错误信息
         logger.error(f"更新模板信息失败: template_id={template_id}, 错误: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,
             detail=f"更新模板信息失败: {str(e)}"
         ) 

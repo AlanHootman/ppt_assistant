@@ -77,19 +77,31 @@ class RedisService:
         # 将ORM对象转换为可序列化的字典
         serializable_templates = []
         for template in templates:
-            template_dict = {
-                "id": template.id,
-                "name": template.name,
-                "description": template.description,
-                "tags": template.tags,
-                "file_path": template.file_path,
-                "preview_path": template.preview_path,
-                "analysis_path": template.analysis_path,
-                "status": template.status,
-                "upload_time": template.upload_time.isoformat() if template.upload_time else None,
-                "analysis_time": template.analysis_time.isoformat() if template.analysis_time else None
-            }
-            serializable_templates.append(template_dict)
+            try:
+                # 解析标签，处理各种可能的异常情况
+                tags = []
+                if template.tags:
+                    try:
+                        if template.tags.strip():
+                            tags = json.loads(template.tags)
+                    except json.JSONDecodeError:
+                        # 如果JSON解析失败，使用空列表
+                        pass
+                
+                template_dict = {
+                    "id": template.id,
+                    "name": template.name,
+                    "description": template.description,
+                    "tags": tags,
+                    "file_url": template.file_path,
+                    "preview_url": template.preview_path,
+                    "status": template.status,
+                    "upload_time": template.upload_time.isoformat() if template.upload_time else None,
+                }
+                serializable_templates.append(template_dict)
+            except Exception:
+                # 忽略序列化失败的模板
+                continue
         
         self.redis_client.setex(
             key,
