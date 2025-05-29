@@ -9,6 +9,7 @@ export interface ProgressMessage {
   step: string
   message: string
   progress: number
+  isError?: boolean // 添加错误标识
 }
 
 // 预览图片接口
@@ -16,6 +17,14 @@ export interface PreviewImage {
   id: string
   url: string
   time: Date
+}
+
+// 错误信息接口
+export interface TaskError {
+  has_error: boolean
+  error_code?: string
+  error_message?: string
+  can_retry: boolean
 }
 
 // 任务状态类型
@@ -30,6 +39,8 @@ export const useProgressStore = defineStore('progress', () => {
   const previewImages = ref<PreviewImage[]>([])
   // 是否正在生成
   const isGenerating = ref(false)
+  // 错误信息
+  const taskError = ref<TaskError | null>(null)
   
   /**
    * 更新任务进度
@@ -43,6 +54,22 @@ export const useProgressStore = defineStore('progress', () => {
       taskStatus.value = data.status
     }
     
+    // 处理错误信息
+    if (data.error) {
+      taskError.value = data.error
+    } else if (data.status === 'failed') {
+      // 如果状态为failed但没有error字段，创建默认错误信息
+      taskError.value = {
+        has_error: true,
+        error_code: 'UNKNOWN_ERROR',
+        error_message: data.step_description || '任务执行失败',
+        can_retry: true
+      }
+    } else {
+      // 非错误状态时清除错误信息
+      taskError.value = null
+    }
+    
     // 添加进度消息
     if (data.step_description) {
       const message: ProgressMessage = {
@@ -50,7 +77,8 @@ export const useProgressStore = defineStore('progress', () => {
         time: new Date(),
         step: data.current_step || '处理中',
         message: data.step_description,
-        progress: data.progress || 0
+        progress: data.progress || 0,
+        isError: data.status === 'failed' // 标记是否为错误消息
       }
       progressMessages.value.push(message)
     }
@@ -106,6 +134,7 @@ export const useProgressStore = defineStore('progress', () => {
     progressMessages.value = []
     previewImages.value = []
     isGenerating.value = false
+    taskError.value = null
   }
   
   return { 
@@ -113,6 +142,7 @@ export const useProgressStore = defineStore('progress', () => {
     progressMessages, 
     previewImages, 
     isGenerating, 
+    taskError,
     updateTaskProgress,
     setTaskStatus,
     setIsGenerating,

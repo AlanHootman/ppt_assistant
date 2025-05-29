@@ -108,6 +108,8 @@ class NodeExecutor:
             logger.error(error_msg)
             logger.error(traceback.format_exc())
             state.record_failure(error_msg)
+            # 反馈错误状态
+            self.report_progress(node_name, 0, error_msg, {"error": True})
             raise
     
     async def _execute_and_validate_node(self, node_name: str, state: AgentState, 
@@ -194,6 +196,8 @@ class NodeExecutor:
             error_msg = "缺少原始Markdown内容"
             logger.error(error_msg)
             state.record_failure(error_msg)
+            # 反馈错误状态
+            self.report_progress("markdown_parser", 0, error_msg, {"error": True})
             return
         
         logger.info("执行Markdown解析节点")
@@ -233,10 +237,17 @@ class NodeExecutor:
                 # 添加检查点并报告进度
                 state.add_checkpoint("markdown_parser_completed")
                 self.report_progress("markdown_parser", 20, "Markdown解析完成")
+            else:
+                logger.warning("Markdown解析结果为空")
+                state.planning_failed = True
+                self.report_progress("markdown_parser", 20, "Markdown解析未能生成有效结果", {"error": True})
+                
         except Exception as e:
             error_msg = f"Markdown解析失败: {str(e)}"
             logger.error(error_msg)
             state.record_failure(error_msg)
+            # 反馈错误状态
+            self.report_progress("markdown_parser", 0, error_msg, {"error": True})
             
     async def _execute_ppt_analyzer(self, state: AgentState) -> None:
         """
@@ -253,6 +264,8 @@ class NodeExecutor:
             error_msg = "缺少PPT模板路径"
             logger.error(error_msg)
             state.record_failure(error_msg)
+            # 反馈错误状态
+            self.report_progress("ppt_analyzer", 0, error_msg, {"error": True})
             return
         
         logger.info("执行PPT模板分析节点")
@@ -292,10 +305,17 @@ class NodeExecutor:
                 # 添加检查点
                 state.add_checkpoint("ppt_analyzer_completed")
                 self.report_progress("ppt_analyzer", 40, "PPT模板分析完成")
+            else:
+                logger.warning("PPT模板分析结果为空")
+                state.planning_failed = True
+                self.report_progress("ppt_analyzer", 40, "PPT模板分析未能生成有效结果", {"error": True})
+                
         except Exception as e:
             error_msg = f"PPT分析失败: {str(e)}"
             logger.error(error_msg)
             state.record_failure(error_msg)
+            # 反馈错误状态
+            self.report_progress("ppt_analyzer", 0, error_msg, {"error": True})
             
     async def _execute_content_planner(self, state: AgentState) -> None:
         """
@@ -313,6 +333,8 @@ class NodeExecutor:
             logger.error(error_msg)
             state.record_failure(error_msg)
             state.planning_failed = True
+            # 反馈错误状态
+            self.report_progress("content_planner", 0, error_msg, {"error": True})
             return
         
         if not state.layout_features:
@@ -320,6 +342,8 @@ class NodeExecutor:
             logger.error(error_msg)
             state.record_failure(error_msg)
             state.planning_failed = True
+            # 反馈错误状态
+            self.report_progress("content_planner", 0, error_msg, {"error": True})
             return
         
         logger.info("执行内容规划节点")
@@ -348,7 +372,7 @@ class NodeExecutor:
             else:
                 logger.warning("内容规划结果为空")
                 state.planning_failed = True
-                self.report_progress("content_planner", 60, "内容规划未能生成有效结果")
+                self.report_progress("content_planner", 60, "内容规划未能生成有效结果", {"error": True})
                 
         except Exception as e:
             error_msg = f"内容规划失败: {str(e)}"
@@ -356,7 +380,8 @@ class NodeExecutor:
             logger.error(traceback.format_exc())
             state.record_failure(error_msg)
             state.planning_failed = True
-            self.report_progress("content_planner", 60, f"内容规划失败: {str(e)}")
+            # 反馈错误状态
+            self.report_progress("content_planner", 0, error_msg, {"error": True})
     
     async def _execute_slide_generator(self, state: AgentState) -> None:
         """
@@ -373,6 +398,8 @@ class NodeExecutor:
             error_msg = "缺少内容规划，无法生成幻灯片"
             logger.error(error_msg)
             state.record_failure(error_msg)
+            # 反馈错误状态
+            self.report_progress("slide_generator", 0, error_msg, {"error": True})
             return
         
         logger.info("执行幻灯片生成节点")
@@ -400,7 +427,8 @@ class NodeExecutor:
             logger.error(error_msg)
             logger.error(traceback.format_exc())
             state.record_failure(error_msg)
-            self.report_progress("slide_generator", 80, f"幻灯片生成遇到问题: {str(e)}")
+            # 反馈错误状态
+            self.report_progress("slide_generator", 0, error_msg, {"error": True})
     
     async def _execute_next_slide_or_end(self, state: AgentState) -> None:
         """
@@ -414,6 +442,8 @@ class NodeExecutor:
             error_msg = "无效的状态，缺少幻灯片索引或内容规划"
             logger.error(error_msg)
             state.record_failure(error_msg)
+            # 反馈错误状态
+            self.report_progress("next_slide_or_end", 0, error_msg, {"error": True})
             return
         
         total_slides = len(state.planned_content.get("slides", []))
@@ -465,4 +495,6 @@ class NodeExecutor:
             error_msg = f"PPT完善失败: {str(e)}"
             logger.error(error_msg)
             logger.error(traceback.format_exc())
-            state.record_failure(error_msg) 
+            state.record_failure(error_msg)
+            # 反馈错误状态
+            self.report_progress("ppt_finalizer", 0, error_msg, {"error": True}) 

@@ -13,11 +13,16 @@
     <div 
       v-for="message in progressMessages" 
       :key="message.id"
-      class="message progress-message"
+      class="message"
+      :class="{
+        'progress-message': !message.isError,
+        'error-message': message.isError
+      }"
     >
       <div class="message-header">
         <span class="step-name">{{ message.step }}</span>
-        <span class="progress-percent">{{ message.progress }}%</span>
+        <span v-if="!message.isError" class="progress-percent">{{ message.progress }}%</span>
+        <span v-else class="error-indicator">错误</span>
         <span class="message-time">{{ formatTime(message.time) }}</span>
       </div>
       <div class="message-content">
@@ -34,16 +39,20 @@
       </div>
     </div>
     
-    <!-- 错误消息 -->
-    <div class="message error-message" v-if="hasError">
+    <!-- 详细错误信息 -->
+    <div class="message error-message" v-if="hasDetailedError">
       <div class="message-header">
-        <span class="step-name">错误</span>
+        <span class="step-name">详细错误信息</span>
         <span class="message-time">{{ formatTime(new Date()) }}</span>
       </div>
       <div class="message-content">
-        {{ errorMessage }}
+        <div class="error-details">
+          <p><strong>错误代码:</strong> {{ taskError.error_code || 'UNKNOWN' }}</p>
+          <p><strong>错误描述:</strong> {{ taskError.error_message || '未知错误' }}</p>
+          <p v-if="taskError.can_retry"><strong>支持重试:</strong> 是</p>
+        </div>
       </div>
-      <div class="error-actions">
+      <div class="error-actions" v-if="taskError.can_retry">
         <el-button type="primary" size="small" @click="handleRetry">
           重试
         </el-button>
@@ -68,7 +77,7 @@ import { useProgressStore, type ProgressMessage, type PreviewImage } from '../..
 import { useTaskProgress } from '../../composables/useTaskProgress'
 
 const progressStore = useProgressStore()
-const { retryTask } = useTaskProgress()
+const { createPptTask } = useTaskProgress()
 
 // 进度消息列表
 const progressMessages = computed(() => progressStore.progressMessages)
@@ -79,14 +88,19 @@ const previewImages = computed(() => progressStore.previewImages)
 // 是否正在生成
 const isGenerating = computed(() => progressStore.isGenerating)
 
+// 错误信息
+const taskError = computed(() => progressStore.taskError)
+
 // 是否有消息
 const hasMessages = computed(() => progressMessages.value.length > 0)
 
 // 是否有错误
 const hasError = computed(() => progressStore.taskStatus === 'failed')
 
-// 错误消息
-const errorMessage = ref('生成过程中遇到错误，请重试')
+// 是否有详细错误信息
+const hasDetailedError = computed(() => {
+  return hasError.value && taskError.value && taskError.value.has_error
+})
 
 // 格式化时间
 function formatTime(time: Date) {
@@ -106,13 +120,10 @@ function getPreviewForMessage(messageId: string): PreviewImage | null {
 
 // 处理重试
 async function handleRetry() {
-  if (progressStore.taskStatus === 'failed') {
-    // 假设最后一条消息的ID是任务ID
-    const taskId = progressMessages.value[progressMessages.value.length - 1]?.id
-    
-    if (taskId) {
-      await retryTask(taskId)
-    }
+  if (hasError.value) {
+    // 重置进度并重新创建任务
+    progressStore.resetProgress()
+    await createPptTask()
   }
 }
 </script>
@@ -180,6 +191,11 @@ async function handleRetry() {
   color: #409eff;
 }
 
+.error-indicator {
+  margin-right: 10px;
+  color: #f56c6c;
+}
+
 .message-time {
   margin-left: auto;
 }
@@ -203,6 +219,26 @@ async function handleRetry() {
 
 .error-actions {
   margin-top: 15px;
+}
+
+.error-details {
+  font-family: 'Courier New', monospace;
+  background-color: #faf2f2;
+  border: 1px solid #fbc4c4;
+  border-radius: 4px;
+  padding: 10px;
+  margin: 10px 0;
+}
+
+.error-details p {
+  margin: 8px 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.error-details strong {
+  color: #f56c6c;
+  font-weight: 600;
 }
 
 .loading-indicator {

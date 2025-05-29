@@ -22,6 +22,8 @@ def generate_ppt_task(self, task_data: dict):
         task_data: 包含template_id, markdown_content等信息
     """
     task_id = self.request.id
+    logger.info(f"开始PPT生成任务: task_id={task_id}, template_id={task_data.get('template_id')}")
+    
     redis_service = RedisService()
     file_service = FileService()
     
@@ -65,8 +67,20 @@ def generate_ppt_task(self, task_data: dict):
                 "updated_at": datetime.utcnow().isoformat()
             }
             
-            # 如果有预览数据，添加到更新数据中
-            if preview_data:
+            # 检查是否为错误状态
+            if preview_data and preview_data.get("error"):
+                update_data["status"] = "failed"
+                update_data["error"] = {
+                    "has_error": True,
+                    "error_code": "WORKFLOW_ERROR",
+                    "error_message": description,
+                    "can_retry": True
+                }
+                # 错误状态时，进度设为失败时的进度或0
+                update_data["progress"] = max(0, progress)
+            
+            # 如果有其他预览数据，添加到更新数据中
+            if preview_data and not preview_data.get("error"):
                 if "preview_url" in preview_data:
                     update_data["preview_url"] = preview_data["preview_url"]
                 if "preview_images" in preview_data:
@@ -79,7 +93,11 @@ def generate_ppt_task(self, task_data: dict):
             websocket_data = {"task_id": task_id, **update_data}
             redis_service.publish_task_update(task_id, websocket_data)
             
-            logger.info(f"任务进度更新: task_id={task_id}, step={step}, progress={progress}%, description={description}")
+            # 根据状态类型记录不同级别的日志
+            if update_data["status"] == "failed":
+                logger.error(f"任务错误: task_id={task_id}, step={step}, description={description}")
+            else:
+                logger.info(f"任务进度更新: task_id={task_id}, step={step}, progress={progress}%, description={description}")
         
         # 设置进度回调到节点执行器
         engine.node_executor.set_progress_callback(progress_callback)

@@ -161,6 +161,13 @@ class WorkflowEngine:
             if error_response:
                 state.record_failure(error_response.get("error", "未知错误"))
                 state.save()
+                # 通过进度回调反馈错误信息
+                if hasattr(self.node_executor, 'report_progress'):
+                    self.node_executor.report_progress(
+                        "markdown_parser", 0, 
+                        error_response.get("error", "Markdown解析失败"),
+                        {"error": True}
+                    )
                 if self.enable_tracking and self.tracker: self.tracker.end_workflow_run("FAILED")
                 return state
             
@@ -171,6 +178,13 @@ class WorkflowEngine:
             if error_response:
                 state.record_failure(error_response.get("error", "未知错误"))
                 state.save()
+                # 通过进度回调反馈错误信息
+                if hasattr(self.node_executor, 'report_progress'):
+                    self.node_executor.report_progress(
+                        "ppt_analyzer", 0, 
+                        error_response.get("error", "PPT模板分析失败"),
+                        {"error": True}
+                    )
                 if self.enable_tracking and self.tracker: self.tracker.end_workflow_run("FAILED")
                 return state
             
@@ -181,6 +195,13 @@ class WorkflowEngine:
             if error_response:
                 state.record_failure(error_response.get("error", "未知错误"))
                 state.save()
+                # 通过进度回调反馈错误信息
+                if hasattr(self.node_executor, 'report_progress'):
+                    self.node_executor.report_progress(
+                        "content_planner", 0, 
+                        error_response.get("error", "内容规划失败"),
+                        {"error": True}
+                    )
                 if self.enable_tracking and self.tracker: self.tracker.end_workflow_run("FAILED")
                 return state
             
@@ -189,6 +210,13 @@ class WorkflowEngine:
                 error_msg = "内容规划失败，终止工作流"
                 logger.error(error_msg)
                 state.record_failure(error_msg)
+                # 通过进度回调反馈错误信息
+                if hasattr(self.node_executor, 'report_progress'):
+                    self.node_executor.report_progress(
+                        "content_planner", 0, 
+                        error_msg,
+                        {"error": True}
+                    )
                 if self.enable_tracking and self.tracker: self.tracker.end_workflow_run("FAILED")
                 state.save()
                 return state
