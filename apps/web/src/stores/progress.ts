@@ -35,31 +35,52 @@ export const useProgressStore = defineStore('progress', () => {
    * 更新任务进度
    */
   function updateTaskProgress(progressData: any) {
+    // 适配API返回格式
+    const data = progressData.data ? progressData.data : progressData
+    
     // 更新任务状态
-    if (progressData.status) {
-      taskStatus.value = progressData.status
+    if (data.status) {
+      taskStatus.value = data.status
     }
     
     // 添加进度消息
-    if (progressData.message) {
+    if (data.step_description) {
       const message: ProgressMessage = {
         id: nanoid(),
         time: new Date(),
-        step: progressData.step || '处理中',
-        message: progressData.message,
-        progress: progressData.progress || 0
+        step: data.current_step || '处理中',
+        message: data.step_description,
+        progress: data.progress || 0
       }
       progressMessages.value.push(message)
     }
     
     // 添加预览图片
-    if (progressData.preview_url) {
+    if (data.preview_url) {
       const preview: PreviewImage = {
         id: nanoid(),
-        url: progressData.preview_url,
+        url: data.preview_url,
         time: new Date()
       }
       previewImages.value.push(preview)
+    }
+    
+    // 处理多个预览图
+    if (data.preview_images && Array.isArray(data.preview_images)) {
+      data.preview_images.forEach((img: any) => {
+        if (img.preview_url) {
+          const preview: PreviewImage = {
+            id: nanoid(),
+            url: img.preview_url,
+            time: new Date()
+          }
+          // 检查是否已存在相同URL的预览图
+          const exists = previewImages.value.some(p => p.url === img.preview_url)
+          if (!exists) {
+            previewImages.value.push(preview)
+          }
+        }
+      })
     }
   }
   

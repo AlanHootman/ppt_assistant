@@ -6,13 +6,19 @@ from apps.api.models.database import GenerationTask, Template
 from apps.api.dependencies.auth import get_current_active_user
 from apps.api.services.redis_service import RedisService
 from apps.api.tasks.ppt_generation import generate_ppt_task
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from pydantic import BaseModel
 import uuid
 from datetime import datetime
 
 router = APIRouter(prefix="/ppt")
 redis_service = RedisService()
+
+# 标准API响应格式
+class ApiResponse(BaseModel):
+    code: int = 200
+    message: str
+    data: Optional[Dict[str, Any]] = None
 
 class GenerationRequest(BaseModel):
     template_id: int
@@ -31,7 +37,7 @@ class TaskStatusResponse(BaseModel):
     updated_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 
-@router.post("/generate", response_model=Dict[str, Any])
+@router.post("/generate", response_model=ApiResponse)
 async def create_generation_task(
     request: GenerationRequest,
     background_tasks: BackgroundTasks,
@@ -94,13 +100,18 @@ async def create_generation_task(
         "markdown_content": request.markdown_content
     })
     
-    return {
-        "task_id": task_id,
-        "status": "pending",
-        "message": "任务已创建并加入队列"
-    }
+    # 返回标准格式响应
+    return ApiResponse(
+        code=201,
+        message="PPT生成任务已创建",
+        data={
+            "task_id": task_id,
+            "status": "pending",
+            "created_at": task.created_at.isoformat()
+        }
+    )
 
-@router.get("/tasks/{task_id}", response_model=TaskStatusResponse)
+@router.get("/tasks/{task_id}", response_model=ApiResponse)
 async def get_task_status(
     task_id: str,
     db: Session = Depends(get_db)
@@ -139,21 +150,39 @@ async def get_task_status(
     # 确保返回的数据包含task_id
     status_data["task_id"] = task_id
     
-    # 转换日期字符串为datetime对象
+    # 转换日期字符串为datetime对象用于验证
+    created_at = task.created_at
+    updated_at = None
+    completed_at = None
+    
     if "created_at" in status_data and isinstance(status_data["created_at"], str):
-        status_data["created_at"] = datetime.fromisoformat(status_data["created_at"])
-    else:
-        status_data["created_at"] = task.created_at
+        created_at = datetime.fromisoformat(status_data["created_at"])
     
     if "updated_at" in status_data and isinstance(status_data["updated_at"], str):
-        status_data["updated_at"] = datetime.fromisoformat(status_data["updated_at"])
+        updated_at = datetime.fromisoformat(status_data["updated_at"])
     
     if "completed_at" in status_data and isinstance(status_data["completed_at"], str):
-        status_data["completed_at"] = datetime.fromisoformat(status_data["completed_at"])
+        completed_at = datetime.fromisoformat(status_data["completed_at"])
     
-    return TaskStatusResponse(**status_data)
+    # 准备响应数据
+    task_data = {**status_data}
+    
+    # 转换回字符串格式用于JSON响应
+    if created_at:
+        task_data["created_at"] = created_at.isoformat()
+    if updated_at:
+        task_data["updated_at"] = updated_at.isoformat()
+    if completed_at:
+        task_data["completed_at"] = completed_at.isoformat()
+    
+    # 返回标准格式响应
+    return ApiResponse(
+        code=200,
+        message="获取任务状态成功",
+        data=task_data
+    )
 
-@router.delete("/tasks/{task_id}")
+@router.delete("/tasks/{task_id}", response_model=ApiResponse)
 async def cancel_task(
     task_id: str,
     db: Session = Depends(get_db)
@@ -203,4 +232,12 @@ async def cancel_task(
         "step_description": "任务已取消"
     })
     
-    return {"message": "任务已取消"} 
+    # 返回标准格式响应
+    return ApiResponse(
+        code=200,
+        message="任务已取消",
+        data={
+            "task_id": task_id,
+            "status": "cancelled"
+        }
+    ) 

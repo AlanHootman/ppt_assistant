@@ -298,7 +298,7 @@ Authorization: Bearer {token}
     "code": 201,
     "message": "PPT生成任务已创建",
     "data": {
-      "task_id": "task-67890",
+      "task_id": "73981347-ef2a-472d-97cd-94d2327c178a",
       "status": "pending",
       "created_at": "2023-07-10T15:45:30Z"
     }
@@ -313,9 +313,9 @@ Authorization: Bearer {token}
   ```json
   {
     "code": 200,
-    "message": "获取成功",
+    "message": "获取任务状态成功",
     "data": {
-      "task_id": "task-67890",
+      "task_id": "73981347-ef2a-472d-97cd-94d2327c178a",
       "status": "processing", // 可能的状态: pending, processing, completed, failed, cancelled
       "progress": 65,
       "current_step": "slide_generation",
@@ -346,9 +346,9 @@ Authorization: Bearer {token}
   ```json
   {
     "code": 200,
-    "message": "获取成功",
+    "message": "获取任务状态成功",
     "data": {
-      "task_id": "task-67890",
+      "task_id": "73981347-ef2a-472d-97cd-94d2327c178a",
       "status": "failed",
       "progress": 35,
       "current_step": "slide_generation",
@@ -381,7 +381,7 @@ Authorization: Bearer {token}
     "code": 200,
     "message": "任务已重新启动",
     "data": {
-      "task_id": "task-67890",
+      "task_id": "73981347-ef2a-472d-97cd-94d2327c178a",
       "status": "processing",
       "progress": 35,
       "retry_count": 1,
@@ -401,7 +401,7 @@ Authorization: Bearer {token}
     "code": 200,
     "message": "获取成功",
     "data": {
-      "task_id": "task-67890",
+      "task_id": "73981347-ef2a-472d-97cd-94d2327c178a",
       "status": "completed",
       "file_url": "/static/output/task-67890/presentation.pptx",
       "preview_url": "/static/output/task-67890/preview.png",
@@ -432,7 +432,7 @@ Authorization: Bearer {token}
     "code": 200,
     "message": "任务已取消",
     "data": {
-      "task_id": "task-67890",
+      "task_id": "73981347-ef2a-472d-97cd-94d2327c178a",
       "status": "cancelled"
     }
   }
@@ -448,7 +448,7 @@ Authorization: Bearer {token}
     "code": 200,
     "message": "获取成功",
     "data": {
-      "task_id": "task-67890",
+      "task_id": "73981347-ef2a-472d-97cd-94d2327c178a",
       "total_slides": 10,
       "generated_slides": 4,
       "previews": [
