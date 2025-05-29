@@ -138,12 +138,35 @@
                 "PYTHONPATH": "${workspaceFolder}"
             },
             "purpose": ["debug-test"]
+        },
+        {
+            "name": "启动前端开发服务器",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/apps/web",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "dev"],
+            "serverReadyAction": {
+                "pattern": "Local:.*(:\\d+)",
+                "uriFormat": "http://localhost%s",
+                "action": "openExternally"
+            },
+            "console": "integratedTerminal",
+            "presentation": {
+                "hidden": false,
+                "group": "前端",
+                "order": 1
+            }
         }
     ],
     "compounds": [
         {
             "name": "启动完整后端服务",
             "configurations": ["启动FastAPI后端服务", "启动Celery Worker"]
+        },
+        {
+            "name": "启动完整应用(前端+后端)",
+            "configurations": ["启动前端开发服务器", "启动FastAPI后端服务", "启动Celery Worker"]
         }
     ],
     "inputs": [
