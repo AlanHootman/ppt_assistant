@@ -67,6 +67,11 @@ export const useProgressStore = defineStore('progress', () => {
     // 更新任务状态
     if (data.status) {
       taskStatus.value = data.status
+      
+      // 当任务状态变为失败时，自动重置生成状态
+      if (data.status === 'failed') {
+        isGenerating.value = false
+      }
     }
     
     // 处理错误信息
