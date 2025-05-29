@@ -94,11 +94,14 @@ async def create_generation_task(
         created_at=task.created_at.isoformat()
     )
     
-    # 提交Celery任务
-    generate_ppt_task.delay({
-        "template_id": request.template_id,
-        "markdown_content": request.markdown_content
-    })
+    # 提交Celery任务，使用API生成的task_id
+    generate_ppt_task.apply_async(
+        args=[{
+            "template_id": request.template_id,
+            "markdown_content": request.markdown_content
+        }],
+        task_id=task_id  # 强制使用API生成的task_id
+    )
     
     # 返回标准格式响应
     return ApiResponse(
