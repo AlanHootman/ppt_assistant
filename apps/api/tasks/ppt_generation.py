@@ -13,7 +13,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, autoretry_for=(), max_retries=0, default_retry_delay=0)
 def generate_ppt_task(self, task_data: dict):
     """
     PPT生成异步任务
@@ -233,8 +233,8 @@ def generate_ppt_task(self, task_data: dict):
         websocket_data = {"task_id": task_id, **error_data}
         redis_service.publish_task_update(task_id, websocket_data)
         
-        # 重试任务
-        raise self.retry(countdown=60, max_retries=3)
+        # 不再自动重试，直接返回失败状态，让用户手动决定是否重试
+        return {"task_id": task_id, **error_data}
 
 def generate_preview_images(ppt_path: str) -> list:
     """生成PPT预览图

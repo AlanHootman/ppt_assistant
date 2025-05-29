@@ -25,7 +25,7 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, autoretry_for=(), max_retries=0, default_retry_delay=0)
 def analyze_template_task(self, template_data: dict):
     """
     模板分析异步任务
@@ -234,7 +234,11 @@ def analyze_template_task(self, template_data: dict):
             except Exception as log_error:
                 logger.warning(f"记录失败到MLflow失败: {str(log_error)}")
         
-        raise self.retry(countdown=30, max_retries=2)
+        # 不再自动重试，直接返回失败状态，让用户手动决定是否重试
+        return {
+            "template_id": template_data.get("template_id"),
+            **error_data
+        }
 
 def update_template_status_in_db(template_id: int, status: str, analysis_path: str = None, analysis_time: datetime = None, preview_path: str = None):
     """更新数据库中的模板状态
