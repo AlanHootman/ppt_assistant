@@ -13,6 +13,7 @@ from datetime import datetime
 import logging
 from apps.api.models.database import Template
 from apps.api.models import SessionLocal
+import time
 
 # 导入MLflow跟踪功能
 try:
@@ -92,8 +93,26 @@ def analyze_template_task(self, template_data: dict):
             # 记录进度到MLflow
             if enable_tracking and tracker and HAS_MLFLOW:
                 try:
+                    # 记录整体进度
                     mlflow.log_metric(f"progress", progress)
-                    mlflow.log_param(f"status_message", description)
+                    
+                    # 为每个不同的步骤创建嵌套运行
+                    current_step = f"{step}_{progress}"
+                    
+                    # 使用嵌套运行跟踪每个步骤的详细信息
+                    with mlflow.start_run(run_name=current_step, nested=True):
+                        # 在嵌套运行中记录详细信息
+                        mlflow.log_param("step_name", step)
+                        mlflow.log_param("step_description", description)
+                        mlflow.log_metric("step_progress", progress)
+                        
+                        # 如果有预览数据，也记录
+                        if preview_data:
+                            try:
+                                preview_summary = json.dumps(preview_data)
+                                mlflow.log_text(preview_summary, f"preview_{step}_{progress}.json")
+                            except:
+                                pass
                 except Exception as e:
                     logger.warning(f"记录进度到MLflow失败: {str(e)}")
         
@@ -169,7 +188,8 @@ def analyze_template_task(self, template_data: dict):
             template_id=template_data.get("template_id"),
             status="ready",
             analysis_path=str(cache_path),
-            analysis_time=datetime.utcnow()
+            analysis_time=datetime.utcnow(),
+            preview_path=preview_images[0] if preview_images else None
         )
         
         # 结束MLflow跟踪
@@ -216,7 +236,7 @@ def analyze_template_task(self, template_data: dict):
         
         raise self.retry(countdown=30, max_retries=2)
 
-def update_template_status_in_db(template_id: int, status: str, analysis_path: str = None, analysis_time: datetime = None):
+def update_template_status_in_db(template_id: int, status: str, analysis_path: str = None, analysis_time: datetime = None, preview_path: str = None):
     """更新数据库中的模板状态
     
     Args:
@@ -224,6 +244,7 @@ def update_template_status_in_db(template_id: int, status: str, analysis_path: s
         status: 新状态
         analysis_path: 分析结果路径
         analysis_time: 分析完成时间
+        preview_path: 预览图路径
     """
     try:
         # 创建数据库会话
@@ -237,6 +258,8 @@ def update_template_status_in_db(template_id: int, status: str, analysis_path: s
                     template.analysis_path = analysis_path
                 if analysis_time:
                     template.analysis_time = analysis_time
+                if preview_path:
+                    template.preview_path = preview_path
                 
                 # 提交更改
                 db.commit()

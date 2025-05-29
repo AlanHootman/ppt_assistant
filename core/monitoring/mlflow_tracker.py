@@ -179,6 +179,59 @@ class MLflowTracker:
                     except:
                         logger.warning(f"无法记录制品 {name} 用于节点 {node_name}")
 
+    def start_nested_run(self, step_name, step_description=None):
+        """开始一个嵌套运行，用于跟踪特定步骤
+        
+        Args:
+            step_name: 步骤名称
+            step_description: 步骤描述
+            
+        Returns:
+            嵌套运行对象
+        """
+        if not self.active_run:
+            logger.warning("没有活动的父运行，无法创建嵌套运行")
+            return None
+            
+        # 创建嵌套运行
+        nested_run = mlflow.start_run(
+            run_name=f"{step_name}_{int(time.time())}", 
+            nested=True,
+            tags={
+                "step_name": step_name,
+                "step_description": step_description or step_name
+            }
+        )
+        
+        logger.info(f"开始嵌套运行: {nested_run.info.run_id} - {step_name}")
+        return nested_run
+        
+    def end_nested_run(self, status="FINISHED"):
+        """结束当前嵌套运行
+        
+        Args:
+            status: 运行状态
+        """
+        # 转换状态为MLflow支持的格式
+        status_map = {
+            "completed": "FINISHED",
+            "finished": "FINISHED",
+            "success": "FINISHED",
+            "failed": "FAILED",
+            "error": "FAILED",
+            "interrupted": "KILLED",
+            "killed": "KILLED",
+            "running": "RUNNING",
+            "scheduled": "SCHEDULED",
+        }
+        
+        mlflow_status = status_map.get(status.lower(), status)
+        if mlflow_status not in ["FINISHED", "FAILED", "KILLED", "RUNNING", "SCHEDULED"]:
+            mlflow_status = "FINISHED"
+            
+        mlflow.end_run(status=mlflow_status)
+        logger.info(f"结束嵌套运行: 状态={mlflow_status}")
+
 def register_with_langgraph(tracker, graph):
     """向LangGraph注册MLflow跟踪器
     
