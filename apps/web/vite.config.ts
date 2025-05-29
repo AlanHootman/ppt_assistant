@@ -26,6 +26,10 @@ export default defineConfig({
       '/ws': {
         target: 'ws://localhost:8000',
         ws: true
+      },
+      '/workspace': {
+        target: 'http://localhost:8000',
+        changeOrigin: true
       }
     }
   }
