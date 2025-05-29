@@ -2,8 +2,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useProgressStore } from '@/stores/progress'
 import { useClientStore } from '@/stores/client'
 import WebSocketService from '@/services/websocket'
-import * as pptApi from '@/services/api/ppt.api'
-import type { TaskStatus } from '@/types/api'
+import { pptApi } from '@/services/api/ppt.api'
 import { useWebSocket } from './useWebSocket'
 import { getClientId } from '@/utils/clientId'
 import { useEditorStore } from '@/stores/editor'
@@ -49,13 +48,13 @@ export function useTaskProgress() {
     
     if (!templateId) {
       error.value = '请先选择一个模板'
-      ElMessage.error(error.value)
+      ElMessage.error('请先选择一个模板')
       return null
     }
     
     if (!markdownContent.trim()) {
       error.value = '请先输入Markdown内容'
-      ElMessage.error(error.value)
+      ElMessage.error('请先输入Markdown内容')
       return null
     }
     
@@ -70,6 +69,7 @@ export function useTaskProgress() {
         client_id: getClientId()
       })
       
+      // 获取任务ID
       const taskId = response.data.task_id
       
       // 保存任务ID
@@ -85,7 +85,7 @@ export function useTaskProgress() {
       return taskId
     } catch (err: any) {
       error.value = err.message || '创建任务失败'
-      ElMessage.error(error.value)
+      ElMessage.error(err.message || '创建任务失败')
       return null
     } finally {
       loading.value = false
@@ -98,24 +98,15 @@ export function useTaskProgress() {
     error.value = null
     
     try {
-      // 这里应该调用API获取任务状态
-      // const response = await pptApi.getTaskStatus(taskId)
-      
-      // 模拟API响应
-      const response = {
-        data: {
-          status: 'processing',
-          progress: 30,
-          current_step: 'content_planning',
-          step_description: '正在进行内容规划'
-        }
-      }
+      // 调用API获取任务状态
+      const response = await pptApi.getTaskById(taskId)
+      const taskData = response.data
       
       // 更新进度状态
-      progressStore.updateTaskProgress(response.data)
+      progressStore.updateTaskProgress(taskData)
       
-      return response.data
-    } catch (err) {
+      return taskData
+    } catch (err: any) {
       console.error('获取任务状态失败:', err)
       error.value = '获取任务状态失败'
       return null
@@ -124,34 +115,13 @@ export function useTaskProgress() {
     }
   }
   
-  // 重试任务
-  async function retryTask(taskId: string) {
-    loading.value = true
-    error.value = null
-    
-    try {
-      // 这里应该调用API重试任务
-      // await pptApi.retryTask(taskId)
-      
-      // 连接WebSocket获取实时进度
-      connectWebSocket(taskId, onTaskUpdate)
-      
-      return true
-    } catch (err) {
-      console.error('重试任务失败:', err)
-      error.value = '重试任务失败'
-      return false
-    } finally {
-      loading.value = false
-    }
-  }
-  
   // 取消任务
   async function cancelTask() {
-    if (!currentTaskId.value) return
+    const taskId = currentTaskId.value
+    if (!taskId) return
     
     try {
-      await pptApi.cancelTask(currentTaskId.value)
+      await pptApi.cancelTask(taskId)
       
       // 断开WebSocket连接
       disconnectWebSocket()
@@ -163,13 +133,13 @@ export function useTaskProgress() {
       ElMessage.info('任务已取消')
     } catch (err: any) {
       error.value = err.message || '取消任务失败'
-      ElMessage.error(error.value)
+      ElMessage.error(err.message || '取消任务失败')
     }
   }
   
   // 下载PPT
   function downloadPpt(taskId: string) {
-    pptApi.downloadPpt(taskId)
+    window.location.href = pptApi.getTaskDownloadUrl(taskId)
   }
   
   // 计算属性
@@ -181,7 +151,7 @@ export function useTaskProgress() {
   
   // 组件挂载时，检查是否有未完成的任务
   onMounted(() => {
-    const taskId = clientStore.currentTaskId
+    const taskId = currentTaskId.value
     if (taskId) {
       // 获取任务状态
       getTaskStatus(taskId).then((status) => {
@@ -226,7 +196,7 @@ export function useTaskProgress() {
       disconnectWebSocket()
       progressStore.setIsGenerating(false)
       error.value = data.message || '任务执行失败'
-      ElMessage.error(error.value)
+      ElMessage.error(data.message || '任务执行失败')
     }
   }
   
@@ -243,46 +213,50 @@ export function useTaskProgress() {
       const response = await pptApi.getTaskById(taskId)
       const taskData = response.data
       
-      // 如果任务仍在进行中，连接WebSocket获取实时进度
-      if (taskData.status === 'processing') {
-        progressStore.setTaskStatus('processing')
+      // 根据任务状态更新UI
+      if (taskData.status === 'processing' || taskData.status === 'pending') {
+        progressStore.setTaskStatus(taskData.status)
         progressStore.setIsGenerating(true)
         connectWebSocket(taskId, handleProgressUpdate)
       } else if (taskData.status === 'completed') {
         progressStore.setTaskStatus('completed')
         progressStore.setIsGenerating(false)
-      } else {
-        // 其他状态（失败、取消等）
-        progressStore.setTaskStatus(taskData.status)
+      } else if (taskData.status === 'failed') {
+        progressStore.setTaskStatus('failed')
         progressStore.setIsGenerating(false)
+        if (taskData.error && taskData.error.error_message) {
+          error.value = taskData.error.error_message
+          ElMessage.error(taskData.error.error_message)
+        }
       }
+      
+      // 更新进度数据
+      progressStore.updateTaskProgress(taskData)
     } catch (err) {
-      // 获取任务失败，可能任务已过期或被删除
+      console.error('获取任务详情失败:', err)
+      // 清除任务ID
       clientStore.clearCurrentTask()
     }
   }
   
-  /**
-   * 获取任务下载链接
-   */
-  function getDownloadUrl(taskId: string) {
-    return `${import.meta.env.VITE_API_BASE_URL}/tasks/${taskId}/download`
+  // 获取下载链接
+  function getDownloadUrl(taskId: string): string {
+    return pptApi.getTaskDownloadUrl(taskId)
   }
   
   return {
+    createPptTask,
+    getTaskStatus,
+    cancelTask,
+    downloadPpt,
+    initTaskProgress,
+    getDownloadUrl,
     loading,
     error,
     isGenerating,
     progressMessages,
     previewImages,
     taskStatus,
-    taskCompleted,
-    createPptTask,
-    getTaskStatus,
-    retryTask,
-    cancelTask,
-    downloadPpt,
-    getDownloadUrl,
-    initTaskProgress
+    taskCompleted
   }
 } 
