@@ -124,6 +124,8 @@ onMounted(async () => {
 <style scoped>
 .template-selector {
   margin-bottom: 15px;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
 .title {
@@ -166,6 +168,8 @@ onMounted(async () => {
 
 .template-list {
   margin-bottom: 15px;
+  max-height: 150px;
+  overflow-y: auto;
 }
 
 .template-card {

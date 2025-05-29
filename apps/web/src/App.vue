@@ -22,12 +22,10 @@ html, body {
   line-height: 1.5;
   background-color: #f5f7fa;
   height: 100%;
-  overflow: hidden;
 }
 
 #app {
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
 }
 
 a {

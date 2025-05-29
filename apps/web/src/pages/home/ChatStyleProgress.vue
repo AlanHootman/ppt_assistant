@@ -32,9 +32,11 @@
         </div>
         
         <!-- 预览图片 -->
-        <div v-if="getPreviewForMessage(message.id)" class="preview-container">
+        <div v-if="shouldShowPreview(message)" class="preview-container">
           <img 
-            :src="getPreviewForMessage(message.id).url" 
+            v-for="preview in previewImages" 
+            :key="preview.id"
+            :src="preview.url" 
             alt="预览" 
             class="preview-image"
           />
@@ -62,7 +64,7 @@
       </div>
       
       <!-- 加载中动画 -->
-      <div v-if="isGenerating" class="loading-indicator">
+      <div v-if="isGenerating && !hasError" class="loading-indicator">
         <div class="loading-dots">
           <span></span>
           <span></span>
@@ -127,15 +129,17 @@ function formatTime(time: Date) {
   return dayjs(time).format('HH:mm:ss')
 }
 
-// 获取消息对应的预览图片
-function getPreviewForMessage(messageId: string): PreviewImage | null {
-  // 在实际应用中，需要根据消息ID关联预览图
-  // 这里简化为返回最近的预览图
-  if (previewImages.value.length === 0) {
-    return null
-  }
+// 判断是否应该显示预览图
+function shouldShowPreview(message: ProgressMessage): boolean {
+  // 只有在以下条件下才显示预览图：
+  // 1. 是最后一条消息
+  // 2. 任务状态为completed
+  // 3. 不是错误消息
+  const isLastMessage = progressMessages.value[progressMessages.value.length - 1]?.id === message.id
+  const isCompleted = progressStore.taskStatus === 'completed'
+  const hasPreviewImages = previewImages.value.length > 0
   
-  return previewImages.value[previewImages.value.length - 1]
+  return isLastMessage && isCompleted && !message.isError && hasPreviewImages
 }
 
 // 处理重试
@@ -154,6 +158,7 @@ async function handleRetry() {
   border-radius: 8px;
   padding: 12px; /* 减少内边距 */
   height: 100%;
+  max-height: 500px; /* 设置最大高度，避免过高 */
   display: flex;
   flex-direction: column;
   overflow: hidden; /* 防止整体溢出 */
@@ -172,6 +177,7 @@ async function handleRetry() {
   padding-right: 5px; /* 为滚动条留出空间 */
   scrollbar-width: thin; /* Firefox滚动条样式 */
   scrollbar-color: #c0c4cc #f5f7fa; /* Firefox滚动条颜色 */
+  max-height: 450px; /* 限制最大高度 */
 }
 
 /* Webkit滚动条样式 */

@@ -58,7 +58,9 @@ const progressStore = useProgressStore()
 const { createPptTask, initTaskProgress } = useTaskProgress()
 
 // 计算任务是否完成
-const taskCompleted = computed(() => progressStore.taskStatus === 'completed')
+const taskCompleted = computed(() => 
+  progressStore.taskStatus === 'completed' && !progressStore.taskError
+)
 
 // 导航到管理后台
 function navigateToAdmin() {
@@ -98,7 +100,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  overflow: hidden; /* 避免页面滚动 */
+  /* 移除 overflow: hidden，允许必要时滚动 */
 }
 
 .header {
@@ -123,18 +125,19 @@ onMounted(() => {
 .main-content {
   flex: 1;
   padding: 15px 0; /* 减少上下padding */
-  overflow: hidden; /* 避免主内容区域滚动 */
+  min-height: 0; /* 允许flex子元素缩小 */
 }
 
 .responsive-container {
-  height: 100%; /* 使用全部可用高度 */
+  height: calc(100vh - 120px); /* 计算可用高度，减去header和footer */
+  min-height: 600px; /* 设置最小高度，确保内容可见 */
 }
 
 .editor-panel, .preview-panel {
   padding: 10px; /* 减少内边距 */
   flex: 1;
-  height: 100%; /* 使用全部高度 */
-  overflow: hidden; /* 避免面板滚动 */
+  min-height: 0; /* 允许flex子元素缩小 */
+  overflow-y: auto; /* 允许各面板内部滚动 */
 }
 
 .footer {
@@ -149,6 +152,11 @@ onMounted(() => {
 @media (max-width: 768px) {
   .editor-panel, .preview-panel {
     width: 100%;
+  }
+  
+  .responsive-container {
+    height: auto; /* 移动端允许自然高度 */
+    min-height: auto;
   }
 }
 </style> 
