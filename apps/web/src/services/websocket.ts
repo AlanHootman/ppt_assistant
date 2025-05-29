@@ -62,15 +62,20 @@ class WebSocketService {
           const data = JSON.parse(event.data)
           console.log('WebSocket message received:', data)
           
-          // 过滤连接确认消息
-          if (data.type === 'connection_established') {
-            console.log('WebSocket connection established')
+          // 过滤连接确认消息和心跳消息
+          if (data.type === 'connection_established' || data.type === 'pong') {
+            console.log('WebSocket connection established or pong received')
             return
           }
           
-          // 更新进度
-          const progressStore = useProgressStore()
-          progressStore.updateTaskProgress(data)
+          // 只处理包含任务状态或进度信息的消息
+          if (data.status || data.step_description || data.progress !== undefined) {
+            // 更新进度
+            const progressStore = useProgressStore()
+            progressStore.updateTaskProgress(data)
+          } else {
+            console.log('Skipping message without status or progress:', data)
+          }
         } catch (error) {
           console.error('Failed to parse WebSocket message:', error)
         }
