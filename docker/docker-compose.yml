@@ -6,7 +6,7 @@ services:
       args:
         - DOCKER_ENV=production
     expose:
-      - "5173"
+      - "5173:5173"
     depends_on:
       - ppt_api
     networks:
@@ -83,12 +83,12 @@ services:
     volumes:
       - ../workspace/mlflow:/app/mlruns
     ports:
-      - "5001:5001"
+      - "5000:5000"
     networks:
       - ppt-net
     command: >
       sh -c "pip install mlflow &&
-             mlflow server --host 0.0.0.0 --port 5001 --backend-store-uri file:///app/mlruns --default-artifact-root file:///app/mlruns"
+             mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri file:///app/mlruns --default-artifact-root file:///app/mlruns"
     environment:
       - TZ=Asia/Shanghai
 
