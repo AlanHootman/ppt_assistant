@@ -20,7 +20,8 @@ RUN npm config set registry https://registry.npmmirror.com/
 COPY apps/web/package*.json ./
 
 # 安装依赖（添加重试机制和超时设置）
-RUN npm ci --legacy-peer-deps
+# RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 # 复制源代码
 COPY apps/web/ ./
