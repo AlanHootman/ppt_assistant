@@ -4,7 +4,7 @@ services:
       context: ..
       dockerfile: docker/web/Dockerfile
       args:
-        - DOCKER_ENV=production
+        - DOCKER_ENV=development
     expose:
       - "5173:5173"
     depends_on:

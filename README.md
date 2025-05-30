@@ -39,6 +39,10 @@ conda activate ppt_gen
 # 安装依赖
 pip install -r requirements.txt
 
+# 初始化子模块
+git submodule update --init
+
+# 安装ppt_manager
 cd libs/ppt_manager
 pip install -e .
 ```
