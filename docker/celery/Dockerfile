@@ -66,6 +66,8 @@ RUN mkdir -p /app/workspace/output \
     /app/workspace/logs \
     /app/workspace/mlflow \
     /app/workspace/redis \
+    /app/workspace/cache \
+    /app/workspace/db \
     && chown -R appuser:appuser /app/workspace \
     && chown -R appuser:appuser /app
 
@@ -78,6 +80,10 @@ RUN mkdir -p /home/appuser/.config/libreoffice/4/user \
 # 4.2 验证LibreOffice安装
 RUN soffice --version || (echo "LibreOffice installation failed" && exit 1)
 
+# 4.3 添加启动时验证脚本
+COPY docker/celery/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 # 5. 切换到应用用户
 USER appuser
 
@@ -86,4 +92,5 @@ HEALTHCHECK --interval=60s --timeout=30s --start-period=30s --retries=3 \
     CMD celery -A apps.api.celery_app inspect ping && soffice --version > /dev/null || exit 1
 
 # 7. 默认启动命令
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["celery", "-A", "apps.api.celery_app", "worker", "--loglevel=INFO", "--concurrency=2", "-Q", "ppt_generation,template_analysis"] 
