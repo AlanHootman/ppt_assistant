@@ -5,7 +5,7 @@ FROM node:18-alpine
 WORKDIR /app
 
 # 设置环境变量
-ARG NODE_ENV=production
+ARG NODE_ENV=development
 ENV NODE_ENV=${NODE_ENV}
 ENV CHOKIDAR_USEPOLLING=true
 ENV HOST=0.0.0.0
@@ -20,7 +20,7 @@ RUN npm config set registry https://registry.npmmirror.com/
 COPY apps/web/package*.json ./
 
 # 安装依赖（添加重试机制和超时设置）
-RUN npm ci --only=production=false
+RUN npm ci --legacy-peer-deps
 
 # 复制源代码
 COPY apps/web/ ./
