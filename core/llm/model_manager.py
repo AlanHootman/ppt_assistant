@@ -12,6 +12,8 @@ import logging
 import json
 import asyncio
 import base64
+import atexit
+import weakref
 from typing import Dict, Any, List, Optional, Union
 
 # 引入OpenAI官方库
@@ -23,6 +25,9 @@ from jinja2 import Template
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
+
+# 全局实例注册表，用于跟踪所有ModelManager实例
+_model_manager_instances = weakref.WeakSet()
 
 class ModelManager:
     """OpenAI API简化封装"""
@@ -51,8 +56,42 @@ class ModelManager:
         
         # 客户端缓存
         self._clients = {}
+        self._is_closed = False
+        
+        # 注册清理函数
+        atexit.register(self._cleanup_clients_sync)
+        
+        # 注册到全局实例集合
+        _model_manager_instances.add(self)
         
         logger.info("初始化大模型管理器")
+    
+    def __enter__(self):
+        """进入上下文管理器"""
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """退出上下文管理器时清理资源"""
+        try:
+            # 如果有运行中的事件循环，创建清理任务
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                loop.create_task(self.close_clients())
+            else:
+                # 如果没有运行中的事件循环，尝试运行清理
+                loop.run_until_complete(self.close_clients())
+        except RuntimeError:
+            # 事件循环不可用，只能标记为已关闭
+            self._is_closed = True
+            self._clients.clear()
+    
+    async def __aenter__(self):
+        """异步上下文管理器进入"""
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """异步上下文管理器退出时清理资源"""
+        await self.close_clients()
     
     def _get_client(self, model_type: str) -> AsyncOpenAI:
         """
@@ -64,6 +103,9 @@ class ModelManager:
         Returns:
             OpenAI客户端实例
         """
+        if self._is_closed:
+            raise RuntimeError("ModelManager已关闭，无法创建新的客户端")
+            
         if model_type in self._clients:
             return self._clients[model_type]
             
@@ -93,6 +135,50 @@ class ModelManager:
         self._clients[model_type] = client
         
         return client
+    
+    async def close_clients(self):
+        """
+        异步关闭所有客户端连接
+        """
+        if self._is_closed:
+            return
+            
+        logger.debug("开始关闭异步客户端连接")
+        for model_type, client in list(self._clients.items()):
+            try:
+                await client.close()
+                logger.debug(f"已关闭 {model_type} 客户端")
+            except Exception as e:
+                logger.warning(f"关闭 {model_type} 客户端时出错: {e}")
+        
+        # 清空客户端缓存
+        self._clients.clear()
+        self._is_closed = True
+        logger.debug("所有异步客户端已关闭")
+    
+    def _cleanup_clients_sync(self):
+        """
+        同步清理方法，用于atexit注册
+        """
+        if self._is_closed or not self._clients:
+            return
+            
+        logger.debug("程序退出时清理异步客户端")
+        
+        # 检查是否有运行中的事件循环
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                # 如果事件循环正在运行，创建任务来清理
+                loop.create_task(self.close_clients())
+            else:
+                # 如果事件循环未运行，运行清理任务
+                loop.run_until_complete(self.close_clients())
+        except RuntimeError:
+            # 如果没有事件循环或事件循环已关闭，直接清理缓存
+            logger.warning("事件循环不可用，跳过异步清理")
+            self._clients.clear()
+            self._is_closed = True
     
     def get_model_config(self, model_type):
         """
@@ -157,7 +243,7 @@ class ModelManager:
         """
         logger.info(f"调用OpenAI生成文本: {model}")
         
-
+        client = None
         try:
             # 获取文本模型客户端
             client = self._get_client("text")

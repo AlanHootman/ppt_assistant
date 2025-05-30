@@ -10,6 +10,7 @@
 import logging
 import json
 import re
+import asyncio
 from typing import Dict, Any, Optional, List, Tuple, Callable, Union
 
 from config.settings import settings
@@ -32,6 +33,25 @@ class ModelHelper:
             model_manager: 模型管理器实例，如不提供则自动创建
         """
         self.model_manager = model_manager or ModelManager()
+        self._owns_model_manager = model_manager is None  # 记录是否拥有ModelManager实例
+    
+    async def cleanup(self):
+        """
+        清理资源
+        """
+        if self._owns_model_manager and self.model_manager:
+            try:
+                await self.model_manager.close_clients()
+            except Exception as e:
+                logger.warning(f"清理ModelManager时出错: {e}")
+    
+    async def __aenter__(self):
+        """异步上下文管理器进入"""
+        return self
+    
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """异步上下文管理器退出"""
+        await self.cleanup()
     
     def get_model_config(self, config: Dict[str, Any], model_type: str = "text") -> Dict[str, Any]:
         """
@@ -96,6 +116,10 @@ class ModelHelper:
                 last_error = e
                 logger.warning(f"调用模型 {model} 生成文本时出错 (尝试 {retry_count+1}/{max_retries+1}): {str(e)}")
                 retry_count += 1
+                
+                # 在重试之间添加短暂延迟
+                if retry_count <= max_retries:
+                    await asyncio.sleep(min(2 ** retry_count, 10))  # 指数退避，最大10秒
         
         # 如果所有重试都失败，抛出最后一个异常
         error_msg = f"调用模型 {model} 生成文本失败，已重试 {max_retries} 次: {str(last_error)}"
@@ -136,6 +160,10 @@ class ModelHelper:
                 last_error = e
                 logger.warning(f"使用模型 {model} 分析图像时出错 (尝试 {retry_count+1}/{max_retries+1}): {str(e)}")
                 retry_count += 1
+                
+                # 在重试之间添加短暂延迟
+                if retry_count <= max_retries:
+                    await asyncio.sleep(min(2 ** retry_count, 10))  # 指数退避，最大10秒
         
         # 如果所有重试都失败，抛出最后一个异常
         error_msg = f"使用模型 {model} 分析图像失败，已重试 {max_retries} 次: {str(last_error)}"
