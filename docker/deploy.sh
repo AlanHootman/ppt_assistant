@@ -135,6 +135,48 @@ update_git_submodules() {
     fi
 }
 
+# 初始化数据目录
+init_data() {
+    log_info "初始化数据目录..."
+    
+    # 检查并创建目标目录
+    mkdir -p "${PROJECT_ROOT}/workspace/cache"
+    mkdir -p "${PROJECT_ROOT}/workspace/db"
+    
+    # 1. 拷贝ppt_analysis目录
+    if [ -d "${PROJECT_ROOT}/scripts/init_data/ppt_analysis" ]; then
+        # 检查目标目录是否为空
+        if [ -z "$(ls -A "${PROJECT_ROOT}/workspace/cache/ppt_analysis" 2>/dev/null)" ]; then
+            log_info "拷贝初始PPT分析缓存数据..."
+            mkdir -p "${PROJECT_ROOT}/workspace/cache/ppt_analysis"
+            cp -r "${PROJECT_ROOT}/scripts/init_data/ppt_analysis/"* "${PROJECT_ROOT}/workspace/cache/ppt_analysis/" 2>/dev/null || true
+            log_success "PPT分析缓存数据初始化完成"
+        else
+            log_info "workspace/cache/ppt_analysis目录已有数据，跳过初始化"
+        fi
+    else
+        log_warning "scripts/init_data/ppt_analysis目录不存在，跳过PPT分析缓存初始化"
+    fi
+    
+    # 2. 拷贝db目录
+    if [ -d "${PROJECT_ROOT}/scripts/init_data/db" ]; then
+        # 检查目标目录是否为空
+        if [ -z "$(ls -A "${PROJECT_ROOT}/workspace/db" 2>/dev/null)" ]; then
+            log_info "拷贝初始数据库数据..."
+            cp -r "${PROJECT_ROOT}/scripts/init_data/db/"* "${PROJECT_ROOT}/workspace/db/" 2>/dev/null || true
+            log_success "数据库数据初始化完成"
+        else
+            log_info "workspace/db目录已有数据，跳过初始化"
+        fi
+    else
+        log_warning "scripts/init_data/db目录不存在，跳过数据库初始化"
+    fi
+    
+    # 设置权限
+    chmod -R 755 "${PROJECT_ROOT}/workspace/cache"
+    chmod -R 755 "${PROJECT_ROOT}/workspace/db"
+}
+
 # 创建必要的目录
 setup_directories() {
     log_info "创建必要的目录..."
@@ -144,6 +186,8 @@ setup_directories() {
         "${PROJECT_ROOT}/workspace/logs"
         "${PROJECT_ROOT}/workspace/mlflow"
         "${PROJECT_ROOT}/workspace/redis"
+        "${PROJECT_ROOT}/workspace/cache"
+        "${PROJECT_ROOT}/workspace/db"
     )
     
     for dir in "${directories[@]}"; do
@@ -156,6 +200,9 @@ setup_directories() {
     # 设置权限
     chmod -R 755 "${PROJECT_ROOT}/workspace"
     log_success "目录创建完成"
+    
+    # 初始化数据
+    init_data
 }
 
 # 构建镜像
