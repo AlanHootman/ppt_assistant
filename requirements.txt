@@ -26,3 +26,4 @@ requests>=2.28.0
 # 其他依赖
 pdf2image
 jinja2
+psutil>=5.9.0
