@@ -148,8 +148,8 @@ class MarkdownAgent(BaseAgent):
             
         except Exception as e:
             logger.error(f"大模型解析失败: {str(e)}")
-            # 创建一个基础的空结构作为返回
-            return {"title": "", "subtitle": "", "sections": []}
+            # 失败则不返回内容
+            return
     
     def _ensure_structure_fields(self, structure: Dict[str, Any], fallback_structure: Dict[str, Any]) -> None:
         """
