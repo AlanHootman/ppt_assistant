@@ -16,6 +16,14 @@ RUN apt-get update && apt-get install -y \
     cmake \
     curl \
     git \
+    libreoffice \
+    libreoffice-writer \
+    libreoffice-impress \
+    libreoffice-calc \
+    fonts-dejavu \
+    fonts-liberation \
+    fonts-noto-cjk \
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 # 1.3 创建专用用户
@@ -27,6 +35,10 @@ ENV PYTHONUNBUFFERED=1
 ENV TZ=Asia/Shanghai
 ENV PYTHONPATH=/app
 ENV WORKING_DIR=/app/workspace
+
+# 1.5 LibreOffice 环境配置
+ENV DISPLAY=:99
+ENV LIBREOFFICE_HEADLESS=1
 
 # 2. 复制项目文件
 # 2.1 复制requirements文件
@@ -52,12 +64,21 @@ RUN mkdir -p /app/workspace/templates \
     && chown -R appuser:appuser /app/workspace \
     && chown -R appuser:appuser /app
 
+# 4.1 配置LibreOffice
+RUN mkdir -p /home/appuser/.config/libreoffice/4/user \
+    && chown -R appuser:appuser /home/appuser/.config \
+    && echo '#!/bin/bash\nsoffice --headless --nologo --nofirststartwizard --accept="socket,host=127.0.0.1,port=2002;urp;" --norestore "$@"' > /usr/local/bin/soffice-headless \
+    && chmod +x /usr/local/bin/soffice-headless
+
+# 4.2 验证LibreOffice安装
+RUN soffice --version || (echo "LibreOffice installation failed" && exit 1)
+
 # 5. 切换到应用用户
 USER appuser
 
-# 6. 健康检查 (检查Celery进程)
+# 6. 健康检查 (检查Celery进程和LibreOffice)
 HEALTHCHECK --interval=60s --timeout=30s --start-period=30s --retries=3 \
-    CMD celery -A apps.api.celery_app inspect ping || exit 1
+    CMD celery -A apps.api.celery_app inspect ping && soffice --version > /dev/null || exit 1
 
 # 7. 默认启动命令
 CMD ["celery", "-A", "apps.api.celery_app", "worker", "--loglevel=INFO", "--concurrency=2", "-Q", "ppt_generation,template_analysis"] 

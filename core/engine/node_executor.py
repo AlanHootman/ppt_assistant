@@ -495,6 +495,6 @@ class NodeExecutor:
             error_msg = f"PPT完善失败: {str(e)}"
             logger.error(error_msg)
             logger.error(traceback.format_exc())
-            state.record_failure(error_msg)
+            state.record_failure(error_msg) 
             # 反馈错误状态
             self.report_progress("ppt_finalizer", 0, error_msg, {"error": True}) 

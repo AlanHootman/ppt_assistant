@@ -17,6 +17,14 @@ RUN apt-get update && apt-get install -y \
     cmake \
     curl \
     git \
+    libreoffice \
+    libreoffice-writer \
+    libreoffice-impress \
+    libreoffice-calc \
+    fonts-dejavu \
+    fonts-liberation \
+    fonts-noto-cjk \
+    xvfb \
     && rm -rf /var/lib/apt/lists/*
 
 # 1.3 设置环境变量
@@ -25,6 +33,10 @@ ENV PYTHONUNBUFFERED=1
 ENV TZ=Asia/Shanghai
 ENV PYTHONPATH=/app
 ENV WORKING_DIR=/app/workspace
+
+# 1.4 LibreOffice 环境配置
+ENV DISPLAY=:99
+ENV LIBREOFFICE_HEADLESS=1
 
 # 2. 复制项目文件
 # 2.1 复制requirements文件
@@ -50,6 +62,14 @@ RUN mkdir -p /app/workspace/templates \
 
 # 5. 设置权限
 RUN chmod -R 755 /app/workspace
+
+# 5.1 配置LibreOffice
+RUN mkdir -p /root/.config/libreoffice/4/user \
+    && echo '#!/bin/bash\nsoffice --headless --nologo --nofirststartwizard --accept="socket,host=127.0.0.1,port=2002;urp;" --norestore "$@"' > /usr/local/bin/soffice-headless \
+    && chmod +x /usr/local/bin/soffice-headless
+
+# 5.2 验证LibreOffice安装
+RUN soffice --version || (echo "LibreOffice installation failed" && exit 1)
 
 # 6. 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
