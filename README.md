@@ -96,7 +96,7 @@ python scripts/start_mlflow_ui.py
 ##### 3.5 启动前端Vue服务
 ```bash
 cd apps/web
-npm install
+npm install --legacy-peer-deps
 npm run dev
 ```
 访问 http://localhost:5173 即可访问前端页面
