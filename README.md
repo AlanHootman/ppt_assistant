@@ -21,7 +21,15 @@
 
 ## 使用方法
 
-### 安装依赖
+### 方式一：使用Docker部署
+
+```bash
+docker-compose -f docker/docker-compose.yml up -d
+```
+
+### 方式二：使用本地环境部署
+
+#### 1. 安装依赖
 
 ```bash
 # 创建虚拟环境
@@ -35,64 +43,124 @@ cd libs/ppt_manager
 pip install -e .
 ```
 
-### 基本使用
+#### 2. 安装LibreOffice
 
-运行示例工作流：
-
-```bash
-python run_workflow.py
-```
-
-自定义运行参数：
+Mac用户可以通过brew安装LibreOffice
 
 ```bash
-python run_workflow.py --markdown <md文件路径> --template <ppt模板路径>
+brew install --cask libreoffice
 ```
 
-### 高级用法
+安装之后创建soffice的命令脚本
+```bash
+# 创建软链接
+sudo tee /usr/local/bin/soffice <<EOF
+#!/bin/bash
+/Applications/LibreOffice.app/Contents/MacOS/soffice "\$@"
+EOF
 
-```python
-from core.engine.workflowEngine import WorkflowEngine
+# 赋予执行权限
+sudo chmod +x /usr/local/bin/soffice
 
-# 初始化工作流引擎
-engine = WorkflowEngine()
-
-# 运行工作流
-result = await engine.run_async(
-    raw_md="# 标题\n## 子标题\n- 要点1\n- 要点2",
-    ppt_template_path="templates/default.pptx"
-)
-
-# 获取生成的PPT文件路径
-ppt_path = result.output_ppt_path
-print(f"PPT已生成: {ppt_path}")
 ```
+
+验证安装
+```bash
+soffice --version
+```
+
+#### 3. 运行
+##### 3.1 启动redis服务
+```bash
+docker-compose -f docker/docker-compose-dev.yml up -d
+```
+
+##### 3.2 启动后端FastAPI服务
+```bash
+uvicorn core.api.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+##### 3.3 启动celery服务
+```bash
+celery -A apps.api.celery_app worker --loglevel=info --concurrency=2 --pool=solo -Q celery,template_analysis,ppt_generation
+```
+##### 3.4 启动mlflow服务
+```bash
+python scripts/start_mlflow_ui.py
+```
+
+##### 3.5 启动前端Vue服务
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+访问 http://localhost:5173 即可访问前端页面
+访问 http://localhost:5000 即可访问mlflow服务
 
 ## 项目结构
 
 ```
 ppt-assisstant/
+├── apps/                  # 应用层
+│   ├── api/               # FastAPI接口服务
+│   │   ├── routers/       # 接口路由
+│   │   │   ├── agent.py   # Agent能力接口
+│   │   │   └── file.py    # 文件处理接口
+│   │   ├── models/        # 接口数据模型
+│   │   ├── dependencies/  # 接口依赖项
+│   │   └── main.py        # FastAPI入口
+│   │
+│   └── web/               # 前端工程
+│       ├── public/        # 静态资源
+│       ├── src/           # 前端源码
+│       └── package.json   # 前端依赖
+│
 ├── core/                  # 核心业务
 │   ├── agents/            # LangGraph Agent实现
+│   │   ├── markdown_agent.py           # Markdown解析
+│   │   ├── ppt_analysis_agent.py       # PPT分析
+│   │   ├── content_planning_agent.py   # 内容规划
+│   │   ├── slide_generator_agent.py    # 幻灯片生成
+│   │   ├── ppt_finalizer_agent.py      # PPT清理与保存
+│   │   └── base_agent.py               # 基础Agent
+│   │
 │   ├── workflows/         # 工作流配置
+│   │   ├── ppt_gen.yaml   # 主工作流配置
+│   │   └── utils.py       # 工作流工具
+│   │
 │   └── engine/            # 执行引擎
-├── config/                # 配置中心
+│       ├── state.py       # 状态管理
+│       └── workflow.py    # 工作流引擎
+│
+├── libs/                  # 第三方库
+│   ├── ppt_manager/       # PPT操作库（git子模块）
+│   └── ...                # 其他子模块
+│
 ├── workspace/             # 运行时文件
+│   ├── sessions/          # 会话数据
+│   │   └── {session_id}/  # 按会话隔离
+│   ├── logs/              # 系统日志
+│   │   └── %Y-%m/         # 按日期分片
+│   └── temp/              # 临时文件
+│
+├── config/                # 配置中心
+│   ├── settings.py        # 应用配置
+│   ├── model_config.yaml  # 模型配置
+│   └── workflow/          # 工作流配置
+│
+├── docs/                  # 文档中心
+│   ├── arch/              # 架构设计
+│   └── api/               # API文档
+│
 ├── tests/                 # 测试体系
-└── docs/                  # 文档中心
+│   ├── unit/              # 单元测试
+│   └── integration/       # 集成测试
+│
+├── Dockerfile             # 容器化构建
+├── docker-compose.yml     # 服务编排
+└── requirements.txt       # Python依赖
 ```
 
-## 开发进度
-
-- [x] 工作流引擎框架
-- [x] 配置加载器
-- [x] 状态管理
-- [ ] Markdown解析Agent
-- [ ] PPT模板分析Agent
-- [ ] 布局决策Agent
-- [ ] PPT生成Agent
-
-## 许可证
-
-MIT
+## 感谢
 
