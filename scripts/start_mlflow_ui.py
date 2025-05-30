@@ -266,7 +266,7 @@ def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='MLflow服务器管理工具')
     parser.add_argument('--host', type=str, default="127.0.0.1", help='MLflow服务器主机地址')
-    parser.add_argument('--port', type=int, default=5000, help='MLflow服务器端口号')
+    parser.add_argument('--port', type=int, default=5001, help='MLflow服务器端口号')
     parser.add_argument('--no-browser', action='store_true', help='不自动打开浏览器')
     parser.add_argument('--stop', action='store_true', help='停止MLflow服务器')
     parser.add_argument('--force', action='store_true', help='强制停止进程（配合--stop使用）')

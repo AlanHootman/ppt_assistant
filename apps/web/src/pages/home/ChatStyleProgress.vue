@@ -155,13 +155,13 @@ function getMlflowUrl(): string {
   const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   
   if (isDev) {
-    return 'http://127.0.0.1:5000'
+    return 'http://127.0.0.1:5001'
   }
   
   // 生产环境：使用当前域名，端口5000
   const protocol = window.location.protocol
   const hostname = window.location.hostname
-  return `${protocol}//${hostname}:5000`
+  return `${protocol}//${hostname}:5001`
 }
 
 // 打开MLflow仪表板
