@@ -81,7 +81,7 @@ docker-compose -f docker/docker-compose-dev.yml up -d
 
 ##### 3.2 启动后端FastAPI服务
 ```bash
-uvicorn core.api.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ##### 3.3 启动celery服务
