@@ -5,12 +5,12 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    networks:
-      - ppt-net
+    # networks:
+    #   - ppt-net
 
 volumes:
   redis_data:
   
-networks:
-  ppt-net:
-    driver: bridge 
+# networks:
+#   ppt-net:
+#     driver: bridge 

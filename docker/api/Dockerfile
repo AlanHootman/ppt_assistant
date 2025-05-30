@@ -54,8 +54,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 4. 创建必要的目录
-RUN mkdir -p /app/workspace/templates \
-    /app/workspace/output \
+RUN mkdir -p /app/workspace/output \
     /app/workspace/logs \
     /app/workspace/mlflow \
     /app/workspace/redis
@@ -63,13 +62,13 @@ RUN mkdir -p /app/workspace/templates \
 # 5. 设置权限
 RUN chmod -R 755 /app/workspace
 
-# 5.1 配置LibreOffice
-RUN mkdir -p /root/.config/libreoffice/4/user \
-    && echo '#!/bin/bash\nsoffice --headless --nologo --nofirststartwizard --accept="socket,host=127.0.0.1,port=2002;urp;" --norestore "$@"' > /usr/local/bin/soffice-headless \
-    && chmod +x /usr/local/bin/soffice-headless
+# # 5.1 配置LibreOffice
+# RUN mkdir -p /root/.config/libreoffice/4/user \
+#     && echo '#!/bin/bash\nsoffice --headless --nologo --nofirststartwizard --accept="socket,host=127.0.0.1,port=2002;urp;" --norestore "$@"' > /usr/local/bin/soffice-headless \
+#     && chmod +x /usr/local/bin/soffice-headless
 
-# 5.2 验证LibreOffice安装
-RUN soffice --version || (echo "LibreOffice installation failed" && exit 1)
+# # 5.2 验证LibreOffice安装
+# RUN soffice --version || (echo "LibreOffice installation failed" && exit 1)
 
 # 6. 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

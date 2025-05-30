@@ -56,6 +56,7 @@ check_soffice() {
         log_warning "PPT助手系统需要LibreOffice来处理和转换PPT文件"
         log_info "请访问以下地址下载并安装LibreOffice:"
         log_info "  https://zh-cn.libreoffice.org/"
+        log_info "或者通过命令brew install --cask libreoffice安装"
         log_info ""
         log_info "安装完成后，请确保 soffice 命令可在终端中使用"
         log_info "您可以通过运行 'soffice --version' 来验证安装"

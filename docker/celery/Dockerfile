@@ -56,8 +56,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 4. 创建目录并设置权限
-RUN mkdir -p /app/workspace/templates \
-    /app/workspace/output \
+RUN mkdir -p /app/workspace/output \
     /app/workspace/logs \
     /app/workspace/mlflow \
     /app/workspace/redis \
