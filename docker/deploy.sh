@@ -90,6 +90,51 @@ check_env() {
     fi
 }
 
+# 更新git子模块
+update_git_submodules() {
+    log_info "更新git子模块..."
+    cd "${PROJECT_ROOT}"
+    
+    # 检查ppt_manager子模块是否存在
+    if [[ -d "${PROJECT_ROOT}/libs/ppt_manager" ]]; then
+        # 检查是否为空目录
+        if [ -z "$(ls -A "${PROJECT_ROOT}/libs/ppt_manager")" ]; then
+            log_info "正在初始化并更新ppt_manager子模块..."
+            git submodule update --init libs/ppt_manager
+        else
+            log_info "正在更新ppt_manager子模块..."
+            git submodule update libs/ppt_manager
+        fi
+        
+        # 验证子模块更新结果
+        if [ -f "${PROJECT_ROOT}/libs/ppt_manager/setup.py" ]; then
+            log_success "ppt_manager子模块更新成功"
+        else
+            log_error "ppt_manager子模块更新失败，setup.py文件不存在"
+            log_warning "PPT处理功能可能无法正常工作"
+            read -p "是否继续部署? (y/N): " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                log_info "部署已取消，请解决子模块问题后重试"
+                exit 1
+            fi
+            log_warning "继续部署，但PPT处理功能可能无法正常工作"
+        fi
+    else
+        log_error "libs/ppt_manager目录不存在，请检查项目结构"
+        log_info "尝试初始化子模块..."
+        git submodule init
+        git submodule update
+        
+        if [ -d "${PROJECT_ROOT}/libs/ppt_manager" ]; then
+            log_success "子模块初始化成功"
+        else
+            log_error "子模块初始化失败"
+            log_warning "PPT处理功能可能无法正常工作"
+        fi
+    fi
+}
+
 # 创建必要的目录
 setup_directories() {
     log_info "创建必要的目录..."
@@ -153,6 +198,7 @@ stop_services() {
 restart_services() {
     log_info "重启PPT助手系统..."
     stop_services
+    update_git_submodules
     start_services
 }
 
@@ -265,6 +311,7 @@ main() {
         start)
             check_docker
             check_env
+            update_git_submodules
             setup_directories
             start_services
             ;;
@@ -278,6 +325,7 @@ main() {
             ;;
         build)
             check_docker
+            update_git_submodules
             build_images
             ;;
         logs)

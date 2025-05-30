@@ -41,7 +41,7 @@ services:
       - PYTHONPATH=/app
       - WORKING_DIR=/app/workspace
     depends_on:
-      - ppt_redis
+      - redis
     networks:
       - ppt-net
     env_file:
@@ -68,7 +68,7 @@ services:
       - PYTHONPATH=/app
       - WORKING_DIR=/app/workspace
     depends_on:
-      - ppt_redis
+      - redis
       - ppt_api
     networks:
       - ppt-net
@@ -83,16 +83,16 @@ services:
     volumes:
       - ../workspace/mlflow:/app/mlruns
     ports:
-      - "5000"
+      - "5001:5001"
     networks:
       - ppt-net
     command: >
       sh -c "pip install mlflow &&
-             mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri file:///app/mlruns --default-artifact-root file:///app/mlruns"
+             mlflow server --host 0.0.0.0 --port 5001 --backend-store-uri file:///app/mlruns --default-artifact-root file:///app/mlruns"
     environment:
       - TZ=Asia/Shanghai
 
-  ppt_redis:
+  redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
@@ -104,7 +104,7 @@ services:
       - TZ=Asia/Shanghai
     command: redis-server --appendonly yes --appendfsync everysec
 
-  ppt_nginx:
+  nginx:
     image: nginx:alpine
     ports:
       - "80:80"
