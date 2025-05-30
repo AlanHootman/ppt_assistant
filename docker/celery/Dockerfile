@@ -50,10 +50,16 @@ COPY core /app/core
 COPY config /app/config
 COPY apps/__init__.py /app/apps/__init__.py
 
+# 2.3 复制libs/ppt_manager
+COPY libs/ppt_manager /app/libs/ppt_manager
+
 # 3. 安装依赖
 # 3.1 升级pip并安装项目依赖
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+# 3.2 安装ppt_manager
+RUN cd /app/libs/ppt_manager && pip install -e .
 
 # 4. 创建目录并设置权限
 RUN mkdir -p /app/workspace/output \
