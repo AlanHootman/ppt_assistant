@@ -80,7 +80,7 @@ check_env() {
         log_warning ".env 文件不存在，请先配置环境变量"
         if [[ -f "${PROJECT_ROOT}/.env.example" ]]; then
             log_info "复制 .env.example 到 .env..."
-            cp "${SCRIPT_DIR}/.env.example" "${SCRIPT_DIR}/.env"
+            cp "${PROJECT_ROOT}/.env.example" "${PROJECT_ROOT}/.env"
             log_warning "请编辑 .env 文件配置必要的环境变量（如 OPENAI_API_KEY）"
         else
             log_error "找不到 .env.example 文件"
@@ -94,7 +94,6 @@ setup_directories() {
     log_info "创建必要的目录..."
     
     directories=(
-        "${PROJECT_ROOT}/workspace/templates"
         "${PROJECT_ROOT}/workspace/output"
         "${PROJECT_ROOT}/workspace/logs"
         "${PROJECT_ROOT}/workspace/mlflow"
@@ -265,7 +264,6 @@ main() {
         start)
             check_docker
             check_env
-            check_soffice
             setup_directories
             start_services
             ;;
