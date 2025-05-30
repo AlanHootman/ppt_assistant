@@ -1,5 +1,5 @@
 services:
-  web:
+  ppt_web:
     build:
       context: ..
       dockerfile: docker/web/Dockerfile
@@ -8,7 +8,7 @@ services:
     expose:
       - "5173"
     depends_on:
-      - api
+      - ppt_api
     networks:
       - ppt-net
     environment:
@@ -20,7 +20,7 @@ services:
       - ../apps/web/index.html:/app/index.html
       - ../apps/web/vite.config.ts:/app/vite.config.ts
 
-  api:
+  ppt_api:
     build:
       context: ..
       dockerfile: docker/api/Dockerfile
@@ -41,7 +41,7 @@ services:
       - PYTHONPATH=/app
       - WORKING_DIR=/app/workspace
     depends_on:
-      - redis
+      - ppt_redis
     networks:
       - ppt-net
     env_file:
@@ -49,7 +49,7 @@ services:
     tty: true
     stdin_open: true
 
-  celery_worker:
+  ppt_celery_worker:
     build:
       context: ..
       dockerfile: docker/celery/Dockerfile
@@ -68,8 +68,8 @@ services:
       - PYTHONPATH=/app
       - WORKING_DIR=/app/workspace
     depends_on:
-      - redis
-      - api
+      - ppt_redis
+      - ppt_api
     networks:
       - ppt-net
     env_file:
@@ -77,7 +77,7 @@ services:
     tty: true
     stdin_open: true
 
-  mlflow:
+  ppt_mlflow:
     image: python:3.10-slim
     working_dir: /app
     volumes:
@@ -92,7 +92,7 @@ services:
     environment:
       - TZ=Asia/Shanghai
 
-  redis:
+  ppt_redis:
     image: redis:7-alpine
     ports:
       - "6379:6379"
@@ -104,7 +104,7 @@ services:
       - TZ=Asia/Shanghai
     command: redis-server --appendonly yes --appendfsync everysec
 
-  nginx:
+  ppt_nginx:
     build:
       context: .
       dockerfile: nginx/Dockerfile
@@ -112,8 +112,8 @@ services:
       - "80:80"
       - "443:443"
     depends_on:
-      - web
-      - api
+      - ppt_web
+      - ppt_api
     networks:
       - ppt-net
     environment:
