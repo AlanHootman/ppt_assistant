@@ -47,11 +47,38 @@ check_docker() {
     log_info "Docker 和 Docker Compose 检查通过"
 }
 
+# 检查LibreOffice (soffice)
+check_soffice() {
+    log_info "检查LibreOffice安装状态..."
+    
+    if ! command -v soffice &> /dev/null; then
+        log_error "LibreOffice 未安装或 soffice 命令不可用"
+        log_warning "PPT助手系统需要LibreOffice来处理和转换PPT文件"
+        log_info "请访问以下地址下载并安装LibreOffice:"
+        log_info "  https://zh-cn.libreoffice.org/"
+        log_info ""
+        log_info "安装完成后，请确保 soffice 命令可在终端中使用"
+        log_info "您可以通过运行 'soffice --version' 来验证安装"
+        echo ""
+        read -p "是否继续部署? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            log_info "部署已取消，请安装LibreOffice后重试"
+            exit 1
+        fi
+        log_warning "继续部署，但PPT处理功能可能无法正常工作"
+    else
+        # 获取LibreOffice版本信息
+        local version=$(soffice --version 2>/dev/null | head -n1 || echo "版本信息获取失败")
+        log_success "LibreOffice 已安装: $version"
+    fi
+}
+
 # 检查环境变量文件
 check_env() {
-    if [[ ! -f "${SCRIPT_DIR}/.env" ]]; then
+    if [[ ! -f "${PROJECT_ROOT}/.env" ]]; then
         log_warning ".env 文件不存在，请先配置环境变量"
-        if [[ -f "${SCRIPT_DIR}/.env.example" ]]; then
+        if [[ -f "${PROJECT_ROOT}/.env.example" ]]; then
             log_info "复制 .env.example 到 .env..."
             cp "${SCRIPT_DIR}/.env.example" "${SCRIPT_DIR}/.env"
             log_warning "请编辑 .env 文件配置必要的环境变量（如 OPENAI_API_KEY）"
@@ -171,6 +198,15 @@ health_check() {
         return 1
     fi
     
+    # 检查LibreOffice
+    if command -v soffice &> /dev/null; then
+        local version=$(soffice --version 2>/dev/null | head -n1 || echo "版本信息获取失败")
+        log_success "LibreOffice 可用: $version"
+    else
+        log_error "LibreOffice (soffice) 不可用"
+        log_warning "PPT处理功能可能无法正常工作"
+    fi
+    
     # 检查API健康状态
     if curl -f http://localhost:8000/health > /dev/null 2>&1; then
         log_success "API服务健康"
@@ -211,6 +247,12 @@ show_help() {
     echo "  clean    - 清理所有数据（危险操作）"
     echo "  help     - 显示此帮助信息"
     echo ""
+    echo "依赖要求:"
+    echo "  - Docker (>= 20.10)"
+    echo "  - Docker Compose (>= 2.0)"
+    echo "  - LibreOffice (包含 soffice 命令)"
+    echo "    下载地址: https://zh-cn.libreoffice.org/"
+    echo ""
     echo "示例:"
     echo "  $0 start                    # 启动服务"
     echo "  $0 logs api                # 查看API服务日志"
@@ -223,6 +265,7 @@ main() {
         start)
             check_docker
             check_env
+            check_soffice
             setup_directories
             start_services
             ;;
