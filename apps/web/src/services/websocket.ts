@@ -13,14 +13,11 @@ class WebSocketService {
    * 获取WebSocket服务器URL
    */
   private getWebSocketBaseUrl(): string {
-    // 开发环境：使用后端API服务器地址
-    if (import.meta.env.DEV) {
-      return 'ws://localhost:8000'
-    }
-    
-    // 生产环境：使用当前域名，但协议改为ws/wss
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    return `${protocol}//${window.location.host}`
+    // 使用相对路径，让Nginx正确代理WebSocket请求
+    // 这样在Docker环境和开发环境下都能正常工作
+    return window.location.protocol === 'https:' 
+      ? `wss://${window.location.host}`
+      : `ws://${window.location.host}`
   }
   
   /**
