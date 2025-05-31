@@ -48,17 +48,6 @@
         <div class="message-content">
           {{ message.message }}
         </div>
-        
-        <!-- 预览图片 -->
-        <div v-if="shouldShowPreview(message)" class="preview-container">
-          <img 
-            v-for="preview in previewImages" 
-            :key="preview.id"
-            :src="preview.url" 
-            alt="预览" 
-            class="preview-image"
-          />
-        </div>
       </div>
       
       <!-- 详细错误信息 -->
@@ -97,7 +86,7 @@
 import { ref, computed, nextTick, watch } from 'vue'
 import { Setting } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
-import { useProgressStore, type ProgressMessage, type PreviewImage } from '../../stores/progress'
+import { useProgressStore, type ProgressMessage } from '../../stores/progress'
 import { useTaskProgress } from '../../composables/useTaskProgress'
 import { useClientStore } from '../../stores/client'
 
@@ -110,7 +99,6 @@ const messagesContainer = ref<HTMLElement>()
 
 // 计算属性
 const progressMessages = computed(() => progressStore.progressMessages)
-const previewImages = computed(() => progressStore.previewImages)
 const isGenerating = computed(() => progressStore.isGenerating)
 const taskError = computed(() => progressStore.taskError)
 const taskStatus = computed(() => progressStore.taskStatus)
@@ -152,15 +140,6 @@ watch([progressMessages, isGenerating, hasDetailedError], scrollToBottom, { flus
 // 格式化时间
 function formatTime(time: Date): string {
   return dayjs(time).format('HH:mm:ss')
-}
-
-// 判断是否应该显示预览图
-function shouldShowPreview(message: ProgressMessage): boolean {
-  const isLastMessage = progressMessages.value[progressMessages.value.length - 1]?.id === message.id
-  const isCompleted = progressStore.taskStatus === 'completed'
-  const hasPreviewImages = previewImages.value.length > 0
-  
-  return isLastMessage && isCompleted && !message.isError && hasPreviewImages
 }
 
 // 处理重试
@@ -319,23 +298,6 @@ async function handleRetry() {
 .message-content {
   line-height: 1.5;
   white-space: pre-line;
-}
-
-/* ==========================================================================
-   预览图片 - 生成结果预览
-   ========================================================================== */
-
-.preview-container {
-  margin-top: 0.75rem;
-  width: 100%;
-}
-
-.preview-image {
-  max-width: 100%;
-  max-height: 200px;
-  height: auto;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* ==========================================================================
