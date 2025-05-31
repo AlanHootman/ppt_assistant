@@ -82,7 +82,7 @@
       </div>
       
       <!-- 加载中动画 -->
-      <div v-if="isGenerating && !hasError" class="loading-indicator">
+      <div v-if="isGenerating && taskStatus !== 'completed' && taskStatus !== 'failed'" class="loading-indicator">
         <div class="loading-dots">
           <span></span>
           <span></span>
@@ -113,6 +113,7 @@ const progressMessages = computed(() => progressStore.progressMessages)
 const previewImages = computed(() => progressStore.previewImages)
 const isGenerating = computed(() => progressStore.isGenerating)
 const taskError = computed(() => progressStore.taskError)
+const taskStatus = computed(() => progressStore.taskStatus)
 const hasMessages = computed(() => progressMessages.value.length > 0)
 const hasError = computed(() => progressStore.taskStatus === 'failed')
 const hasDetailedError = computed(() => {
