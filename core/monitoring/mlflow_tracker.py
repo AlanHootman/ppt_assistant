@@ -31,8 +31,8 @@ class MLflowTracker:
             tracking_uri: MLflow跟踪服务器URI，如未指定则从环境变量获取
             experiment_name: 实验名称
         """
-        # 从环境变量获取tracking_uri（如果未指定），默认为http://127.0.0.1:5000
-        self.tracking_uri = tracking_uri or os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5000")
+        # 从环境变量获取tracking_uri（如果未指定），默认为http://127.0.0.1:5001
+        self.tracking_uri = tracking_uri or os.environ.get("MLFLOW_TRACKING_URI", "http://127.0.0.1:5001")
         self.experiment_name = experiment_name
         self.active_run = None
         
@@ -54,7 +54,7 @@ class MLflowTracker:
         """
         # 结束之前的运行（如果有）
         if self.active_run:
-            self.end_workflow_run("interrupted")
+            self.end_workflow_run("FINISHED")
         
         # 创建新的运行
         tags = {

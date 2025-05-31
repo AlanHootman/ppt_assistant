@@ -26,7 +26,7 @@ def check_mlflow_installed():
     except ImportError:
         return False
 
-def start_mlflow_server(port=5000, host="127.0.0.1"):
+def start_mlflow_server(port=5001, host="127.0.0.1"):
     """启动MLflow服务器"""
     try:
         # 检查mlruns目录是否存在

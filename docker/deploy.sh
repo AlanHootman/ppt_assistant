@@ -230,7 +230,8 @@ start_services() {
     log_info "访问地址:"
     log_info "  - 前端界面: http://localhost"
     log_info "  - API文档: http://localhost:8000/docs"
-    log_info "  - MLflow: http://localhost:5000"
+    log_info "  - MLflow: http://localhost:5001"
+    log_info "  - MLflow (反向代理): http://localhost/mlflow/"
 }
 
 # 停止服务
@@ -320,6 +321,7 @@ health_check() {
     else
         log_error "Redis服务不健康"
     fi
+    
 }
 
 # 显示帮助信息
