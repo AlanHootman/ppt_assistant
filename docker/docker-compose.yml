@@ -85,18 +85,28 @@ services:
     image: python:3.10-slim
     working_dir: /app
     volumes:
-      - ../workspace/mlflow:/app/mlruns
+      - ../workspace/mlflow:/app/mlflow_data
     ports:
       - "5001:5001"
     networks:
       - ppt-net
     command: >
-      sh -c "mkdir -p /app/mlruns &&
-             chmod 755 /app/mlruns &&
-             pip install mlflow &&
-             mlflow server --host 0.0.0.0 --port 5001 --backend-store-uri file:///app/mlruns --default-artifact-root file:///app/mlruns --serve-artifacts"
+      bash -c "
+        mkdir -p /app/mlflow_data/mlruns /app/mlflow_data/mlartifacts &&
+        chmod -R 755 /app/mlflow_data &&
+        pip install --no-cache-dir mlflow &&
+        exec mlflow server 
+          --host 0.0.0.0 
+          --port 5001 
+          --backend-store-uri file:///app/mlflow_data/mlruns 
+          --artifacts-destination file:///app/mlflow_data/mlartifacts 
+          --serve-artifacts
+      "
     environment:
       - TZ=Asia/Shanghai
+      - MLFLOW_TRACKING_URI=http://0.0.0.0:5001
+      - MLFLOW_HOST=0.0.0.0
+      - MLFLOW_PORT=5001
 
   redis:
     image: redis:7-alpine
