@@ -13,7 +13,7 @@
       "type": "封面页",
       "semantic_type": "introduction",
       "relation_type": "none",
-      "layout_description": "页面中心位置有主标题和副标题，以明亮绿色为字体颜色，角落设有绿色渐变装饰。",
+      "layout_description": "页面中心偏上位置有主标题区域，下方有副标题区域以及品牌标识。",
       "content_structure": {
         "type": "title_content"
       },
@@ -24,108 +24,32 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面中部居中",
+          "position": "页面中心偏上",
           "current_text": "iPhone 16 Pro",
-          "word_count": 3,
+          "word_count": 4,
           "purpose": "主标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "title",
-          "position": "页面中部稍下方",
-          "current_text": "Discover the Future of Innovation\nApple",
-          "word_count": 6,
-          "purpose": "副标题",
-          "has_bullets": false
-        }
-      ],
-      "group_structures": []
-    },
-    {
-      "slide_index": 0,
-      "type": "内容页",
-      "semantic_type": "feature_list",
-      "relation_type": "bullet_list",
-      "layout_description": "页面上部为主标题区域，下部为内容区域，以项目符号形式展示产品的多个特性和描述。",
-      "content_structure": {
-        "type": "bullet_list"
-      },
-      "editable_areas": {
-        "title_elements": 1,
-        "bullet_list_long": 1,
-        "total_editable_text_areas": 2
-      },
-      "content_elements": [
-        {
-          "element_type": "title",
-          "position": "页面上部",
-          "current_text": "iPhone 16 Pro",
-          "word_count": 3,
-          "purpose": "主标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "bullet_list_long",
-          "position": "页面中下部",
-          "current_text": "Trade-In and Pricing: Receive $180–$650 credit towards iPhone 16 Pro when trading in an iPhone 12 or newer.\nDesign and Durability: Grade 5 titanium design with microblasted texture, available in four finishes including Desert Titanium.\nDisplay and Camera: New Super Retina XDR displays with 48MP Ultra Wide and 5x Telephoto cameras.\nPerformance and Battery: Up to 27 hours video playback.\nAdditional Features: Advanced Apple Intelligence, enhanced accessibility, environmental and ethical considerations.",
-          "word_count": 64,
-          "purpose": "产品特性列表",
-          "has_bullets": true
-        }
-      ],
-      "group_structures": []
-    },
-    {
-      "slide_index": 0,
-      "type": "内容页",
-      "semantic_type": "feature_list",
-      "relation_type": "parallel",
-      "layout_description": "页面左侧包含大幅图片展示，整体布局成图文对形式。上部有标题区域，下方包含两段详细文字说明，文字部分与图片对应。适合展示单个产品特性并给出详细介绍。",
-      "content_structure": {
-        "type": "image_text_pair"
-      },
-      "editable_areas": {
-        "title_elements": 1,
-        "paragraph_single": 1,
-        "paragraph_multi": 1,
-        "total_editable_text_areas": 3
-      },
-      "content_elements": [
-        {
-          "element_type": "title",
-          "position": "页面下部中间",
-          "current_text": "Design and Durability",
-          "word_count": 3,
-          "purpose": "主要特性标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_single",
-          "position": "页面底部",
-          "current_text": "The iPhone 16 Pro features a Grade 5 titanium design with a microblasted texture, combining strength with a lightweight build.",
-          "word_count": 18,
-          "purpose": "特性说明段落1",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "页面底部",
-          "current_text": "Available in four finishes, including the new Desert Titanium, the iPhone 16 Pro is splash, water, and dust resistant, and comes with the latest-generation Ceramic Shield for enhanced durability.",
-          "word_count": 40,
-          "purpose": "特性说明段落2",
+          "position": "页面中部偏下",
+          "current_text": "Discover the Future of Innovation\nApple",
+          "word_count": 7,
+          "purpose": "副标题和品牌标识",
           "has_bullets": false
         }
       ],
       "group_structures": []
     },
     {
-      "slide_index": 0,
+      "slide_index": 1,
       "type": "内容页",
       "semantic_type": "feature_list",
-      "relation_type": "bullet_list",
-      "layout_description": "页面顶部有标题文本，下方为多个项目符号列表，适合功能或特性展示。",
+      "relation_type": "parallel",
+      "layout_description": "幻灯片包含一个顶部标题区域和一个下方的项目符号列表区域，标题和列表分别突出显示，背景由绿色几何图形构成。",
       "content_structure": {
-        "type": "bullet_list"
+        "type": "title_content",
+        "bullet_list_count": 1
       },
       "editable_areas": {
         "title_elements": 1,
@@ -136,28 +60,28 @@
         {
           "element_type": "title",
           "position": "页面顶部居中",
-          "current_text": "Additional Features and Accessibility",
-          "word_count": 4,
-          "purpose": "功能特性标题",
+          "current_text": "iPhone 16 Pro",
+          "word_count": 12,
+          "purpose": "主标题",
           "has_bullets": false
         },
         {
           "element_type": "bullet_list_long",
-          "position": "页面中部",
-          "current_text": "Satellite Connectivity: Stay connected in remote areas.\nPrivacy and Security: Secure your data with end-to-end encryption.\nAccessibility: Features for all users, including Eye Tracking and Music Haptics.\nSatellite SOS: Text emergency services when cell service is unavailable.\nVocal Shortcuts: Voice commands to enhance usability.",
-          "word_count": 44,
-          "purpose": "功能列表",
+          "position": "页面中部下方",
+          "current_text": "Trade-In and Pricing: Receive $180–$650 credit towards iPhone 16 Pro when trading in an iPhone 12 or newer.\n◦ Design and Durability: Grade 5 titanium design with microblasted texture, available in four finishes including Desert Titanium.\n◦ Display and Camera: New Super Retina XDR displays with 48MP Ultra Wide and 5x Telephoto cameras.\n◦ Performance and Battery: Up to 27 hours video playback.\n◦ Additional Features: Advanced Apple Intelligence, enhanced accessibility, environmental and ethical considerations.",
+          "word_count": 111,
+          "purpose": "产品特性列表",
           "has_bullets": true
         }
       ],
       "group_structures": []
     },
     {
-      "slide_index": 3,
+      "slide_index": 2,
       "type": "内容页",
       "semantic_type": "feature_list",
       "relation_type": "parallel",
-      "layout_description": "页面左上方有大图片展示区域，下方有两个文字说明区域。适合展示产品特性。",
+      "layout_description": "幻灯片包含一张清晰的产品图片，位于页面上部，以及两个文本框，分别位于图片下方。整体结构清晰，用于展示产品特性。",
       "content_structure": {
         "type": "image_text_pair"
       },
@@ -170,79 +94,102 @@
         {
           "element_type": "title",
           "position": "页面中部",
-          "current_text": "Display and Camera Features",
+          "current_text": "Design and Durability",
           "word_count": 4,
-          "purpose": "内容标题",
+          "purpose": "主要标题",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "页面下部左侧",
-          "current_text": "New display technology offers thinner borders and larger 6.3-inch and 6.9-inch Super Retina XDR displays, providing an immersive viewing experience.",
-          "word_count": 19,
-          "purpose": "特性描述1",
+          "position": "标题下方",
+          "current_text": "The iPhone 16 Pro features a Grade 5 titanium design with a microblasted texture, combining strength with a lightweight build.",
+          "word_count": 23,
+          "purpose": "产品特点描述1",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "页面下部右侧",
-          "current_text": "The 48MP Ultra Wide camera captures high-resolution photos and videos with advanced features like autofocus and ProRAW support. The 5x Telephoto camera provides sharper close-ups, even from a distance.",
-          "word_count": 26,
-          "purpose": "特性描述2",
+          "position": "第一个段落后",
+          "current_text": "Available in four finishes, including the new Desert Titanium, the iPhone 16 Pro is splash, water, and dust resistant, and comes with the latest-generation Ceramic Shield for enhanced durability.",
+          "word_count": 29,
+          "purpose": "产品特点描述2",
           "has_bullets": false
         }
       ],
-      "group_structures": [
-        {
-          "group_type": "image_text_pair",
-          "elements_count": 3,
-          "element_types": {
-            "title": 1,
-            "paragraph_multi": 2
-          },
-          "arrangement": "左上角图片，下方两个文本说明区域",
-          "groups_relation": "parallel"
-        }
-      ]
+      "group_structures": []
     },
     {
-      "slide_index": 4,
-      "type": "内容页",
-      "semantic_type": "feature_list|instruction|data_presentation",
-      "relation_type": "none",
-      "layout_description": "页面顶部是大图片展示，中部为主要标题，底部为详细文本说明。",
+      "slide_index": 3,
+      "type": "特性介绍页",
+      "semantic_type": "feature_list",
+      "relation_type": "parallel",
+      "layout_description": "页面上部为科技感十足的手机图片展示，中部有标题「Display and Camera Features」，下方为详细的产品特性描述。",
       "content_structure": {
         "type": "image_text_pair"
       },
       "editable_areas": {
         "title_elements": 1,
         "paragraph_multi": 1,
-        "paragraph_single": 1,
+        "image": 1,
+        "total_editable_text_areas": 2
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面中部居中",
+          "current_text": "Display and Camera Features",
+          "word_count": 4,
+          "purpose": "页面标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "页面中部下方",
+          "current_text": "New display technology offers thinner borders and larger 6.3-inch and 6.9-inch Super Retina XDR displays, providing an immersive viewing experience.\nThe 48MP Ultra Wide camera captures high-resolution photos and videos with advanced features like autofocus and ProRAW support. The 5x Telephoto camera provides sharper close-ups, even from a distance.",
+          "word_count": 48,
+          "purpose": "产品特性描述",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": []
+    },
+    {
+      "slide_index": 4,
+      "type": "内容介绍页",
+      "semantic_type": "feature_list",
+      "relation_type": "none",
+      "layout_description": "页面左侧展示手机屏幕截图，右侧上方有品牌标识和几何图案装饰，下方为两段详细的文本描述，整体布局清晰，图文并茂。",
+      "content_structure": {
+        "type": "image_text_pair"
+      },
+      "editable_areas": {
+        "title_elements": 1,
+        "paragraph_multi": 2,
         "total_editable_text_areas": 3
       },
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面中部",
+          "position": "页面中部偏下",
           "current_text": "Apple Intelligence: Personal and Private",
-          "word_count": 5,
-          "purpose": "主要标题",
+          "word_count": 4,
+          "purpose": "标题",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "页面底部",
-          "current_text": "Apple Intelligence is a personal intelligence system that assists in writing, self-expression, and task completion. It is designed with privacy at its core, ensuring your data is safe and private at every step.\nFeatures include on-device processing and Private Cloud Compute, which keep your data secure and private. Enjoy the benefits of advanced AI without compromising your personal information.",
-          "word_count": 45,
-          "purpose": "详细说明",
+          "position": "标题下方",
+          "current_text": "Apple Intelligence is a personal intelligence system that assists in writing, self-expression, and task completion. It is designed with privacy at its core, ensuring your data is safe and private at every step.",
+          "word_count": 28,
+          "purpose": "特征描述1",
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_single",
-          "position": "页面底部",
-          "current_text": "Apple Intelligence: Personal and Private",
-          "word_count": 5,
-          "purpose": "副标题",
+          "element_type": "paragraph_multi",
+          "position": "特征描述1下方",
+          "current_text": "Features include on-device processing and Private Cloud Compute, which keep your data secure and private. Enjoy the benefits of advanced AI without compromising your personal information.",
+          "word_count": 28,
+          "purpose": "特征描述2",
           "has_bullets": false
         }
       ],
@@ -252,32 +199,83 @@
       "slide_index": 5,
       "type": "内容页",
       "semantic_type": "feature_list",
-      "relation_type": "parallel",
-      "layout_description": "幻灯片中心以图像展示主推产品或技术，底部有标题和长段落描述内容。",
+      "relation_type": "none",
+      "layout_description": "页面左侧为大尺寸图片，右侧为产品特性说明，包括标题和多段文字描述，布局清晰，适合展示产品功能与细节。",
       "content_structure": {
         "type": "image_text_pair"
       },
       "editable_areas": {
+        "title_elements": 2,
+        "paragraph_multi": 2,
+        "total_editable_text_areas": 4
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "图片上方",
+          "current_text": "A18 Pro chip. The brains behind",
+          "word_count": 5,
+          "purpose": "产品特性标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "title",
+          "position": "页面右上部",
+          "current_text": "Performance and Battery Life",
+          "word_count": 4,
+          "purpose": "部分标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "页面右中部",
+          "current_text": "The A18 Pro chip features a faster Neural Engine, improved CPU and GPU, and increased memory bandwidth. It offers advanced video and photo capabilities, the best graphics performance for gaming, and hardware-accelerated ray tracing in iOS 18.",
+          "word_count": 39,
+          "purpose": "特性说明",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "页面右下部",
+          "current_text": "The iPhone 16 Pro provides extended battery life, with the Pro Max model offering up to 33 hours of video playback. Fast wireless charging supports up to 25W using a 30W power adapter, allowing up to 50% charge in approximately 30 minutes.",
+          "word_count": 41,
+          "purpose": "特性说明",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": []
+    },
+    {
+      "slide_index": 6,
+      "type": "内容页",
+      "semantic_type": "feature_list",
+      "relation_type": "parallel",
+      "layout_description": "页面包含一个位于顶部的大标题和下方的多个项目符号列表，适用于展示产品特性或功能介绍。右侧有几何图形装饰。",
+      "content_structure": {
+        "type": "bullet_list",
+        "bullet_count": 5
+      },
+      "editable_areas": {
         "title_elements": 1,
-        "paragraph_multi": 1,
+        "bullet_list_long": 1,
         "total_editable_text_areas": 2
       },
       "content_elements": [
         {
           "element_type": "title",
-          "position": "底部居中",
-          "current_text": "Performance and Battery Life",
+          "position": "页面上部",
+          "current_text": "Additional Features and Accessibility",
           "word_count": 4,
-          "purpose": "幻灯片标题",
+          "purpose": "主标题",
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "底部居中",
-          "current_text": "The A18 Pro chip features a faster Neural Engine, improved CPU and GPU, and increased memory bandwidth. It offers advanced video and photo capabilities, the best graphics performance for gaming, and hardware-accelerated ray tracing in iOS 18.\nThe iPhone 16 Pro provides extended battery life, with the Pro Max model offering up to 33 hours of video playback. Fast wireless charging supports up to 25W using a 30W power adapter, allowing up to 50% charge in approximately 30 minutes.",
-          "word_count": 65,
-          "purpose": "详细说明",
-          "has_bullets": false
+          "element_type": "bullet_list_long",
+          "position": "页面中部",
+          "current_text": "Satellite Connectivity: Stay connected in remote areas.\n\nPrivacy and Security: Secure your data with end-to-end encryption.\nAccessibility: Features for all users, including Eye Tracking and Music Haptics.\nSatellite SOS: Text emergency services when cell service is unavailable.\nVocal Shortcuts: Voice commands to enhance usability.\n",
+          "word_count": 34,
+          "purpose": "特性列表",
+          "has_bullets": true
         }
       ],
       "group_structures": []
@@ -285,9 +283,43 @@
     {
       "slide_index": 7,
       "type": "内容页",
-      "semantic_type": "feature_list",
-      "relation_type": "bullet_list",
-      "layout_description": "页面顶部为主要标题，下面为正文内容区，以项目符号展示环保和伦理相关要点。",
+      "semantic_type": "bullet_list",
+      "relation_type": "parallel",
+      "layout_description": "页面顶部为大标题，下方为多个项目符号列表，用于突出要点。",
+      "content_structure": {
+        "type": "bullet_list"
+      },
+      "editable_areas": {
+        "title_elements": 1,
+        "bullet_list_long": 1,
+        "total_editable_text_areas": 2
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面顶部居中",
+          "current_text": "Environmental and Ethical Considerations",
+          "word_count": 4,
+          "purpose": "页面主标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "bullet_list_long",
+          "position": "页面中部偏下，以项目符号形式展示",
+          "current_text": "All Apple data centers run on 100% renewable energy.\n\nThe iPhone 16 Pro uses over 95% recycled lithium in the battery, 100% recycled gold in the USB-C connector, and 100% recycled copper in the MagSafe charger.\nPackaging is 100% fiber-based and thinner, reducing carbon impact for shipping.\nApple prioritizes ethical practices with the use of recycled materials and sustainable packaging.\nPrivacy and security are paramount, ensuring user data is protected and inaccessible to anyone, including Apple.",
+          "word_count": 70,
+          "purpose": "详细要点列表",
+          "has_bullets": true
+        }
+      ],
+      "group_structures": []
+    },
+    {
+      "slide_index": 8,
+      "type": "感谢页",
+      "semantic_type": "thank_you",
+      "relation_type": "none",
+      "layout_description": "页面上部有较大标题区域，下部有项目符号列表区域，内容为结束语和联系信息，右上角有绿色几何图形装饰。",
       "content_structure": {
         "type": "title_content"
       },
@@ -299,53 +331,19 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面顶部",
-          "current_text": "Environmental and Ethical Considerations",
+          "position": "页面上部居中",
+          "current_text": "Thank You for Joining Us",
           "word_count": 4,
-          "purpose": "主要标题",
+          "purpose": "结束语标题",
           "has_bullets": false
         },
         {
           "element_type": "bullet_list_long",
           "position": "页面中部",
-          "current_text": "All Apple data centers run on 100% renewable energy.\n\nThe iPhone 16 Pro uses over 95% recycled lithium in the battery, 100% recycled gold in the USB-C connector, and 100% recycled copper in the MagSafe charger.\nPackaging is 100% fiber-based and thinner, reducing carbon impact for shipping.\nApple prioritizes ethical practices with the use of recycled materials and sustainable packaging.\nPrivacy and security are paramount, ensuring user data is protected and inaccessible to anyone, including Apple.\n",
-          "word_count": 64,
-          "purpose": "环保和伦理措施说明",
-          "has_bullets": true
-        }
-      ],
-      "group_structures": []
-    },
-    {
-      "slide_index": 8,
-      "type": "感谢页",
-      "semantic_type": "thank_you",
-      "relation_type": "none",
-      "layout_description": "幻灯片顶部为感谢标题，内容区域包含多行文本，适用于简短总结或感谢。背景左侧和右下有绿色几何图形装饰，增强视觉效果。",
-      "content_structure": {
-        "type": "title_content"
-      },
-      "editable_areas": {
-        "title_elements": 1,
-        "paragraph_multi": 1,
-        "total_editable_text_areas": 2
-      },
-      "content_elements": [
-        {
-          "element_type": "title",
-          "position": "页面上部居中",
-          "current_text": "Thank You for Joining Us",
-          "word_count": 5,
-          "purpose": "感谢标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_multi",
-          "position": "内容区域",
           "current_text": "We hope you enjoyed learning about the iPhone 16 Pro.\nFor further inquiries, please contact:\nCustomer Support: support@apple.com\nStay tuned for more exciting updates from Apple!",
-          "word_count": 30,
-          "purpose": "感谢信息和联系资讯",
-          "has_bullets": false
+          "word_count": 29,
+          "purpose": "结束语及联系信息",
+          "has_bullets": true
         }
       ],
       "group_structures": []
@@ -353,14 +351,14 @@
   ],
   "recommendations": {},
   "slideImages": [
-    "workspace/sessions/e062eb58-3995-49a0-96d4-aa9239dc15bb/template_images/slide_01.png",
-    "workspace/sessions/e062eb58-3995-49a0-96d4-aa9239dc15bb/template_images/slide_02.png",
-    "workspace/sessions/e062eb58-3995-49a0-96d4-aa9239dc15bb/template_images/slide_03.png",
-    "workspace/sessions/e062eb58-3995-49a0-96d4-aa9239dc15bb/template_images/slide_04.png",
-    "workspace/sessions/e062eb58-3995-49a0-96d4-aa9239dc15bb/template_images/slide_05.png",
-    "workspace/sessions/e062eb58-3995-49a0-96d4-aa9239dc15bb/template_images/slide_06.png",
-    "workspace/sessions/e062eb58-3995-49a0-96d4-aa9239dc15bb/template_images/slide_07.png",
-    "workspace/sessions/e062eb58-3995-49a0-96d4-aa9239dc15bb/template_images/slide_08.png",
-    "workspace/sessions/e062eb58-3995-49a0-96d4-aa9239dc15bb/template_images/slide_09.png"
+    "workspace/sessions/1e2da1c6-a829-46d7-ad46-d6b2b5341623/template_images/slide_01.png",
+    "workspace/sessions/1e2da1c6-a829-46d7-ad46-d6b2b5341623/template_images/slide_02.png",
+    "workspace/sessions/1e2da1c6-a829-46d7-ad46-d6b2b5341623/template_images/slide_03.png",
+    "workspace/sessions/1e2da1c6-a829-46d7-ad46-d6b2b5341623/template_images/slide_04.png",
+    "workspace/sessions/1e2da1c6-a829-46d7-ad46-d6b2b5341623/template_images/slide_05.png",
+    "workspace/sessions/1e2da1c6-a829-46d7-ad46-d6b2b5341623/template_images/slide_06.png",
+    "workspace/sessions/1e2da1c6-a829-46d7-ad46-d6b2b5341623/template_images/slide_07.png",
+    "workspace/sessions/1e2da1c6-a829-46d7-ad46-d6b2b5341623/template_images/slide_08.png",
+    "workspace/sessions/1e2da1c6-a829-46d7-ad46-d6b2b5341623/template_images/slide_09.png"
   ]
 }
