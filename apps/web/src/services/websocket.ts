@@ -13,8 +13,7 @@ class WebSocketService {
    * 获取WebSocket服务器URL
    */
   private getWebSocketBaseUrl(): string {
-    // 使用相对路径，让Nginx正确代理WebSocket请求
-    // 这样在Docker环境和开发环境下都能正常工作
+    // 生产环境下使用完整的WebSocket URL
     return window.location.protocol === 'https:' 
       ? `wss://${window.location.host}`
       : `ws://${window.location.host}`
