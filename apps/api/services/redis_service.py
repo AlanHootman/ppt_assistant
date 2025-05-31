@@ -175,4 +175,13 @@ class RedisService:
             task_id: 任务ID
         """
         key = f"template:{template_id}:analysis_task"
-        self.redis_client.set(key, task_id) 
+        self.redis_client.set(key, task_id)
+    
+    def clear_template_analysis_task_id(self, template_id: int):
+        """清理模板分析任务ID关联
+        
+        Args:
+            template_id: 模板ID
+        """
+        key = f"template:{template_id}:analysis_task"
+        self.redis_client.delete(key) 

@@ -43,6 +43,74 @@ def analyze_template_task(self, template_data: dict):
     if template_id:
         redis_service.save_template_analysis_task_id(template_id, task_id)
     
+    # 检查模板当前状态，防止重复分析
+    db = SessionLocal()
+    try:
+        template = db.query(Template).filter(Template.id == template_id).first()
+        if not template:
+            error_msg = f"模板不存在: template_id={template_id}"
+            logger.error(error_msg)
+            return {
+                "template_id": template_id,
+                "status": "failed",
+                "error": {
+                    "has_error": True,
+                    "error_code": "TEMPLATE_NOT_FOUND",
+                    "error_message": error_msg,
+                    "can_retry": False
+                }
+            }
+        
+        # 如果模板已经分析完成，直接返回成功状态
+        if template.status == "ready" and template.analysis_path:
+            logger.info(f"模板已完成分析，跳过重复分析: template_id={template_id}, status={template.status}")
+            return {
+                "template_id": template_id,
+                "status": "completed",
+                "message": "模板分析已完成",
+                "analysis_file_path": template.analysis_path,
+                "preview_images": []  # 可以从缓存中获取预览图
+            }
+        
+        # 如果模板正在分析中，检查是否有其他活跃的分析任务
+        if template.status == "analyzing":
+            existing_task_id = redis_service.get_template_analysis_task_id(template_id)
+            if existing_task_id and existing_task_id != task_id:
+                # 检查现有任务是否仍在运行
+                existing_task_status = redis_service.get_task_status(existing_task_id)
+                if existing_task_status and existing_task_status.get("status") == "analyzing":
+                    logger.warning(f"模板正在分析中，跳过重复任务: template_id={template_id}, existing_task_id={existing_task_id}, current_task_id={task_id}")
+                    return {
+                        "template_id": template_id,
+                        "status": "analyzing",
+                        "message": f"模板正在分析中，任务ID: {existing_task_id}",
+                        "existing_task_id": existing_task_id
+                    }
+        
+        # 更新模板状态为分析中（防止其他任务同时开始）
+        template.status = "analyzing"
+        db.commit()
+        logger.info(f"开始分析模板: template_id={template_id}, task_id={task_id}")
+        
+    except Exception as e:
+        logger.error(f"检查模板状态失败: template_id={template_id}, error={str(e)}")
+        db.rollback()
+        return {
+            "template_id": template_id,
+            "status": "failed",
+            "error": {
+                "has_error": True,
+                "error_code": "STATUS_CHECK_ERROR",
+                "error_message": str(e),
+                "can_retry": True
+            }
+        }
+    finally:
+        db.close()
+    
+    # 重新创建数据库会话用于后续操作
+    db = SessionLocal()
+    
     # 初始化MLflow跟踪器
     tracker = None
     enable_tracking = template_data.get("enable_tracking", False) and HAS_MLFLOW
@@ -192,6 +260,11 @@ def analyze_template_task(self, template_data: dict):
             preview_path=preview_images[0] if preview_images else None
         )
         
+        # 清理Redis中的任务ID关联（任务完成）
+        if template_id:
+            redis_service.clear_template_analysis_task_id(template_id)
+            logger.info(f"已清理模板分析任务ID关联: template_id={template_id}, task_id={task_id}")
+        
         # 结束MLflow跟踪
         if enable_tracking and tracker:
             tracker.end_workflow_run("FINISHED")
@@ -226,6 +299,11 @@ def analyze_template_task(self, template_data: dict):
             status="failed"
         )
         
+        # 清理Redis中的任务ID关联（任务失败）
+        if template_id:
+            redis_service.clear_template_analysis_task_id(template_id)
+            logger.info(f"已清理模板分析任务ID关联(失败): template_id={template_id}, task_id={task_id}")
+        
         # 记录失败到MLflow
         if enable_tracking and tracker and HAS_MLFLOW:
             try:
@@ -239,6 +317,10 @@ def analyze_template_task(self, template_data: dict):
             "template_id": template_data.get("template_id"),
             **error_data
         }
+    
+    finally:
+        # 确保数据库会话被正确关闭
+        db.close()
 
 def update_template_status_in_db(template_id: int, status: str, analysis_path: str = None, analysis_time: datetime = None, preview_path: str = None):
     """更新数据库中的模板状态
