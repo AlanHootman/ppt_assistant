@@ -11,7 +11,7 @@
     
     <main class="main-content">
       <div class="container">
-        <div class="flex-row responsive-container">
+        <div class="content-grid">
           <!-- 左侧编辑区域 -->
           <div class="editor-panel">
             <template-selector />
@@ -96,18 +96,58 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* ==========================================================================
+   页面布局 - 使用现代Flexbox Grid布局
+   ========================================================================== */
+
 .home-page {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  /* 移除 overflow: hidden，允许必要时滚动 */
+  background-color: #f8fafc;
 }
+
+/* ==========================================================================
+   容器 - 响应式容器，支持不同屏幕尺寸
+   ========================================================================== */
+
+.container {
+  width: 100%;
+  max-width: 1400px; /* 限制最大宽度，避免超大屏幕内容过度拉伸 */
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* 不同屏幕尺寸的容器调整 */
+@media (min-width: 576px) {
+  .container {
+    padding: 0 1.5rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    padding: 0 2rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .container {
+    padding: 0 3rem;
+  }
+}
+
+/* ==========================================================================
+   Header - 固定高度头部
+   ========================================================================== */
 
 .header {
   background-color: #fff;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  padding: 8px 0; /* 减少顶部和底部的padding */
-  flex-shrink: 0; /* 不允许缩放 */
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  padding: 1rem 0;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
 }
 
 .header .container {
@@ -117,46 +157,215 @@ onMounted(() => {
 }
 
 .logo {
-  font-size: 1.3rem; /* 稍微减小字体 */
+  font-size: 1.5rem;
+  font-weight: 600;
   color: #409eff;
   margin: 0;
+  white-space: nowrap;
 }
+
+.nav {
+  display: flex;
+  align-items: center;
+}
+
+/* ==========================================================================
+   Main Content - 自适应主内容区域
+   ========================================================================== */
 
 .main-content {
   flex: 1;
-  padding: 15px 0; /* 减少上下padding */
-  min-height: 0; /* 允许flex子元素缩小 */
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem 0;
+  min-height: 0; /* 重要：允许flex子元素正确收缩 */
 }
 
-.responsive-container {
-  height: calc(100vh - 120px); /* 计算可用高度，减去header和footer */
-  min-height: 600px; /* 设置最小高度，确保内容可见 */
-}
-
-.editor-panel, .preview-panel {
-  padding: 10px; /* 减少内边距 */
+.main-content .container {
   flex: 1;
-  min-height: 0; /* 允许flex子元素缩小 */
-  overflow-y: auto; /* 允许各面板内部滚动 */
+  display: flex;
+  flex-direction: column;
 }
+
+/* ==========================================================================
+   Content Grid - 响应式网格布局
+   ========================================================================== */
+
+.content-grid {
+  display: grid;
+  gap: 1.5rem;
+  flex: 1;
+  min-height: 0;
+  
+  /* 默认单列布局（移动端） */
+  grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr;
+}
+
+/* 平板及以上：双列布局 */
+@media (min-width: 768px) {
+  .content-grid {
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr;
+    min-height: 500px; /* 确保最小高度 */
+  }
+}
+
+/* 大屏幕：优化列宽比例 */
+@media (min-width: 1024px) {
+  .content-grid {
+    grid-template-columns: 1.2fr 0.8fr; /* 左侧稍宽，更适合编辑 */
+    gap: 2rem;
+    min-height: 600px;
+  }
+}
+
+/* 超大屏幕：进一步优化 */
+@media (min-width: 1400px) {
+  .content-grid {
+    gap: 2.5rem;
+    min-height: 650px;
+  }
+}
+
+/* ==========================================================================
+   Panel Styling - 面板样式
+   ========================================================================== */
+
+.editor-panel,
+.preview-panel {
+  background-color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden; /* 防止内容溢出 */
+}
+
+/* 编辑器面板特殊处理 - 允许内容自然滚动 */
+.editor-panel {
+  overflow-y: auto; /* 允许垂直滚动 */
+  scrollbar-width: thin; /* Firefox 细滚动条 */
+  scrollbar-color: #c1c1c1 #f1f1f1; /* Firefox 滚动条颜色 */
+}
+
+/* Webkit滚动条样式优化 */
+.editor-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.editor-panel::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.editor-panel::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.editor-panel::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* 面板内容布局 */
+.editor-panel > *,
+.preview-panel > * {
+  flex-shrink: 0; /* 防止子元素被压缩 */
+}
+
+/* 移除原有的flex-grow设置，让每个组件管理自己的高度 */
+.preview-panel > *:last-child {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 大屏幕面板优化 */
+@media (min-width: 1024px) {
+  .editor-panel,
+  .preview-panel {
+    padding: 2rem;
+  }
+}
+
+/* ==========================================================================
+   Footer - 固定高度底部
+   ========================================================================== */
 
 .footer {
-  background-color: #f5f7fa;
-  padding: 8px 0; /* 减少上下padding */
+  background-color: #f1f5f9;
+  padding: 1rem 0;
   text-align: center;
-  color: #606266;
-  font-size: 0.8rem; /* 减小字体 */
-  flex-shrink: 0; /* 不允许缩放 */
+  color: #64748b;
+  font-size: 0.875rem;
+  flex-shrink: 0;
+  border-top: 1px solid #e2e8f0;
 }
 
-@media (max-width: 768px) {
-  .editor-panel, .preview-panel {
-    width: 100%;
+/* ==========================================================================
+   移动端适配
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .header {
+    padding: 0.75rem 0;
   }
   
-  .responsive-container {
-    height: auto; /* 移动端允许自然高度 */
-    min-height: auto;
+  .logo {
+    font-size: 1.25rem;
+  }
+  
+  .main-content {
+    padding: 1rem 0;
+  }
+  
+  .content-grid {
+    gap: 1rem;
+  }
+  
+  .editor-panel,
+  .preview-panel {
+    padding: 1rem;
+    border-radius: 8px;
+  }
+  
+  .footer {
+    padding: 0.75rem 0;
+    font-size: 0.8rem;
+  }
+}
+
+/* ==========================================================================
+   打印和可访问性优化
+   ========================================================================== */
+
+@media print {
+  .header,
+  .footer {
+    display: none;
+  }
+  
+  .main-content {
+    padding: 0;
+  }
+}
+
+/* 高对比度模式支持 */
+@media (prefers-contrast: high) {
+  .editor-panel,
+  .preview-panel {
+    border: 2px solid #333;
+  }
+}
+
+/* 减少动画效果（为有需要的用户） */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
 </style> 

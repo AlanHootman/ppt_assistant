@@ -19,6 +19,13 @@ html, body {
   line-height: 1.5;
 }
 
+/* 主应用容器 */
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
 /* 常用辅助类 */
 .text-center {
   text-align: center;
@@ -117,6 +124,59 @@ html, body {
   flex-wrap: wrap;
 }
 
+/* 响应式显示辅助类 */
+.d-none {
+  display: none;
+}
+
+.d-block {
+  display: block;
+}
+
+/* 小屏幕（手机） */
+@media (max-width: 575px) {
+  .d-none-xs {
+    display: none;
+  }
+  
+  .d-block-xs {
+    display: block;
+  }
+}
+
+/* 中等屏幕（平板） */
+@media (min-width: 576px) and (max-width: 767px) {
+  .d-none-sm {
+    display: none;
+  }
+  
+  .d-block-sm {
+    display: block;
+  }
+}
+
+/* 大屏幕（桌面） */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .d-none-md {
+    display: none;
+  }
+  
+  .d-block-md {
+    display: block;
+  }
+}
+
+/* 超大屏幕 */
+@media (min-width: 1024px) {
+  .d-none-lg {
+    display: none;
+  }
+  
+  .d-block-lg {
+    display: block;
+  }
+}
+
 /* 动画 */
 .fade-enter-active,
 .fade-leave-active {
@@ -131,15 +191,21 @@ html, body {
 /* 卡片样式 */
 .card {
   background-color: #fff;
-  border-radius: 4px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.08);
   padding: 1rem;
+  transition: box-shadow 0.3s ease;
+}
+
+.card:hover {
+  box-shadow: 0 4px 20px 0 rgba(0, 0, 0, 0.12);
 }
 
 /* 链接样式 */
 a {
   color: #409eff;
   text-decoration: none;
+  transition: color 0.3s ease;
 }
 
 a:hover {
@@ -149,13 +215,103 @@ a:hover {
 
 /* 响应式布局辅助类 */
 @media (max-width: 768px) {
-  .d-none-sm {
-    display: none;
-  }
-  
   .flex-column-sm {
     flex-direction: column;
   }
+  
+  .text-center-sm {
+    text-align: center;
+  }
+}
+
+/* 容器辅助类 */
+.container-fluid {
+  width: 100%;
+  padding: 0 1rem;
+}
+
+/* 网格辅助类 */
+.grid {
+  display: grid;
+}
+
+.grid-cols-1 {
+  grid-template-columns: 1fr;
+}
+
+.grid-cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.grid-cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.gap-1 {
+  gap: 0.5rem;
+}
+
+.gap-2 {
+  gap: 1rem;
+}
+
+.gap-3 {
+  gap: 1.5rem;
+}
+
+.gap-4 {
+  gap: 2rem;
+}
+
+/* 文字大小辅助类 */
+.text-xs {
+  font-size: 0.75rem;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+}
+
+.text-base {
+  font-size: 1rem;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+}
+
+.text-xl {
+  font-size: 1.25rem;
+}
+
+.text-2xl {
+  font-size: 1.5rem;
+}
+
+/* 圆角辅助类 */
+.rounded {
+  border-radius: 4px;
+}
+
+.rounded-lg {
+  border-radius: 8px;
+}
+
+.rounded-xl {
+  border-radius: 12px;
+}
+
+/* 阴影辅助类 */
+.shadow-sm {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.shadow {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.shadow-lg {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
 /* 页面过渡动画 */
@@ -168,4 +324,24 @@ a:hover {
 .page-leave-to {
   opacity: 0;
   transform: translateY(10px);
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 } 

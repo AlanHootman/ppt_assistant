@@ -7,53 +7,20 @@
 </script>
 
 <style>
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* 移除重复的全局样式，这些已在main.scss中定义 */
+/* 只保留应用级别的特定样式 */
 
-html, body {
-  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  font-size: 16px;
-  color: #333;
-  line-height: 1.5;
-  background-color: #f5f7fa;
-  height: 100%;
-}
-
+/* 应用根容器 */
 #app {
   min-height: 100vh;
-}
-
-a {
-  color: #409eff;
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-.container {
-  width: 100%;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 0.8rem;
-  height: 100%;
-}
-
-.flex-row {
   display: flex;
-  flex-direction: row;
-  height: 100%;
+  flex-direction: column;
 }
 
-@media (max-width: 768px) {
-  .responsive-container {
-    flex-direction: column;
-  }
+/* 路由视图容器 */
+.router-view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 </style> 

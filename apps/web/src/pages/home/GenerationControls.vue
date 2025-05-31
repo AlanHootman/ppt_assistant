@@ -99,20 +99,153 @@ async function handleCancel() {
 </script>
 
 <style scoped>
+/* ==========================================================================
+   生成控制面板 - 按钮布局
+   ========================================================================== */
+
 .generation-controls {
   display: flex;
-  gap: 10px;
-  margin-top: 15px;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-shrink: 0; /* 防止按钮区域被压缩 */
 }
+
+/* ==========================================================================
+   生成按钮 - 主要操作按钮
+   ========================================================================== */
 
 .generate-button {
   flex: 2;
-  height: 36px;
+  height: 42px;
   font-size: 1rem;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
 }
+
+.generate-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(64, 158, 255, 0.3);
+}
+
+.generate-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.generate-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* ==========================================================================
+   取消按钮 - 次要操作按钮
+   ========================================================================== */
 
 .cancel-button {
   flex: 1;
-  height: 36px;
+  height: 42px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  background-color: #f56c6c;
+  border-color: #f56c6c;
+  box-shadow: 0 2px 8px rgba(245, 108, 108, 0.2);
+}
+
+.cancel-button:hover {
+  background-color: #f78989;
+  border-color: #f78989;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(245, 108, 108, 0.3);
+}
+
+.cancel-button:active {
+  transform: translateY(0);
+}
+
+/* ==========================================================================
+   响应式优化 - 移动端适配
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .generation-controls {
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    flex-direction: column; /* 移动端垂直排列 */
+  }
+  
+  .generate-button,
+  .cancel-button {
+    flex: none;
+    width: 100%;
+    height: 38px;
+    font-size: 0.875rem;
+  }
+}
+
+/* 超小屏幕优化 */
+@media (max-width: 479px) {
+  .generation-controls {
+    gap: 0.375rem;
+  }
+  
+  .generate-button,
+  .cancel-button {
+    height: 36px;
+    font-size: 0.8rem;
+  }
+}
+
+/* ==========================================================================
+   可访问性和交互增强
+   ========================================================================== */
+
+.generate-button:focus,
+.cancel-button:focus {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .generate-button,
+  .cancel-button {
+    transition: none;
+  }
+  
+  .generate-button:hover:not(:disabled),
+  .cancel-button:hover {
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   加载状态优化
+   ========================================================================== */
+
+.generate-button.is-loading {
+  position: relative;
+}
+
+.generate-button.is-loading::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 1rem;
+  width: 1rem;
+  height: 1rem;
+  margin-top: -0.5rem;
+  border: 2px solid transparent;
+  border-top: 2px solid currentColor;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 </style> 
