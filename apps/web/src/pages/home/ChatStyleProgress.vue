@@ -6,8 +6,7 @@
         v-if="hasMessages || hasError"
         effect="dark" 
         placement="left"
-        :content="mlflowTooltipContent"
-        :disabled="!mlflowTooltipContent"
+        content="点击查看与大模型交互内容"
       >
         <el-button
           type="info"
@@ -15,8 +14,9 @@
           circle
           @click="openMlflowDashboard"
           class="debug-button"
-          :icon="BugIcon"
-        />
+        >
+          <el-icon><Setting /></el-icon>
+        </el-button>
       </el-tooltip>
     </div>
     
@@ -69,12 +69,12 @@
         </div>
         <div class="message-content">
           <div class="error-details">
-            <p><strong>错误代码:</strong> {{ taskError.error_code || 'UNKNOWN' }}</p>
-            <p><strong>错误描述:</strong> {{ taskError.error_message || '未知错误' }}</p>
-            <p v-if="taskError.can_retry"><strong>支持重试:</strong> 是</p>
+            <p><strong>错误代码:</strong> {{ taskError?.error_code || 'UNKNOWN' }}</p>
+            <p><strong>错误描述:</strong> {{ taskError?.error_message || '未知错误' }}</p>
+            <p v-if="taskError?.can_retry"><strong>支持重试:</strong> 是</p>
           </div>
         </div>
-        <div class="error-actions" v-if="taskError.can_retry">
+        <div class="error-actions" v-if="taskError?.can_retry">
           <el-button type="primary" size="small" @click="handleRetry">
             重试
           </el-button>
@@ -95,11 +95,11 @@
 
 <script setup lang="ts">
 import { ref, computed, nextTick, watch } from 'vue'
+import { Setting } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import { useProgressStore, type ProgressMessage, type PreviewImage } from '../../stores/progress'
 import { useTaskProgress } from '../../composables/useTaskProgress'
 import { useClientStore } from '../../stores/client'
-import { Setting as BugIcon } from '@element-plus/icons-vue'
 
 const progressStore = useProgressStore()
 const clientStore = useClientStore()
@@ -108,76 +108,32 @@ const { createPptTask } = useTaskProgress()
 // 消息容器引用
 const messagesContainer = ref<HTMLElement>()
 
-// 进度消息列表
+// 计算属性
 const progressMessages = computed(() => progressStore.progressMessages)
-
-// 预览图列表
 const previewImages = computed(() => progressStore.previewImages)
-
-// 是否正在生成
 const isGenerating = computed(() => progressStore.isGenerating)
-
-// 错误信息
 const taskError = computed(() => progressStore.taskError)
-
-// 是否有消息
 const hasMessages = computed(() => progressMessages.value.length > 0)
-
-// 是否有错误
 const hasError = computed(() => progressStore.taskStatus === 'failed')
-
-// 是否有详细错误信息
 const hasDetailedError = computed(() => {
   return hasError.value && taskError.value && taskError.value.has_error
 })
 
-// MLflow提示内容
-const mlflowTooltipContent = computed(() => {
-  const taskId = clientStore.currentTaskId
-  if (!taskId) return ''
-  
-  const totalMessages = progressMessages.value.length
-  const errorMessages = progressMessages.value.filter(m => m.isError).length
-  const lastStep = progressMessages.value[progressMessages.value.length - 1]?.step || '未知'
-  
-  return `调试信息 (Task ID: ${taskId.slice(0, 8)}...)
-• 总进度步骤: ${totalMessages}
-• 错误步骤: ${errorMessages}
-• 最后步骤: ${lastStep}
-• 状态: ${progressStore.taskStatus || '未知'}
-
-点击查看MLflow跟踪详情`
-})
-
 // 获取MLflow服务器URL
 function getMlflowUrl(): string {
-  // 开发环境检查
-  const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  // 从当前页面URL获取服务器地址
+  const { protocol, hostname } = window.location
   
-  if (isDev) {
-    return 'http://127.0.0.1:5001'
-  }
-  
-  // 生产环境：使用当前域名，端口5000
-  const protocol = window.location.protocol
-  const hostname = window.location.hostname
-  return `${protocol}//${hostname}:5001`
+  // 构建MLflow URL - 使用标准的/mlflow路径
+  return `${protocol}//${hostname}/mlflow`
 }
 
 // 打开MLflow仪表板
 function openMlflowDashboard() {
   const mlflowUrl = getMlflowUrl()
-  const taskId = clientStore.currentTaskId
-  
-  // 构建带有任务ID过滤的URL（如果有任务ID）
-  let targetUrl = mlflowUrl
-  if (taskId) {
-    // MLflow实验查看URL，可以根据实际情况调整
-    targetUrl = `${mlflowUrl}/#/experiments`
-  }
   
   // 在新标签页中打开
-  window.open(targetUrl, '_blank', 'noopener,noreferrer')
+  window.open(mlflowUrl, '_blank', 'noopener,noreferrer')
 }
 
 // 自动滚动到底部
@@ -190,21 +146,15 @@ function scrollToBottom() {
 }
 
 // 监听消息变化，自动滚动到底部
-watch([progressMessages, isGenerating, hasDetailedError], () => {
-  scrollToBottom()
-}, { flush: 'post' })
+watch([progressMessages, isGenerating, hasDetailedError], scrollToBottom, { flush: 'post' })
 
 // 格式化时间
-function formatTime(time: Date) {
+function formatTime(time: Date): string {
   return dayjs(time).format('HH:mm:ss')
 }
 
 // 判断是否应该显示预览图
 function shouldShowPreview(message: ProgressMessage): boolean {
-  // 只有在以下条件下才显示预览图：
-  // 1. 是最后一条消息
-  // 2. 任务状态为completed
-  // 3. 不是错误消息
   const isLastMessage = progressMessages.value[progressMessages.value.length - 1]?.id === message.id
   const isCompleted = progressStore.taskStatus === 'completed'
   const hasPreviewImages = previewImages.value.length > 0
@@ -215,7 +165,6 @@ function shouldShowPreview(message: ProgressMessage): boolean {
 // 处理重试
 async function handleRetry() {
   if (hasError.value) {
-    // 重置进度并重新创建任务
     progressStore.resetProgress()
     await createPptTask()
   }
@@ -223,29 +172,38 @@ async function handleRetry() {
 </script>
 
 <style scoped>
+/* ==========================================================================
+   聊天进度组件 - 整体布局
+   ========================================================================== */
+
 .chat-progress {
   background-color: #f9f9f9;
   border-radius: 8px;
-  padding: 12px; /* 减少内边距 */
+  padding: 1rem;
   height: 100%;
-  max-height: 500px; /* 设置最大高度，避免过高 */
+  max-height: 500px;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* 防止整体溢出 */
+  overflow: hidden;
 }
+
+/* ==========================================================================
+   头部区域 - 标题和调试按钮
+   ========================================================================== */
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px; /* 减少底部间距 */
+  margin-bottom: 1rem;
+  flex-shrink: 0;
 }
 
 .title {
-  font-size: 1.1rem; /* 减小标题字体 */
-  margin: 0; /* 移除margin，在header中控制 */
+  font-size: 1.1rem;
+  margin: 0;
   color: #303133;
-  flex-shrink: 0; /* 标题不缩放 */
+  font-weight: 600;
 }
 
 .debug-button {
@@ -257,13 +215,17 @@ async function handleRetry() {
   opacity: 1;
 }
 
+/* ==========================================================================
+   消息容器 - 滚动区域
+   ========================================================================== */
+
 .messages-container {
-  flex: 1; /* 占用剩余空间 */
-  overflow-y: auto; /* 显示垂直滚动条 */
-  padding-right: 5px; /* 为滚动条留出空间 */
-  scrollbar-width: thin; /* Firefox滚动条样式 */
-  scrollbar-color: #c0c4cc #f5f7fa; /* Firefox滚动条颜色 */
-  max-height: 450px; /* 限制最大高度 */
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 0.375rem;
+  scrollbar-width: thin;
+  scrollbar-color: #c0c4cc #f5f7fa;
+  max-height: 450px;
 }
 
 /* Webkit滚动条样式 */
@@ -285,18 +247,22 @@ async function handleRetry() {
   background: #a4a9b6;
 }
 
+/* ==========================================================================
+   消息样式 - 不同类型消息的外观
+   ========================================================================== */
+
 .message {
-  margin-bottom: 12px; /* 减少间距 */
-  padding: 10px 12px; /* 减少内边距 */
+  margin-bottom: 0.75rem;
+  padding: 0.75rem;
   border-radius: 6px;
   max-width: 95%;
-  font-size: 0.9rem; /* 稍微减小字体 */
+  font-size: 0.875rem;
 }
 
 .system-message {
   align-self: center;
   background-color: #f0f9ff;
-  border-left: 3px solid #409eff; /* 减少边框宽度 */
+  border-left: 3px solid #409eff;
   color: #606266;
   width: 100%;
 }
@@ -313,68 +279,82 @@ async function handleRetry() {
   border-left: 3px solid #f56c6c;
 }
 
+/* ==========================================================================
+   消息头部 - 步骤名称、进度和时间
+   ========================================================================== */
+
 .message-header {
   display: flex;
-  margin-bottom: 6px; /* 减少间距 */
-  font-size: 0.8rem; /* 减小字体 */
+  margin-bottom: 0.5rem;
+  font-size: 0.8rem;
   color: #909399;
 }
 
 .step-name {
-  font-weight: bold;
-  margin-right: 8px;
+  font-weight: 600;
+  margin-right: 0.5rem;
   color: #303133;
 }
 
 .progress-percent {
-  margin-right: 8px;
+  margin-right: 0.5rem;
   color: #409eff;
+  font-weight: 500;
 }
 
 .error-indicator {
-  margin-right: 8px;
+  margin-right: 0.5rem;
   color: #f56c6c;
+  font-weight: 500;
 }
 
 .message-time {
   margin-left: auto;
 }
 
+/* ==========================================================================
+   消息内容 - 文本内容样式
+   ========================================================================== */
+
 .message-content {
-  line-height: 1.4; /* 减少行高 */
+  line-height: 1.5;
   white-space: pre-line;
 }
 
+/* ==========================================================================
+   预览图片 - 生成结果预览
+   ========================================================================== */
+
 .preview-container {
-  margin-top: 10px; /* 减少间距 */
+  margin-top: 0.75rem;
   width: 100%;
 }
 
 .preview-image {
   max-width: 100%;
-  max-height: 200px; /* 限制预览图高度 */
+  max-height: 200px;
   height: auto;
   border-radius: 4px;
-  box-shadow: 0 2px 8px 0 rgba(0, 0, 0, 0.1); /* 减少阴影 */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.error-actions {
-  margin-top: 10px; /* 减少间距 */
-}
+/* ==========================================================================
+   错误详情 - 错误信息显示
+   ========================================================================== */
 
 .error-details {
-  font-family: 'Courier New', monospace;
+  font-family: 'SF Mono', 'Monaco', 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
   background-color: #faf2f2;
   border: 1px solid #fbc4c4;
   border-radius: 4px;
-  padding: 8px; /* 减少内边距 */
-  margin: 8px 0; /* 减少外边距 */
+  padding: 0.5rem;
+  margin: 0.5rem 0;
 }
 
 .error-details p {
-  margin: 6px 0; /* 减少间距 */
-  font-size: 0.85rem; /* 减小字体 */
-  line-height: 1.3;
+  margin: 0.375rem 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
 .error-details strong {
@@ -382,10 +362,18 @@ async function handleRetry() {
   font-weight: 600;
 }
 
+.error-actions {
+  margin-top: 0.75rem;
+}
+
+/* ==========================================================================
+   加载动画 - 生成进度指示器
+   ========================================================================== */
+
 .loading-indicator {
   align-self: center;
-  margin-top: 15px; /* 减少间距 */
-  padding: 10px 0; /* 减少内边距 */
+  margin-top: 1rem;
+  padding: 0.75rem 0;
 }
 
 .loading-dots {
@@ -396,9 +384,9 @@ async function handleRetry() {
 
 .loading-dots span {
   display: inline-block;
-  width: 8px; /* 减小点的大小 */
+  width: 8px;
   height: 8px;
-  margin: 0 4px; /* 减小间距 */
+  margin: 0 0.25rem;
   background-color: #409eff;
   border-radius: 50%;
   animation: loading 1.4s infinite ease-in-out both;
@@ -415,8 +403,55 @@ async function handleRetry() {
 @keyframes loading {
   0%, 80%, 100% { 
     transform: scale(0);
-  } 40% { 
+  } 
+  40% { 
     transform: scale(1.0);
+  }
+}
+
+/* ==========================================================================
+   响应式优化 - 移动端适配
+   ========================================================================== */
+
+@media (max-width: 767px) {
+  .chat-progress {
+    padding: 0.75rem;
+    max-height: 400px;
+  }
+  
+  .header {
+    margin-bottom: 0.75rem;
+  }
+  
+  .title {
+    font-size: 1rem;
+  }
+  
+  .message {
+    padding: 0.5rem;
+    font-size: 0.8rem;
+  }
+  
+  .message-header {
+    font-size: 0.75rem;
+  }
+  
+  .messages-container {
+    max-height: 350px;
+  }
+}
+
+/* ==========================================================================
+   可访问性优化
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .debug-button {
+    transition: none;
+  }
+  
+  .loading-dots span {
+    animation: none;
   }
 }
 </style> 
