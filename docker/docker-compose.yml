@@ -71,9 +71,12 @@ services:
       - PYTHONPATH=/app
       - WORKING_DIR=/app/workspace
     depends_on:
-      - redis
-      - ppt_api
-      - ppt_mlflow
+      redis:
+        condition: service_started
+      ppt_api:
+        condition: service_started
+      ppt_mlflow:
+        condition: service_healthy
     networks:
       - ppt-net
     env_file:
@@ -86,27 +89,23 @@ services:
     working_dir: /app
     volumes:
       - ../workspace/mlflow:/app/mlflow_data
+      - ./mlflow/start.sh:/app/start.sh
     ports:
       - "5001:5001"
     networks:
       - ppt-net
-    command: >
-      bash -c "
-        mkdir -p /app/mlflow_data/mlruns /app/mlflow_data/mlartifacts &&
-        chmod -R 755 /app/mlflow_data &&
-        pip install --no-cache-dir mlflow &&
-        exec mlflow server 
-          --host 0.0.0.0 
-          --port 5001 
-          --backend-store-uri file:///app/mlflow_data/mlruns 
-          --artifacts-destination file:///app/mlflow_data/mlartifacts 
-          --serve-artifacts
-      "
+    command: bash /app/start.sh
     environment:
       - TZ=Asia/Shanghai
       - MLFLOW_TRACKING_URI=http://0.0.0.0:5001
       - MLFLOW_HOST=0.0.0.0
       - MLFLOW_PORT=5001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 
   redis:
     image: redis:7-alpine
