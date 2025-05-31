@@ -110,6 +110,14 @@ class Settings:
             }
         }
         
+        # 模型请求间隔配置（毫秒）
+        self.MODEL_REQUEST_INTERVALS = {
+            "text": int(os.environ.get("LLM_REQUEST_INTERVAL_MS", "0")),
+            "deep_thinking": int(os.environ.get("DEEP_THINKING_REQUEST_INTERVAL_MS", "0")),
+            "vision": int(os.environ.get("VISION_REQUEST_INTERVAL_MS", "0")),
+            "embedding": int(os.environ.get("EMBEDDING_REQUEST_INTERVAL_MS", "0"))
+        }
+        
         logger.info(f"加载系统配置，项目根目录: {self.BASE_DIR}")
     
     def get_model_defaults(self, model_type: str = "text") -> Dict[str, Any]:

@@ -105,6 +105,9 @@ class ModelHelper:
             try:
                 logger.info(f"调用模型 {model} 生成文本，尝试 {retry_count+1}/{max_retries+1}")
                 
+                # 等待请求间隔
+                await self.model_manager._wait_for_request_interval(model_type)
+                
                 # 根据模型类型选择适当的客户端
                 if model_type == "deep_thinking":
                     client = self.model_manager._get_client("deep_thinking")

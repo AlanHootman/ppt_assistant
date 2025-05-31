@@ -14,6 +14,7 @@ import asyncio
 import base64
 import atexit
 import weakref
+import time
 from typing import Dict, Any, List, Optional, Union
 
 # 引入OpenAI官方库
@@ -63,6 +64,10 @@ class ModelManager:
         self._clients = {}
         self._is_closed = False
         
+        # 请求间隔控制
+        self._last_request_times = {}  # 记录每种模型类型的上次请求时间
+        self._request_intervals = settings.MODEL_REQUEST_INTERVALS  # 获取配置的请求间隔
+        
         # 注册清理函数
         atexit.register(self._cleanup_clients_sync)
         
@@ -70,6 +75,7 @@ class ModelManager:
         _model_manager_instances.add(self)
         
         logger.info("初始化大模型管理器")
+        logger.info(f"请求间隔配置: {self._request_intervals}")
     
     def __enter__(self):
         """进入上下文管理器"""
@@ -97,6 +103,32 @@ class ModelManager:
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """异步上下文管理器退出时清理资源"""
         await self.close_clients()
+    
+    async def _wait_for_request_interval(self, model_type: str):
+        """
+        根据配置的间隔等待请求
+        
+        Args:
+            model_type: 模型类型 (text, deep_thinking, vision, embedding)
+        """
+        interval_ms = self._request_intervals.get(model_type, 0)
+        if interval_ms <= 0:
+            return  # 没有配置间隔或间隔为0，不需要等待
+        
+        current_time = time.time() * 1000  # 转换为毫秒
+        last_request_time = self._last_request_times.get(model_type, 0)
+        
+        # 计算需要等待的时间
+        elapsed_time = current_time - last_request_time
+        wait_time = interval_ms - elapsed_time
+        
+        if wait_time > 0:
+            wait_seconds = wait_time / 1000.0  # 转换为秒
+            logger.debug(f"模型类型 {model_type} 需要等待 {wait_time:.1f} 毫秒")
+            await asyncio.sleep(wait_seconds)
+        
+        # 更新上次请求时间
+        self._last_request_times[model_type] = time.time() * 1000
     
     def _get_client(self, model_type: str) -> AsyncOpenAI:
         """
@@ -259,6 +291,9 @@ class ModelManager:
         
         client = None
         try:
+            # 等待请求间隔
+            await self._wait_for_request_interval("text")
+            
             # 获取文本模型客户端
             client = self._get_client("text")
             
@@ -298,6 +333,9 @@ class ModelManager:
         
 
         try:
+            # 等待请求间隔
+            await self._wait_for_request_interval("embedding")
+            
             # 获取嵌入模型客户端
             client = self._get_client("embedding")
             
@@ -334,6 +372,9 @@ class ModelManager:
             raise FileNotFoundError(f"图像文件不存在: {image_path}")
         
         try:
+            # 等待请求间隔
+            await self._wait_for_request_interval("vision")
+            
             # 获取视觉模型客户端
             client = self._get_client("vision")
             
@@ -396,6 +437,9 @@ class ModelManager:
         
        
         try:
+            # 等待请求间隔
+            await self._wait_for_request_interval("vision")
+            
             # 获取视觉模型客户端
             client = self._get_client("vision")
             
