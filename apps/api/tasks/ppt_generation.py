@@ -3,6 +3,7 @@ from apps.api.celery_app import celery_app
 from apps.api.services.redis_service import RedisService
 from core.engine.workflowEngine import WorkflowEngine
 from apps.api.services.file_service import FileService
+from apps.api.models import SessionLocal, GenerationTask
 import asyncio
 import json
 from datetime import datetime
@@ -27,6 +28,9 @@ def generate_ppt_task(self, task_data: dict):
     redis_service = RedisService()
     file_service = FileService()
     
+    # 获取数据库会话
+    db = SessionLocal()
+    
     try:
         # 准备初始状态数据
         initial_status = {
@@ -37,6 +41,21 @@ def generate_ppt_task(self, task_data: dict):
             "created_at": datetime.utcnow().isoformat(),
             "updated_at": datetime.utcnow().isoformat()
         }
+        
+        # 更新数据库中的任务状态
+        try:
+            db_task = db.query(GenerationTask).filter(GenerationTask.id == task_id).first()
+            if db_task:
+                db_task.status = "processing"
+                db_task.progress = 0
+                db_task.current_step = "initialization"
+                db_task.step_description = "初始化PPT生成任务"
+                db_task.started_at = datetime.utcnow()
+                db.commit()
+                logger.info(f"更新数据库任务状态: task_id={task_id}, status=processing")
+        except Exception as e:
+            logger.warning(f"更新数据库任务状态失败: {str(e)}")
+            db.rollback()
         
         # 更新任务状态
         redis_service.update_task_status(task_id, **initial_status)
@@ -86,6 +105,21 @@ def generate_ppt_task(self, task_data: dict):
                 if "preview_images" in preview_data:
                     update_data["preview_images"] = preview_data["preview_images"]
             
+            # 更新数据库中的任务状态
+            try:
+                db_task = db.query(GenerationTask).filter(GenerationTask.id == task_id).first()
+                if db_task:
+                    db_task.status = update_data["status"]
+                    db_task.progress = update_data["progress"]
+                    db_task.current_step = update_data["current_step"]
+                    db_task.step_description = update_data["step_description"]
+                    if update_data["status"] == "failed":
+                        db_task.error_message = update_data.get("error", {}).get("error_message", description)
+                    db.commit()
+            except Exception as e:
+                logger.warning(f"更新数据库任务进度失败: {str(e)}")
+                db.rollback()
+            
             # 更新Redis中的任务状态
             redis_service.update_task_status(task_id, **update_data)
             
@@ -132,6 +166,18 @@ def generate_ppt_task(self, task_data: dict):
                 }
             }
             
+            # 更新数据库状态
+            try:
+                db_task = db.query(GenerationTask).filter(GenerationTask.id == task_id).first()
+                if db_task:
+                    db_task.status = "failed"
+                    db_task.error_message = last_failure
+                    db_task.completed_at = datetime.utcnow()
+                    db.commit()
+            except Exception as e:
+                logger.warning(f"更新数据库失败状态失败: {str(e)}")
+                db.rollback()
+            
             # 更新Redis状态
             redis_service.update_task_status(task_id, **error_data)
             
@@ -161,6 +207,18 @@ def generate_ppt_task(self, task_data: dict):
                     "can_retry": True
                 }
             }
+            
+            # 更新数据库状态
+            try:
+                db_task = db.query(GenerationTask).filter(GenerationTask.id == task_id).first()
+                if db_task:
+                    db_task.status = "failed"
+                    db_task.error_message = error_msg
+                    db_task.completed_at = datetime.utcnow()
+                    db.commit()
+            except Exception as e:
+                logger.warning(f"更新数据库失败状态失败: {str(e)}")
+                db.rollback()
             
             # 更新Redis状态
             redis_service.update_task_status(task_id, **error_data)
@@ -196,6 +254,25 @@ def generate_ppt_task(self, task_data: dict):
             "updated_at": datetime.utcnow().isoformat()
         }
         
+        # 更新数据库中的任务状态（重要：设置完成状态和输出路径）
+        try:
+            db_task = db.query(GenerationTask).filter(GenerationTask.id == task_id).first()
+            if db_task:
+                db_task.status = "completed"
+                db_task.progress = 100
+                db_task.current_step = "completed"
+                db_task.step_description = "PPT生成已完成"
+                db_task.output_path = result.output_ppt_path  # 设置实际的输出路径
+                db_task.completed_at = datetime.utcnow()
+                db_task.error_message = None  # 清除错误信息
+                db.commit()
+                logger.info(f"更新数据库任务完成状态: task_id={task_id}, status=completed, output_path={result.output_ppt_path}")
+            else:
+                logger.error(f"数据库中未找到任务记录: task_id={task_id}")
+        except Exception as e:
+            logger.error(f"更新数据库完成状态失败: {str(e)}")
+            db.rollback()
+        
         # 更新Redis状态
         redis_service.update_task_status(task_id, **final_data)
         
@@ -226,6 +303,19 @@ def generate_ppt_task(self, task_data: dict):
             }
         }
         
+        # 更新数据库中的异常状态
+        try:
+            db_task = db.query(GenerationTask).filter(GenerationTask.id == task_id).first()
+            if db_task:
+                db_task.status = "failed"
+                db_task.error_message = str(e)
+                db_task.completed_at = datetime.utcnow()
+                db.commit()
+                logger.info(f"更新数据库异常状态: task_id={task_id}, status=failed")
+        except Exception as db_e:
+            logger.error(f"更新数据库异常状态失败: {str(db_e)}")
+            db.rollback()
+        
         # 更新Redis状态
         redis_service.update_task_status(task_id, **error_data)
         
@@ -235,6 +325,10 @@ def generate_ppt_task(self, task_data: dict):
         
         # 不再自动重试，直接返回失败状态，让用户手动决定是否重试
         return {"task_id": task_id, **error_data}
+    
+    finally:
+        # 确保数据库会话被正确关闭
+        db.close()
 
 def generate_preview_images(ppt_path: str) -> list:
     """生成PPT预览图
