@@ -97,6 +97,10 @@ class Settings:
                 "temperature": float(os.environ.get("LLM_TEMPERATURE", "0.7")),
                 "max_tokens": int(os.environ.get("LLM_MAX_TOKENS", "128000"))
             },
+            "deep_thinking": {
+                "temperature": float(os.environ.get("DEEP_THINKING_TEMPERATURE", "1.0")),
+                "max_tokens": int(os.environ.get("DEEP_THINKING_MAX_TOKENS", "65536"))
+            },
             "vision": {
                 "temperature": float(os.environ.get("VISION_TEMPERATURE", "0.7")),
                 "max_tokens": int(os.environ.get("VISION_MAX_TOKENS", "128000"))

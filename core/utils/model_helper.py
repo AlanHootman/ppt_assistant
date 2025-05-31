@@ -81,7 +81,8 @@ class ModelHelper:
     async def generate_text_with_retry(self, model: str, prompt: str, 
                                      temperature: Optional[float] = None, 
                                      max_tokens: Optional[int] = None,
-                                     max_retries: int = 3) -> str:
+                                     max_retries: int = 3,
+                                     model_type: str = "text") -> str:
         """
         使用重试机制生成文本
         
@@ -91,6 +92,7 @@ class ModelHelper:
             temperature: 温度参数
             max_tokens: 最大 token 数
             max_retries: 最大重试次数
+            model_type: 模型类型，用于选择正确的客户端
             
         Returns:
             生成的文本
@@ -103,14 +105,26 @@ class ModelHelper:
             try:
                 logger.info(f"调用模型 {model} 生成文本，尝试 {retry_count+1}/{max_retries+1}")
                 
-                response = await self.model_manager.generate_text(
+                # 根据模型类型选择适当的客户端
+                if model_type == "deep_thinking":
+                    client = self.model_manager._get_client("deep_thinking")
+                else:
+                    client = self.model_manager._get_client("text")
+                
+                # 创建消息
+                messages = [{"role": "user", "content": prompt}]
+                
+                # 调用OpenAI API
+                response = await client.chat.completions.create(
                     model=model,
-                    prompt=prompt,
+                    messages=messages,
                     temperature=temperature,
                     max_tokens=max_tokens
                 )
                 
-                return response
+                # 提取结果
+                result = response.choices[0].message.content
+                return result or ""
                 
             except Exception as e:
                 last_error = e

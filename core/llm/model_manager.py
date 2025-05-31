@@ -49,6 +49,11 @@ class ModelManager:
         self.vision_api_key = os.environ.get("VISION_API_KEY", self.default_api_key)
         self.vision_api_base = os.environ.get("VISION_API_BASE", self.default_api_base)
         
+        # 深度思考LLM模型配置
+        self.deep_thinking_model = os.environ.get("DEEP_THINKING_MODEL", "o1-preview")
+        self.deep_thinking_api_key = os.environ.get("DEEP_THINKING_API_KEY", self.default_api_key)
+        self.deep_thinking_api_base = os.environ.get("DEEP_THINKING_API_BASE", self.default_api_base)
+        
         # 嵌入模型配置
         self.embedding_model = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-large")
         self.embedding_api_key = os.environ.get("EMBEDDING_API_KEY", self.default_api_key)
@@ -116,6 +121,9 @@ class ModelManager:
         elif model_type == "vision":
             api_key = self.vision_api_key
             api_base = self.vision_api_base
+        elif model_type == "deep_thinking":
+            api_key = self.deep_thinking_api_key
+            api_base = self.deep_thinking_api_base
         elif model_type == "embedding":
             api_key = self.embedding_api_key
             api_base = self.embedding_api_base
@@ -203,6 +211,12 @@ class ModelManager:
         elif model_type == "vision":
             return {
                 "model": self.vision_model,
+                "temperature": model_defaults.get("temperature"),
+                "max_tokens": model_defaults.get("max_tokens")
+            }
+        elif model_type == "deep_thinking":
+            return {
+                "model": self.deep_thinking_model,
                 "temperature": model_defaults.get("temperature"),
                 "max_tokens": model_defaults.get("max_tokens")
             }

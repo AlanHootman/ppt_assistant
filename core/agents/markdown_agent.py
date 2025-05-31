@@ -43,12 +43,13 @@ class MarkdownAgent(BaseAgent):
         self.model_manager = ModelManager()
         self.model_helper = ModelHelper(self.model_manager)
         
-        # 获取模型配置
-        model_config = self.model_helper.get_model_config(config, "text")
+        # 获取模型配置 - 使用深度思考模型
+        model_config = self.model_helper.get_model_config(config, "deep_thinking")
         self.llm_model = model_config.get("model")
         self.temperature = model_config.get("temperature")
         self.max_tokens = model_config.get("max_tokens")
         self.max_retries = model_config.get("max_retries", 3)
+        self.model_type = "deep_thinking"  # 记录模型类型
         
         logger.info(f"初始化 MarkdownAgent，使用模型: {self.llm_model}，最大重试次数: {self.max_retries}")
     
@@ -120,7 +121,8 @@ class MarkdownAgent(BaseAgent):
                 prompt=prompt,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
-                max_retries=self.max_retries
+                max_retries=self.max_retries,
+                model_type=self.model_type
             )
             
             # 解析JSON响应
