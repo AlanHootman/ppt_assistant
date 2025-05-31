@@ -508,6 +508,92 @@
       "group_structures": []
     },
     {
+      "slide_index": 10,
+      "type": "特性页",
+      "semantic_type": "feature_list",
+      "relation_type": "parallel",
+      "layout_description": "页面左侧有一张大图片，右侧有五个圆形标签和对应的文字说明，顶部有主标题。",
+      "content_structure": {
+        "type": "grid_layout",
+        "cells_count": 5
+      },
+      "editable_areas": {
+        "title_elements": 1,
+        "bullet_list_long": 1,
+        "shape_label": 5,
+        "total_editable_text_areas": 7
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面顶部居中",
+          "current_text": "知识与能力",
+          "word_count": 4,
+          "purpose": "页面标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "bullet_list_long",
+          "position": "页面左侧",
+          "current_text": "",
+          "word_count": 0,
+          "purpose": "图片说明",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "右上圆形标签",
+          "current_text": "经纬战场：\n用地理坐标APP锁定马六甲海峡的战略价值。",
+          "word_count": 15,
+          "purpose": "特性标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "右中间第一个圆形标签",
+          "current_text": "等高线读心术:\n从等高距判断喜马拉雅山的攀登难度差异。",
+          "word_count": 18,
+          "purpose": "特性标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "右中间第二个圆形标签",
+          "current_text": "气候密码本：\n用等降水量线解码印度旱灾与洪涝交替的真相。",
+          "word_count": 21,
+          "purpose": "特性标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "右中间第三个圆形标签",
+          "current_text": "GIS预言术：\n在腾讯地图上叠加油田分布与地震带，预测中亚资源争夺热点。",
+          "word_count": 24,
+          "purpose": "特性标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "右下圆形标签",
+          "current_text": "人地交互黑科技：\n用卫星遥感图追踪咸海萎缩的凶手链(棉花田→河流断流→生态崩溃)。",
+          "word_count": 25,
+          "purpose": "特性标题",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": [
+        {
+          "group_type": "grid_layout",
+          "elements_count": 5,
+          "element_types": {
+            "shape_label": 5
+          },
+          "arrangement": "右上至右下五个圆形标签排列",
+          "groups_relation": "parallel"
+        }
+      ]
+    },
+    {
       "slide_index": 11,
       "type": "章节标题页",
       "semantic_type": "section_header",
@@ -624,6 +710,142 @@
         }
       ],
       "group_structures": []
+    },
+    {
+      "slide_index": 14,
+      "type": "特性列表页",
+      "semantic_type": "feature_list",
+      "relation_type": "grid",
+      "layout_description": "页面顶部有标题区域，下方以网格方式排列了六项特性内容，每项内容包含序号和对应的描述。",
+      "content_structure": {
+        "type": "grid_layout",
+        "cells_count": 6
+      },
+      "editable_areas": {
+        "title_elements": 1,
+        "paragraph_multi": 6,
+        "shape_label": 6,
+        "total_editable_text_areas": 13
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面顶部居中",
+          "current_text": "高精尖价值",
+          "word_count": 5,
+          "purpose": "页面标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "左上圆形标签",
+          "current_text": "01",
+          "word_count": 2,
+          "purpose": "特性序号",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "圆形标签01右侧",
+          "current_text": "家庭篇：用等高线地图帮爸妈选登山路线，成为家庭旅行首席安全官！",
+          "word_count": 22,
+          "purpose": "特性描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "中上圆形标签",
+          "current_text": "02",
+          "word_count": 2,
+          "purpose": "特性序号",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "圆形标签02右侧",
+          "current_text": "校园篇：用GIS给学校设计抗台风应急撤离路线，C位出道被校长点赞！",
+          "word_count": 26,
+          "purpose": "特性描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "左中圆形标签",
+          "current_text": "03",
+          "word_count": 2,
+          "purpose": "特性序号",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "圆形标签03右侧",
+          "current_text": "省市篇：参与浙江“数字孪生流域”项目，用VR防洪系统拯救钱塘江村落。",
+          "word_count": 27,
+          "purpose": "特性描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "右上圆形标签",
+          "current_text": "04",
+          "word_count": 2,
+          "purpose": "特性序号",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "圆形标签04右侧",
+          "current_text": "国家篇：为川藏铁路绘制地质雷达图谱，避免隧道塌方成全国英雄！",
+          "word_count": 23,
+          "purpose": "特性描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "右中圆形标签",
+          "current_text": "05",
+          "word_count": 2,
+          "purpose": "特性序号",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "圆形标签05右侧",
+          "current_text": "全球篇：用气候模型破解北极航道开通密码，改写世界贸易版图！",
+          "word_count": 25,
+          "purpose": "特性描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "右下圆形标签",
+          "current_text": "06",
+          "word_count": 2,
+          "purpose": "特性序号",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "圆形标签06右侧",
+          "current_text": "未来篇：移民火星前，先用你的月球等高线地图帮SpaceX选基地位置！",
+          "word_count": 28,
+          "purpose": "特性描述",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": [
+        {
+          "group_type": "grid_layout",
+          "elements_count": 12,
+          "element_types": {
+            "shape_label": 6,
+            "paragraph_multi": 6
+          },
+          "arrangement": "六项内容网格排列",
+          "connection_type": "无直接连接",
+          "groups_relation": "parallel"
+        }
+      ]
     },
     {
       "slide_index": 15,
@@ -1176,6 +1398,70 @@
             "paragraph_multi": 4
           },
           "arrangement": "中间和底部四列网格排列",
+          "groups_relation": "parallel"
+        }
+      ]
+    },
+    {
+      "slide_index": 28,
+      "type": "特性页",
+      "semantic_type": "feature_list",
+      "relation_type": "grid",
+      "layout_description": "页面顶部有标题区域，页面分为上下两排，每排三个特性展示区域，每个区域包含一个圆形编号形状和一段描述文本。",
+      "content_structure": {
+        "type": "grid_layout",
+        "cells_count": 6
+      },
+      "editable_areas": {
+        "title_elements": 2,
+        "paragraph_multi": 6,
+        "shape_label": 6,
+        "total_editable_text_areas": 14
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面上部居中",
+          "current_text": "工作提升建议",
+          "word_count": 6,
+          "purpose": "主标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "title",
+          "position": "每项特性上方",
+          "current_text": "添加标题",
+          "word_count": 4,
+          "purpose": "特性标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "每项特性下方",
+          "current_text": "请在此处添加文本，与标题相关并符合整体语言风格内容请简洁,祝您使用愉快。",
+          "word_count": 26,
+          "purpose": "特性描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "每项特性编号区域",
+          "current_text": "编号（如01,02等）",
+          "word_count": 2,
+          "purpose": "特性编号",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": [
+        {
+          "group_type": "grid_layout",
+          "elements_count": 6,
+          "element_types": {
+            "shape_label": 6,
+            "paragraph_multi": 6,
+            "title": 2
+          },
+          "arrangement": "上排三个，下排三个的网格排列",
           "groups_relation": "parallel"
         }
       ]
