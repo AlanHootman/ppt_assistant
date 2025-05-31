@@ -229,9 +229,8 @@ start_services() {
     log_success "PPT助手系统启动完成!"
     log_info "访问地址:"
     log_info "  - 前端界面: http://localhost"
-    log_info "  - API文档: http://localhost:8000/docs"
-    log_info "  - MLflow: http://localhost:5001"
-    log_info "  - MLflow (反向代理): http://localhost/mlflow/"
+    log_info "  - API文档: http://localhost:8000/api/docs"
+    log_info "  - MLflow: http://localhost/mlflow/"
 }
 
 # 停止服务
