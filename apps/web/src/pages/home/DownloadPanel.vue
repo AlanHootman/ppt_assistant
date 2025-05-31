@@ -78,47 +78,91 @@ function handleNewTask() {
 </script>
 
 <style scoped>
+/* ==========================================================================
+   下载面板 - 紧凑式布局
+   ========================================================================== */
+
 .download-panel {
   background-color: #f0f9eb;
   border-radius: 8px;
-  padding: 20px;
-  margin-top: 20px;
+  padding: 1rem;
   border-left: 4px solid #67c23a;
+  flex-shrink: 0; /* 防止被压缩 */
 }
 
 .title {
-  font-size: 1.2rem;
-  margin-top: 0;
-  margin-bottom: 15px;
+  font-size: 1.1rem;
+  margin: 0 0 0.75rem 0;
   color: #67c23a;
+  font-weight: 600;
 }
 
 .success-message {
   display: flex;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 1rem;
   color: #606266;
 }
 
 .success-icon {
-  font-size: 24px;
+  font-size: 1.25rem;
   color: #67c23a;
-  margin-right: 10px;
+  margin-right: 0.5rem;
+  flex-shrink: 0;
+}
+
+.success-message p {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 .download-actions {
   display: flex;
-  gap: 15px;
-  margin-top: 20px;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .download-button {
   background-color: #67c23a;
   border-color: #67c23a;
+  height: 36px;
+  font-size: 0.875rem;
 }
 
 .download-button:hover {
   background-color: #85ce61;
   border-color: #85ce61;
+}
+
+/* 响应式优化 */
+@media (max-width: 767px) {
+  .download-panel {
+    padding: 0.75rem;
+  }
+  
+  .title {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+  
+  .success-message {
+    margin-bottom: 0.75rem;
+  }
+  
+  .success-message p {
+    font-size: 0.8rem;
+  }
+  
+  .download-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  
+  .download-actions .el-button {
+    width: 100%;
+    height: 32px;
+    font-size: 0.8rem;
+  }
 }
 </style> 

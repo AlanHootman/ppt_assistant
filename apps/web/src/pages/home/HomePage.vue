@@ -275,11 +275,27 @@ onMounted(() => {
   flex-shrink: 0; /* 防止子元素被压缩 */
 }
 
-/* 移除原有的flex-grow设置，让每个组件管理自己的高度 */
-.preview-panel > *:last-child {
+/* 预览面板特殊处理 - 让生成进度组件充分利用空间 */
+.preview-panel {
+  /* 确保预览面板内容能够充分利用空间 */
+}
+
+.preview-panel > * {
+  flex-shrink: 0;
+}
+
+/* ChatStyleProgress组件占用大部分空间 */
+.preview-panel > *:first-child {
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 下载面板保持固定大小 */
+.preview-panel > *:last-child:not(:first-child) {
+  flex-shrink: 0;
+  margin-top: 1rem;
 }
 
 /* 大屏幕面板优化 */

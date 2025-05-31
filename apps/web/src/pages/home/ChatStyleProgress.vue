@@ -181,7 +181,6 @@ async function handleRetry() {
   border-radius: 8px;
   padding: 1rem;
   height: 100%;
-  max-height: 500px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -225,7 +224,7 @@ async function handleRetry() {
   padding-right: 0.375rem;
   scrollbar-width: thin;
   scrollbar-color: #c0c4cc #f5f7fa;
-  max-height: 450px;
+  min-height: 0;
 }
 
 /* Webkit滚动条样式 */
@@ -416,7 +415,6 @@ async function handleRetry() {
 @media (max-width: 767px) {
   .chat-progress {
     padding: 0.75rem;
-    max-height: 400px;
   }
   
   .header {
@@ -437,7 +435,17 @@ async function handleRetry() {
   }
   
   .messages-container {
-    max-height: 350px;
+  }
+}
+
+/* 平板端适配 */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .chat-progress {
+    padding: 0.875rem;
+  }
+  
+  .message {
+    padding: 0.625rem;
   }
 }
 
