@@ -5,12 +5,34 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-    # networks:
-    #   - ppt-net
+    networks:
+      - ppt-net
 
+  ppt_mlflow:
+    image: python:3.10-slim
+    working_dir: /app
+    volumes:
+      - ../workspace/mlflow:/app/mlflow_data
+      - ./mlflow/start.sh:/app/start.sh
+    ports:
+      - "5001:5001"
+    networks:
+      - ppt-net
+    command: bash /app/start.sh
+    environment:
+      - TZ=Asia/Shanghai
+      - MLFLOW_TRACKING_URI=http://0.0.0.0:5001
+      - MLFLOW_HOST=0.0.0.0
+      - MLFLOW_PORT=5001
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
 volumes:
   redis_data:
   
-# networks:
-#   ppt-net:
-#     driver: bridge 
+networks:
+  ppt-net:
+    driver: bridge 
