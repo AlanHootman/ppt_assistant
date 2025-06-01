@@ -13,13 +13,6 @@ import os
 import logging
 from typing import Dict, Any, Optional, List
 
-# 导入MLflow跟踪功能
-try:
-    import mlflow
-    from core.monitoring import MLflowTracker
-    HAS_MLFLOW = True
-except ImportError:
-    HAS_MLFLOW = False
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +152,7 @@ def _validate_template_and_create_dirs(task_data: Dict[str, Any], task_id: str) 
 def _create_workflow_engine(task_data: Dict[str, Any]) -> WorkflowEngine:
     """创建工作流引擎，安全地处理MLflow跟踪"""
     # 检查是否启用跟踪，默认禁用以避免连接问题
-    enable_tracking = task_data.get("enable_tracking", False) and HAS_MLFLOW
+    enable_tracking = task_data.get("enable_tracking", True)
     
     logger.info(f"正在初始化工作流引擎... (MLflow跟踪: {'启用' if enable_tracking else '禁用'})")
     engine = WorkflowEngine(enable_tracking=enable_tracking)
