@@ -72,28 +72,41 @@ sudo chmod +x /usr/local/bin/soffice
 ```bash
 soffice --version
 ```
+#### 3. 安装poppler
 
-#### 3. 运行
-##### 3.1 启动redis服务
+Mac用户可以通过brew安装poppler
+```bash
+brew install poppler
+```
+Linux用户可以通过apt安装poppler
+```bash
+sudo apt-get install poppler-utils
+```
+
+Windows用户需要手动下载安装
+下载地址：https://poppler.freedesktop.org/
+
+#### 4. 运行
+##### 4.1 启动redis服务
 ```bash
 docker-compose -f docker/docker-compose-dev.yml up -d
 ```
 
-##### 3.2 启动后端FastAPI服务
+##### 4.2 启动后端FastAPI服务
 ```bash
 uvicorn apps.api.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-##### 3.3 启动celery服务
+##### 4.3 启动celery服务
 ```bash
 celery -A apps.api.celery_app worker --loglevel=info --concurrency=2 --pool=solo -Q celery,template_analysis,ppt_generation
 ```
-##### 3.4 启动mlflow服务
+##### 4.4 启动mlflow服务
 ```bash
 python scripts/start_mlflow_ui.py
 ```
 
-##### 3.5 启动前端Vue服务
+##### 4.5 启动前端Vue服务
 ```bash
 cd apps/web
 npm install --legacy-peer-deps
