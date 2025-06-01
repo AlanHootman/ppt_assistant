@@ -24,8 +24,19 @@
 ### 方式一：使用Docker部署
 
 ```bash
-docker-compose -f docker/docker-compose.yml up -d
+cd docker
+
+# 编辑.env文件，配置相关大模型API Key
+cp .env.example .env
+
+# 执行部署脚本
+./deploy.sh build
+# 执行启动脚本
+./deploy.sh start
 ```
+> 备注：
+> 1. 需要提前安装好docker和docker-compose
+
 
 ### 方式二：使用本地环境部署
 
