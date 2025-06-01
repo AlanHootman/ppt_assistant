@@ -55,56 +55,6 @@
             }
         },
         {
-            "name": "测试PPT生成API (上传模板)",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/tests/test_api_ppt_generation.py",
-            "args": [
-                "--template", "${input:selectPptTemplate}",
-                "--markdown", "${input:selectMarkdownFile}",
-                "--download",
-                "--output", "workspace/output/test_api_output.pptx"
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
-            "name": "测试PPT生成API (使用模板ID)",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/tests/test_api_ppt_generation.py",
-            "args": [
-                "--template-id", "${input:templateId}",
-                "--markdown", "${input:selectMarkdownFile}",
-                "--download",
-                "--output", "workspace/output/test_api_output.pptx"
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
-            "name": "测试模板管理API",
-            "type": "python",
-            "request": "launch",
-            "program": "${workspaceFolder}/tests/test_api_template_management.py",
-            "args": [
-                "full-test",
-                "--template", "${input:selectPptTemplate}",
-                "--no-delete"
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": false,
-            "env": {
-                "PYTHONPATH": "${workspaceFolder}"
-            }
-        },
-        {
             "name": "测试模板上传API",
             "type": "python",
             "request": "launch",
