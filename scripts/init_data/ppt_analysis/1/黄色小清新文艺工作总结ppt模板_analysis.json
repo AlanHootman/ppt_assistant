@@ -13,7 +13,7 @@
       "type": "封面页",
       "semantic_type": "introduction",
       "relation_type": "none",
-      "layout_description": "页面中央有大标题区域，上方有副标题区域，下方有两行文本框和两个标签框，背景为花卉图案。",
+      "layout_description": "页面中心有主标题和副标题区域，下方有可编辑的段落文本区域，右下角有品牌标识，左下角有汇报人信息。",
       "content_structure": {
         "type": "title_content"
       },
@@ -26,25 +26,25 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面上方居中",
-          "current_text": "工作总结 / 工作计划 / 竞聘报告 / 述职报告",
-          "word_count": 16,
-          "purpose": "副标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "title",
-          "position": "页面中部居中",
+          "position": "页面中部",
           "current_text": "小清新简约通用模板",
           "word_count": 10,
           "purpose": "主标题",
           "has_bullets": false
         },
         {
+          "element_type": "title",
+          "position": "页面顶部",
+          "current_text": "工作总结/工作计划/竞聘报告/述职报告",
+          "word_count": 16,
+          "purpose": "副标题",
+          "has_bullets": false
+        },
+        {
           "element_type": "paragraph_multi",
-          "position": "页面中部下方",
+          "position": "主标题下方",
           "current_text": "Click enter replacement textClick enter replacement textClick enter replacement textClick enter replacement text Click enter replacement",
-          "word_count": 44,
+          "word_count": 37,
           "purpose": "内容描述",
           "has_bullets": false
         },
@@ -52,13 +52,13 @@
           "element_type": "shape_label",
           "position": "页面右下角",
           "current_text": "汇报日期：202X",
-          "word_count": 8,
+          "word_count": 7,
           "purpose": "日期标签",
           "has_bullets": false
         },
         {
           "element_type": "shape_label",
-          "position": "页面右下角偏左",
+          "position": "页面左下角",
           "current_text": "汇报人：千库网",
           "word_count": 6,
           "purpose": "汇报人标签",
@@ -72,7 +72,7 @@
       "type": "目录页",
       "semantic_type": "toc",
       "relation_type": "sequence",
-      "layout_description": "页面中央有大标题“目录”，下方有英文标题“Contents”。右侧有五个编号标题，每个标题左侧有一个圆形图标，颜色交替出现。页面四周装饰有花卉图案。",
+      "layout_description": "页面中央顶部有大标题“目录”及英文说明“Contents”。中部为五项要点列表，每一项点前面有一个圆形图标，按序排列。页面四角有花卉和自然元素装饰。",
       "content_structure": {
         "type": "bullet_list_long",
         "items_count": 5
@@ -85,7 +85,7 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面中央上方",
+          "position": "页面中部顶端",
           "current_text": "目录",
           "word_count": 2,
           "purpose": "主标题",
@@ -93,71 +93,72 @@
         },
         {
           "element_type": "title",
-          "position": "主标题下方",
+          "position": "页面中部略下，主标题下方",
           "current_text": "Contents",
-          "word_count": 1,
-          "purpose": "英文标题",
+          "word_count": 8,
+          "purpose": "副标题",
           "has_bullets": false
         },
         {
           "element_type": "bullet_list_long",
-          "position": "右侧第一个标题",
+          "position": "列表第1项",
           "current_text": "01 添加标题",
           "word_count": 5,
-          "purpose": "目录项1",
+          "purpose": "内容项1",
           "has_bullets": false
         },
         {
           "element_type": "bullet_list_long",
-          "position": "右侧第二个标题",
+          "position": "列表第2项",
           "current_text": "02 添加标题",
           "word_count": 5,
-          "purpose": "目录项2",
+          "purpose": "内容项2",
           "has_bullets": false
         },
         {
           "element_type": "bullet_list_long",
-          "position": "右侧第三个标题",
+          "position": "列表第3项",
           "current_text": "03 添加标题",
           "word_count": 5,
-          "purpose": "目录项3",
+          "purpose": "内容项3",
           "has_bullets": false
         },
         {
           "element_type": "bullet_list_long",
-          "position": "右侧第四个标题",
+          "position": "列表第4项",
           "current_text": "04 添加标题",
           "word_count": 5,
-          "purpose": "目录项4",
+          "purpose": "内容项4",
           "has_bullets": false
         },
         {
           "element_type": "bullet_list_long",
-          "position": "右侧第五个标题",
+          "position": "列表第5项",
           "current_text": "05 添加标题",
           "word_count": 5,
-          "purpose": "目录项5",
+          "purpose": "内容项5",
           "has_bullets": false
         }
       ],
       "group_structures": [
         {
-          "group_type": "bullet_list_long",
+          "group_type": "process_flow",
           "elements_count": 5,
           "element_types": {
             "bullet_list_long": 5
           },
-          "arrangement": "垂直排列",
+          "arrangement": "垂直列表排列",
+          "connection_type": "序列",
           "groups_relation": "sequence"
         }
       ]
     },
     {
       "slide_index": 2,
-      "type": "章节标题页",
+      "type": "内容页",
       "semantic_type": "section_header",
       "relation_type": "none",
-      "layout_description": "页面中央有一个大标题区域，上方有一个橙色圆角矩形框，内有“Part.01”字样，周围装饰有花卉图案。",
+      "layout_description": "页面包含一个顶部的装饰图案区域和中间的主要文本区域。上方的花卉图案为页面增添了视觉美感，中间有提示性文本用于添加内容。",
       "content_structure": {
         "type": "title_content"
       },
@@ -168,18 +169,18 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面中央",
-          "current_text": "目标与任务导学设计",
-          "word_count": 8,
+          "position": "页面中部上方居中",
+          "current_text": "Part.01",
+          "word_count": 6,
           "purpose": "章节标题",
           "has_bullets": false
         },
         {
-          "element_type": "shape_label",
-          "position": "橙色圆角矩形框内",
-          "current_text": "Part.01",
-          "word_count": 6,
-          "purpose": "章节编号",
+          "element_type": "title",
+          "position": "页面中部偏下居中",
+          "current_text": "请您单击此处添加",
+          "word_count": 8,
+          "purpose": "提示文本",
           "has_bullets": false
         }
       ],
@@ -187,12 +188,12 @@
     },
     {
       "slide_index": 3,
-      "type": "内容页",
-      "semantic_type": "learning_objective",
+      "type": "章节页",
+      "semantic_type": "instruction",
       "relation_type": "none",
-      "layout_description": "页面顶部有标题区域，中部有引导词和设疑问题的文本区域，底部有留白的回答区域。页面四周装饰有花卉图案。",
+      "layout_description": "页面顶部为粉色矩形标题框，包含“目标与任务导学设计”的文字。页面中部和下部分别有两个文字描述区域，用于引导和回答内容。页面四周装饰有淡色花卉图案，增添活力。",
       "content_structure": {
-        "type": "detail_content"
+        "type": "title_content"
       },
       "editable_areas": {
         "title_elements": 1,
@@ -202,25 +203,25 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面顶部居中",
+          "position": "页面顶部粉色矩形框内",
           "current_text": "目标与任务导学设计",
-          "word_count": 8,
+          "word_count": 9,
           "purpose": "章节标题",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
           "position": "页面中部",
-          "current_text": "引导词：看一看\n设疑问题：北京的暴雨淹没街道、新疆的葡萄因冰雹绝收…这些极端天气背后，藏着亚洲怎样的地理密码？",
-          "word_count": 36,
-          "purpose": "引导词和设疑问题",
+          "current_text": "引导词：看一看\n\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 28,
+          "purpose": "引导说明",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "页面底部",
-          "current_text": "回答：（留白）",
-          "word_count": 5,
+          "position": "页面下部",
+          "current_text": "回答:（留白）",
+          "word_count": 7,
           "purpose": "回答区域",
           "has_bullets": false
         }
@@ -230,9 +231,9 @@
     {
       "slide_index": 4,
       "type": "章节页",
-      "semantic_type": "introduction",
+      "semantic_type": "/introduction|learning_objective",
       "relation_type": "none",
-      "layout_description": "页面上部有标题区域，中部有大段介绍性文本，四周装饰有花卉图案。",
+      "layout_description": "页面上部左侧有学习目标标题，中部偏下有介绍文字区域，页面四周有淡雅花卉和绿叶作为装饰。",
       "content_structure": {
         "type": "title_content"
       },
@@ -252,10 +253,10 @@
         },
         {
           "element_type": "paragraph_multi",
-          "position": "页面中部",
-          "current_text": "介绍语\n上周新闻里，巴基斯坦洪水冲毁上百万人的家园；孟加拉台风让渔船沉没…这些亚洲真实灾难的背后，是山川河流的布局失衡？还是人类对地理的无知？今天起，你将化身“亚洲地理侦探”，用地图解谜技术，从等高线、风向标中找到答案。",
-          "word_count": 67,
-          "purpose": "介绍性内容",
+          "position": "页面中部偏下",
+          "current_text": "介绍语\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 22,
+          "purpose": "介绍说明文本",
           "has_bullets": false
         }
       ],
@@ -266,9 +267,23 @@
       "type": "章节页",
       "semantic_type": "learning_objective",
       "relation_type": "none",
-      "layout_description": "页面顶部有学习目标标题，左侧有引导句，中间部分为项目符号列表，展示具体的学习目标。页面四周装饰有花卉图案。",
+      "layout_description": "页面上部有花朵和叶子装饰，中部有主要文本区域，包含标题'学习目标'、引导句和五条要点说明文字，右下角和左上角有装饰性插图。",
       "content_structure": {
-        "type": "bullet_list"
+        "type": "title_content",
+        "details": [
+          {
+            "content_type": "title",
+            "description": "页面上部较大字体显示的'学习目标'"
+          },
+          {
+            "content_type": "paragraph",
+            "description": "在'学习目标'下方的引导性语句"
+          },
+          {
+            "content_type": "bullet_list",
+            "description": "五条要点说明文字"
+          }
+        ]
       },
       "editable_areas": {
         "title_elements": 1,
@@ -279,26 +294,26 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面顶部居中",
+          "position": "页面上部",
           "current_text": "学习目标",
           "word_count": 4,
-          "purpose": "章节标题",
+          "purpose": "页面标题",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_single",
-          "position": "页面左侧",
-          "current_text": "引导句\n准备好解锁你的地图神器，让亚洲的地理谜题无所遁形！",
-          "word_count": 18,
+          "position": "标题下方",
+          "current_text": "引导句\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 24,
           "purpose": "引导句",
           "has_bullets": false
         },
         {
           "element_type": "bullet_list_long",
           "position": "页面中部",
-          "current_text": "• 解码地图形状：3秒内从亚洲地形图读出“帕米尔高原是地理十字路口”的证据。\n• 预测气候风云：用等降水量线图解北京暴雨的“水汽通道”来源。\n• 空间透视术：通过经纬网定位，分析青藏铁路为何避开喜马拉雅山脉最险段。\n• 人地关系连线：在卫星影像上圈出恒河三角洲洪灾高危区，为孟加拉渔民设计逃生路径。\n• 未来规划师：基于GIS技术，为长江中下游设计能抗百年洪水的智能城市模型。",
-          "word_count": 119,
-          "purpose": "学习目标列表",
+          "current_text": "• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 137,
+          "purpose": "详细说明",
           "has_bullets": true
         }
       ],
@@ -306,18 +321,19 @@
     },
     {
       "slide_index": 6,
-      "type": "任务页",
+      "type": "任务说明页",
       "semantic_type": "task",
-      "relation_type": "sequence",
-      "layout_description": "页面顶部有标题区域，左侧有编号标签，中间有三个任务描述区域，底部有详细的任务说明。",
+      "relation_type": "parallel",
+      "layout_description": "页面顶部有大标题'学习任务'，左侧有编号标签(01, 02, 03)，右侧对应有描述框，底部有任务标题和任务描述区域。整体布局清晰，适合任务说明和任务分配。",
       "content_structure": {
-        "type": "question_set"
+        "type": "detail_content"
       },
       "editable_areas": {
         "title_elements": 1,
         "paragraph_multi": 4,
-        "shape_label": 3,
-        "total_editable_text_areas": 8
+        "shape_label": 4,
+        "shape_content": 4,
+        "total_editable_text_areas": 9
       },
       "content_elements": [
         {
@@ -325,76 +341,85 @@
           "position": "页面顶部居中",
           "current_text": "学习任务",
           "word_count": 4,
-          "purpose": "页面标题",
+          "purpose": "页面主标题",
           "has_bullets": false
         },
         {
           "element_type": "shape_label",
-          "position": "左侧第一个标签",
+          "position": "左侧顶部",
           "current_text": "01",
-          "word_count": 2,
-          "purpose": "任务编号",
+          "word_count": 1,
+          "purpose": "任务标签1",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "中间第一个任务描述",
-          "current_text": "若东京奥运会时的台风突然转向，你能用季风图预测它袭击上海的概率吗？（单选）",
-          "word_count": 26,
-          "purpose": "任务描述",
-          "has_bullets": false
-        },
-        {
-          "element_type": "shape_label",
-          "position": "左侧第二个标签",
-          "current_text": "02",
-          "word_count": 2,
-          "purpose": "任务编号",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_multi",
-          "position": "中间第二个任务描述",
-          "current_text": "珠峰“身高”测量为什么要用北斗卫星而非传统测绘？（判断）",
+          "position": "右侧第一个描述框",
+          "current_text": "请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
           "word_count": 22,
-          "purpose": "任务描述",
+          "purpose": "任务描述1",
           "has_bullets": false
         },
         {
           "element_type": "shape_label",
-          "position": "左侧第三个标签",
+          "position": "左侧中间",
+          "current_text": "02",
+          "word_count": 1,
+          "purpose": "任务标签2",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "右侧第二个描述框",
+          "current_text": "请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 22,
+          "purpose": "任务描述2",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "左侧底部",
           "current_text": "03",
-          "word_count": 2,
-          "purpose": "任务编号",
+          "word_count": 1,
+          "purpose": "任务标签3",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "中间第三个任务描述",
-          "current_text": "假设你是中亚输油管道工程师，哪条线路既能避开地震带又最短？（绘图解答）",
-          "word_count": 26,
-          "purpose": "任务描述",
+          "position": "右侧第三个描述框",
+          "current_text": "请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 22,
+          "purpose": "任务描述3",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_content",
+          "position": "左侧底部",
+          "current_text": "你的任务",
+          "word_count": 4,
+          "purpose": "任务标题",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "底部任务说明",
-          "current_text": "你的任务\n成为亚洲气候 / 地形 / 灾害“三重间谍”！用分层设色地图 + 气象 App ，侦破 2023 年巴基斯坦洪灾的“自然帮凶”与“人类内鬼”，并制作防災科普 H5 推送给当地学生。",
-          "word_count": 54,
-          "purpose": "详细任务说明",
+          "position": "底部描述框",
+          "current_text": "请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 22,
+          "purpose": "任务详细描述",
           "has_bullets": false
         }
       ],
       "group_structures": [
         {
-          "group_type": "question_set",
-          "elements_count": 7,
+          "group_type": "task_group",
+          "elements_count": 4,
           "element_types": {
             "shape_label": 3,
-            "paragraph_multi": 4
+            "paragraph_multi": 3,
+            "shape_content": 1
           },
-          "arrangement": "左侧编号标签与中间任务描述对应排列",
-          "groups_relation": "sequence"
+          "arrangement": "左右对齐，上下并排",
+          "groups_relation": "parallel"
         }
       ]
     },
@@ -403,7 +428,7 @@
       "type": "章节标题页",
       "semantic_type": "section_header",
       "relation_type": "none",
-      "layout_description": "页面中央有大标题文本区域，上方有一个橙色的标签形状区域，内有小标题文本。页面四周装饰有花卉图案。",
+      "layout_description": "页面顶部有装饰性的花叶图案，中间偏右部分有一个橙色圆角矩形按钮，内有文字“Part.02”，下方中央为大号文本区域，用于添加内容文字。",
       "content_structure": {
         "type": "title_content"
       },
@@ -414,18 +439,18 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面中央",
-          "current_text": "知识与能力导学设计",
-          "word_count": 8,
-          "purpose": "大标题",
+          "position": "页面中部右上角橙色圆角矩形内",
+          "current_text": "Part.02",
+          "word_count": 6,
+          "purpose": "章节标识",
           "has_bullets": false
         },
         {
-          "element_type": "shape_label",
-          "position": "页面上方橙色标签内",
-          "current_text": "Part.02",
-          "word_count": 6,
-          "purpose": "小标题",
+          "element_type": "title",
+          "position": "页面中央",
+          "current_text": "请您单击此处添加",
+          "word_count": 9,
+          "purpose": "主要内容展示区域",
           "has_bullets": false
         }
       ],
@@ -433,10 +458,206 @@
     },
     {
       "slide_index": 8,
+      "type": "问答页",
+      "semantic_type": "question_answer",
+      "relation_type": "none",
+      "layout_description": "页面上部有标题区域，中部有引导词和引导说明区域，下部有回答区域。页面四周有花卉和叶子作为装饰。",
+      "content_structure": {
+        "type": "question_set"
+      },
+      "editable_areas": {
+        "title_elements": 1,
+        "paragraph_multi": 2,
+        "total_editable_text_areas": 3
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面上部",
+          "current_text": "引导问题",
+          "word_count": 4,
+          "purpose": "页面标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "页面中部",
+          "current_text": "引导词：探究\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 23,
+          "purpose": "引导说明",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "页面下部",
+          "current_text": "回答:（留白）\n",
+          "word_count": 6,
+          "purpose": "回答区域",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": []
+    },
+    {
+      "slide_index": 9,
+      "type": "内容页",
+      "semantic_type": "instruction",
+      "relation_type": "none",
+      "layout_description": "页面上部有标题区域，中部左侧有装饰性图像，中部主要文本区域用于添加介绍语。右上角和左上角有装饰性元素。",
+      "content_structure": {
+        "type": "title_content"
+      },
+      "editable_areas": {
+        "title_elements": 2,
+        "paragraph_multi": 1,
+        "total_editable_text_areas": 3
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面上部左侧",
+          "current_text": "知识与能力",
+          "word_count": 4,
+          "purpose": "章节标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "title",
+          "position": "页面中部左侧",
+          "current_text": "介绍语",
+          "word_count": 3,
+          "purpose": "段落标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "页面中部",
+          "current_text": "请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 27,
+          "purpose": "详细内容说明",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": []
+    },
+    {
+      "slide_index": 10,
+      "type": "内容页",
+      "semantic_type": "feature_list",
+      "relation_type": "grid",
+      "layout_description": "页面左侧为一张大面积的图片，展示相关场景或对象；右侧均匀分布着五个文本框，周围配有彩色圆点作为装饰，适合用于列举多个特征或要点。",
+      "content_structure": {
+        "type": "grid_layout",
+        "cells_count": 5
+      },
+      "editable_areas": {
+        "title_elements": 1,
+        "shape_label": 0,
+        "paragraph_multi": 5,
+        "total_editable_text_areas": 6
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面顶部左侧",
+          "current_text": "知识与能力",
+          "word_count": 4,
+          "purpose": "页面主要标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "右侧第一个文本框",
+          "current_text": "标题：\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 25,
+          "purpose": "特性标题枚举1",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "右侧第二个文本框",
+          "current_text": "标题 ：\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 25,
+          "purpose": "特性标题枚举2",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "右侧第三个文本框",
+          "current_text": "标题 ：\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 25,
+          "purpose": "特性标题枚举3",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "右侧第四个文本框",
+          "current_text": "标题 ：\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 25,
+          "purpose": "特性标题枚举4",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "页面底部右侧文本框",
+          "current_text": "标题 ：\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 25,
+          "purpose": "特性标题枚举5",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": [
+        {
+          "group_type": "feature_list",
+          "elements_count": 5,
+          "element_types": {
+            "paragraph_multi": 5
+          },
+          "arrangement": "右侧五个标题和左侧标题在视图内形成网格状布局",
+          "groups_relation": "parallel"
+        }
+      ]
+    },
+    {
+      "slide_index": 11,
+      "type": "章节标题页",
+      "semantic_type": "section_header",
+      "relation_type": "none",
+      "layout_description": "页面中央有较大的文本区域，顶部有一个橙色的按钮状区域用于章节标注，周围装饰有丰富的花卉和绿叶图案，制造出愉悦的视觉效果。",
+      "content_structure": {
+        "type": "title_content"
+      },
+      "editable_areas": {
+        "shape_label": 1,
+        "paragraph_single": 1,
+        "total_editable_text_areas": 2
+      },
+      "content_elements": [
+        {
+          "element_type": "shape_label",
+          "position": "顶部中央",
+          "current_text": "Part.03",
+          "word_count": 6,
+          "purpose": "章节标注",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_single",
+          "position": "页面中央",
+          "current_text": "请您单击此处添加",
+          "word_count": 8,
+          "purpose": "主要内容区域",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": []
+    },
+    {
+      "slide_index": 12,
       "type": "章节页",
       "semantic_type": "question_answer",
-      "relation_type": "problem_solution",
-      "layout_description": "页面顶部有引导问题标题，中间部分包含引导词和设疑问题，底部留有空白区域供回答。页面四周装饰有花卉和叶子图案。",
+      "relation_type": "parallel",
+      "layout_description": "页面顶部为标题区域，包含一个引导问题和一个回答留白区域，页面四周装饰有插画元素。",
       "content_structure": {
         "type": "paired_content"
       },
@@ -448,50 +669,8 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面顶部",
+          "position": "页面顶部左侧",
           "current_text": "引导问题",
-          "word_count": 4,
-          "purpose": "引导问题标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_multi",
-          "position": "页面中部",
-          "current_text": "引导词：探究\n设疑问题：为什么塔克拉玛干沙漠和印度半岛同处北纬30°，却一个黄沙漫天一个暴雨倾盆？",
-          "word_count": 32,
-          "purpose": "引导词和设疑问题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_multi",
-          "position": "页面底部",
-          "current_text": "回答：（留白）",
-          "word_count": 6,
-          "purpose": "回答区域",
-          "has_bullets": false
-        }
-      ],
-      "group_structures": []
-    },
-    {
-      "slide_index": 9,
-      "type": "章节页",
-      "semantic_type": "introduction",
-      "relation_type": "none",
-      "layout_description": "页面上部有标题区域，中部有大段介绍性文本，四周装饰有花卉图案。",
-      "content_structure": {
-        "type": "title_content"
-      },
-      "editable_areas": {
-        "title_elements": 1,
-        "paragraph_multi": 1,
-        "total_editable_text_areas": 2
-      },
-      "content_elements": [
-        {
-          "element_type": "title",
-          "position": "页面上部左侧",
-          "current_text": "知识与能力",
           "word_count": 4,
           "purpose": "章节标题",
           "has_bullets": false
@@ -499,179 +678,17 @@
         {
           "element_type": "paragraph_multi",
           "position": "页面中部",
-          "current_text": "介绍语\n当你在手机导航上滑动东京地铁图，或者用 AR 地图玩《原神》时，这些炫酷科技背后都是地理技术的魔法！翻开教材 P16，让我们一起破解“亚洲气候类型分布密码本”。",
-          "word_count": 46,
-          "purpose": "介绍性内容",
-          "has_bullets": false
-        }
-      ],
-      "group_structures": []
-    },
-    {
-      "slide_index": 10,
-      "type": "特性页",
-      "semantic_type": "feature_list",
-      "relation_type": "parallel",
-      "layout_description": "页面左侧有一张大图片，右侧有五个圆形标签和对应的文字说明，顶部有主标题。",
-      "content_structure": {
-        "type": "grid_layout",
-        "cells_count": 5
-      },
-      "editable_areas": {
-        "title_elements": 1,
-        "bullet_list_long": 1,
-        "shape_label": 5,
-        "total_editable_text_areas": 7
-      },
-      "content_elements": [
-        {
-          "element_type": "title",
-          "position": "页面顶部居中",
-          "current_text": "知识与能力",
-          "word_count": 4,
-          "purpose": "页面标题",
+          "current_text": "引导词：广阔天地\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 29,
+          "purpose": "引导词说明",
           "has_bullets": false
         },
         {
-          "element_type": "bullet_list_long",
-          "position": "页面左侧",
-          "current_text": "",
-          "word_count": 0,
-          "purpose": "图片说明",
-          "has_bullets": false
-        },
-        {
-          "element_type": "shape_label",
-          "position": "右上圆形标签",
-          "current_text": "经纬战场：\n用地理坐标APP锁定马六甲海峡的战略价值。",
-          "word_count": 15,
-          "purpose": "特性标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "shape_label",
-          "position": "右中间第一个圆形标签",
-          "current_text": "等高线读心术:\n从等高距判断喜马拉雅山的攀登难度差异。",
-          "word_count": 18,
-          "purpose": "特性标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "shape_label",
-          "position": "右中间第二个圆形标签",
-          "current_text": "气候密码本：\n用等降水量线解码印度旱灾与洪涝交替的真相。",
-          "word_count": 21,
-          "purpose": "特性标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "shape_label",
-          "position": "右中间第三个圆形标签",
-          "current_text": "GIS预言术：\n在腾讯地图上叠加油田分布与地震带，预测中亚资源争夺热点。",
-          "word_count": 24,
-          "purpose": "特性标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "shape_label",
-          "position": "右下圆形标签",
-          "current_text": "人地交互黑科技：\n用卫星遥感图追踪咸海萎缩的凶手链(棉花田→河流断流→生态崩溃)。",
-          "word_count": 25,
-          "purpose": "特性标题",
-          "has_bullets": false
-        }
-      ],
-      "group_structures": [
-        {
-          "group_type": "grid_layout",
-          "elements_count": 5,
-          "element_types": {
-            "shape_label": 5
-          },
-          "arrangement": "右上至右下五个圆形标签排列",
-          "groups_relation": "parallel"
-        }
-      ]
-    },
-    {
-      "slide_index": 11,
-      "type": "章节标题页",
-      "semantic_type": "section_header",
-      "relation_type": "none",
-      "layout_description": "页面中央有一个大标题文本框，上方有一个橙色的圆形标签，标签内有“Part.03”字样。页面四周装饰有花卉图案，背景为淡黄色。",
-      "content_structure": {
-        "type": "title_content"
-      },
-      "editable_areas": {
-        "title_elements": 2,
-        "total_editable_text_areas": 2
-      },
-      "content_elements": [
-        {
-          "element_type": "title",
-          "position": "页面中央",
-          "current_text": "未来价值与意义导学设计",
-          "word_count": 10,
-          "purpose": "章节标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "shape_label",
-          "position": "页面上方中央",
-          "current_text": "Part.03",
+          "element_type": "paragraph_multi",
+          "position": "页面下方",
+          "current_text": "回答:（留白）",
           "word_count": 6,
-          "purpose": "章节编号",
-          "has_bullets": false
-        }
-      ],
-      "group_structures": []
-    },
-    {
-      "slide_index": 12,
-      "type": "章节页",
-      "semantic_type": "question_answer",
-      "relation_type": "none",
-      "layout_description": "页面上方有一个标题区域，包含“引导问题”的形象标题。标题下方有两段引导性文字，提出来一个问题引导思考。下方有一个留白区域供观众回答问题。",
-      "content_structure": {
-        "type": "question_answer"
-      },
-      "editable_areas": {
-        "title_elements": 1,
-        "paragraph_multi": 2,
-        "shape_content": 1,
-        "total_editable_text_areas": 4
-      },
-      "content_elements": [
-        {
-          "element_type": "title",
-          "position": "左上角",
-          "current_text": "引导问题",
-          "word_count": 4,
-          "purpose": "引导问题的标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_multi",
-          "position": "中部上方",
-          "current_text": "引导词：广阔天地\n设疑问题：你设计的防沙林方案，未来能保护敦煌莫高窟壁画不被风蚀吗？",
-          "word_count": 23,
-          "purpose": "问题引导内容",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_multi",
-          "position": "中部下方",
-          "current_text": "回答：（留白）",
-          "word_count": 5,
-          "purpose": "留白回答区域",
-          "has_bullets": false
-        },
-        {
-          "element_type": "shape_content",
-          "position": "顶部中间",
-          "current_text": "引导问题",
-          "word_count": 4,
-          "purpose": "标题形状内容",
+          "purpose": "回答留白",
           "has_bullets": false
         }
       ],
@@ -679,10 +696,10 @@
     },
     {
       "slide_index": 13,
-      "type": "章节页",
-      "semantic_type": "introduction",
+      "type": "内容页",
+      "semantic_type": "instruction",
       "relation_type": "none",
-      "layout_description": "页面上部有一个标题区域，标题为“价值与意义”，下方有一个大段文字内容区域，内容为介绍语。页面四周装饰有花卉和叶子图案，增加了视觉美感。",
+      "layout_description": "页面采用了花卉与自然元素作为装饰，顶部左侧有一个带有小花图案的标题区域，标题下方是主文本说明区域，主要用来介绍章节内容。页面四周有花卉图案装饰。",
       "content_structure": {
         "type": "title_content"
       },
@@ -694,7 +711,7 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面上部靠左",
+          "position": "页面顶部左侧",
           "current_text": "价值与意义",
           "word_count": 4,
           "purpose": "章节标题",
@@ -703,9 +720,9 @@
         {
           "element_type": "paragraph_multi",
           "position": "页面中部",
-          "current_text": "介绍语\n当你知道中亚输油管道的选址关系到中欧班列的运费，日本核污水排海轨迹预测需要洋流模型…地理技术不是纸上谈兵，而是改写未来的利器！",
-          "word_count": 40,
-          "purpose": "详细介绍内容",
+          "current_text": "介绍语\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 27,
+          "purpose": "章节内容说明",
           "has_bullets": false
         }
       ],
@@ -713,10 +730,10 @@
     },
     {
       "slide_index": 14,
-      "type": "特性列表页",
+      "type": "特性页",
       "semantic_type": "feature_list",
-      "relation_type": "grid",
-      "layout_description": "页面顶部有标题区域，下方以网格方式排列了六项特性内容，每项内容包含序号和对应的描述。",
+      "relation_type": "parallel",
+      "layout_description": "页面包含六组并列的圆形象征编号和文字说明区域，适合展示多个特性或关键点。页面顶部有大标题区域，左上角有小型标志和矩形文本框。",
       "content_structure": {
         "type": "grid_layout",
         "cells_count": 6
@@ -730,106 +747,106 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面顶部居中",
+          "position": "页面上部左侧",
           "current_text": "高精尖价值",
           "word_count": 5,
-          "purpose": "页面标题",
+          "purpose": "页面主标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "编号01下方",
+          "current_text": "添加标题：请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 20,
+          "purpose": "特性描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "编号02下方",
+          "current_text": "添加标题：请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 20,
+          "purpose": "特性描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "编号03下方",
+          "current_text": "添加标题：请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 20,
+          "purpose": "特性描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "编号04下方",
+          "current_text": "添加标题：请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 20,
+          "purpose": "特性描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "编号05下方",
+          "current_text": "添加标题：请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 20,
+          "purpose": "特性描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_multi",
+          "position": "编号06下方",
+          "current_text": "添加标题：请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 20,
+          "purpose": "特性描述",
           "has_bullets": false
         },
         {
           "element_type": "shape_label",
-          "position": "左上圆形标签",
+          "position": "编号01",
           "current_text": "01",
           "word_count": 2,
-          "purpose": "特性序号",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_multi",
-          "position": "圆形标签01右侧",
-          "current_text": "家庭篇：用等高线地图帮爸妈选登山路线，成为家庭旅行首席安全官！",
-          "word_count": 22,
-          "purpose": "特性描述",
+          "purpose": "特性编号",
           "has_bullets": false
         },
         {
           "element_type": "shape_label",
-          "position": "中上圆形标签",
+          "position": "编号02",
           "current_text": "02",
           "word_count": 2,
-          "purpose": "特性序号",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_multi",
-          "position": "圆形标签02右侧",
-          "current_text": "校园篇：用GIS给学校设计抗台风应急撤离路线，C位出道被校长点赞！",
-          "word_count": 26,
-          "purpose": "特性描述",
+          "purpose": "特性编号",
           "has_bullets": false
         },
         {
           "element_type": "shape_label",
-          "position": "左中圆形标签",
+          "position": "编号03",
           "current_text": "03",
           "word_count": 2,
-          "purpose": "特性序号",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_multi",
-          "position": "圆形标签03右侧",
-          "current_text": "省市篇：参与浙江“数字孪生流域”项目，用VR防洪系统拯救钱塘江村落。",
-          "word_count": 27,
-          "purpose": "特性描述",
+          "purpose": "特性编号",
           "has_bullets": false
         },
         {
           "element_type": "shape_label",
-          "position": "右上圆形标签",
+          "position": "编号04",
           "current_text": "04",
           "word_count": 2,
-          "purpose": "特性序号",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_multi",
-          "position": "圆形标签04右侧",
-          "current_text": "国家篇：为川藏铁路绘制地质雷达图谱，避免隧道塌方成全国英雄！",
-          "word_count": 23,
-          "purpose": "特性描述",
+          "purpose": "特性编号",
           "has_bullets": false
         },
         {
           "element_type": "shape_label",
-          "position": "右中圆形标签",
+          "position": "编号05",
           "current_text": "05",
           "word_count": 2,
-          "purpose": "特性序号",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_multi",
-          "position": "圆形标签05右侧",
-          "current_text": "全球篇：用气候模型破解北极航道开通密码，改写世界贸易版图！",
-          "word_count": 25,
-          "purpose": "特性描述",
+          "purpose": "特性编号",
           "has_bullets": false
         },
         {
           "element_type": "shape_label",
-          "position": "右下圆形标签",
+          "position": "编号06",
           "current_text": "06",
           "word_count": 2,
-          "purpose": "特性序号",
-          "has_bullets": false
-        },
-        {
-          "element_type": "paragraph_multi",
-          "position": "圆形标签06右侧",
-          "current_text": "未来篇：移民火星前，先用你的月球等高线地图帮SpaceX选基地位置！",
-          "word_count": 28,
-          "purpose": "特性描述",
+          "purpose": "特性编号",
           "has_bullets": false
         }
       ],
@@ -841,18 +858,18 @@
             "shape_label": 6,
             "paragraph_multi": 6
           },
-          "arrangement": "六项内容网格排列",
-          "connection_type": "无直接连接",
+          "arrangement": "六组圆形象征编号与文字说明区域并列排布",
+          "connection_type": "空间分布",
           "groups_relation": "parallel"
         }
       ]
     },
     {
       "slide_index": 15,
-      "type": "内容页",
+      "type": "章节页",
       "semantic_type": "section_header",
       "relation_type": "none",
-      "layout_description": "页面中心有标题和副标题区域，标题区域采用橙色圆角矩形突出显示。页面四周装饰有花卉图案，整体布局平衡，适合展示章节或主题标题。",
+      "layout_description": "此幻灯片包含一个橙色的圆角矩形框，内有灰色文字'Part.04'，位于幻灯片右侧中部偏上；下方是黑色大字标题'请您单击此处添加'，这说明这是一个内容添加提示页，用于引导用户在此处插入内容。",
       "content_structure": {
         "type": "title_content"
       },
@@ -863,18 +880,18 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面中部橙色矩形框中",
+          "position": "右侧中部偏上橙色矩形框内",
           "current_text": "Part.04",
-          "word_count": 7,
-          "purpose": "副标题",
+          "word_count": 5,
+          "purpose": "节标题",
           "has_bullets": false
         },
         {
           "element_type": "title",
-          "position": "页面中部",
-          "current_text": "重要人物与案例导学设计",
-          "word_count": 13,
-          "purpose": "主标题",
+          "position": "圆角矩形框下方",
+          "current_text": "请您单击此处添加",
+          "word_count": 8,
+          "purpose": "引导文本",
           "has_bullets": false
         }
       ],
@@ -882,12 +899,12 @@
     },
     {
       "slide_index": 16,
-      "type": "章节页",
+      "type": "内容页",
       "semantic_type": "question_answer",
       "relation_type": "none",
-      "layout_description": "页面顶部有标题区域，中间部分有引导词和设疑问题，底部有留白的回答区域。页面四周装饰有花卉图案。",
+      "layout_description": "页面上部有“引导问题”标题，中部为引导词和说明文本区域，下部为回答留空区。背景带有花卉和叶片装饰，整体风格清新自然。",
       "content_structure": {
-        "type": "detail_content"
+        "type": "title_content"
       },
       "editable_areas": {
         "title_elements": 1,
@@ -897,7 +914,7 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面顶部",
+          "position": "页面上部居中",
           "current_text": "引导问题",
           "word_count": 4,
           "purpose": "章节标题",
@@ -906,17 +923,17 @@
         {
           "element_type": "paragraph_multi",
           "position": "页面中部",
-          "current_text": "引导词：鉴往如来\n设疑问题：青藏铁路冻土区为什么能架起“天路”？日本关东大地震的防灾系统隐藏着多少黑科技？",
-          "word_count": 36,
-          "purpose": "引导词和设疑问题",
+          "current_text": "引导词：鉴往如来\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 27,
+          "purpose": "引导词与说明",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "页面底部",
+          "position": "页面下部居中",
           "current_text": "回答：（留白）",
-          "word_count": 6,
-          "purpose": "回答区域",
+          "word_count": 7,
+          "purpose": "留白内容区",
           "has_bullets": false
         }
       ],
@@ -924,23 +941,24 @@
     },
     {
       "slide_index": 17,
-      "type": "案例分析页",
+      "type": "案例对比页",
       "semantic_type": "case_study",
       "relation_type": "comparison",
-      "layout_description": "页面顶部为标题和引导词，中部左侧为成功案例内容区域，中部右侧为失败案例内容区域，底部为总结问题。整体布局清晰，对比鲜明。",
+      "layout_description": "页面分为主要标题区域、引导词说明区域以及成功与失败案例对比区域。成功案例和失败案例分别放置在两个形状框中，形成鲜明对比，方便展示不同案例的特点及总结。",
       "content_structure": {
-        "type": "split_screen"
+        "type": "comparison_table",
+        "panels_count": 2
       },
       "editable_areas": {
         "title_elements": 1,
         "paragraph_multi": 4,
-        "bullet_list_short": 4,
-        "total_editable_text_areas": 9
+        "bullet_list_long": 2,
+        "total_editable_text_areas": 7
       },
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面顶部居中",
+          "position": "页面顶部",
           "current_text": "名人与案例",
           "word_count": 4,
           "purpose": "页面标题",
@@ -948,81 +966,176 @@
         },
         {
           "element_type": "paragraph_multi",
-          "position": "页面中部上方",
-          "current_text": "引导词：\n2015年尼泊尔地震时，中国科学家用无人机测绘5小时生成加德满都废墟3D模型！当传统测绘还在爬山时，地理信息技术已让救援效率提升300%。",
-          "word_count": 46,
-          "purpose": "引导词",
+          "position": "页面中部居左",
+          "current_text": "引导词：请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 20,
+          "purpose": "引导词说明",
           "has_bullets": false
         },
         {
-          "element_type": "title",
-          "position": "页面中部左侧",
-          "current_text": "成功案例",
-          "word_count": 4,
-          "purpose": "成功案例标题",
-          "has_bullets": false
+          "element_type": "bullet_list_long",
+          "position": "成功案例区域",
+          "current_text": "成功案例\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性\n\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性\n\n总结：请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 49,
+          "purpose": "成功案例说明",
+          "has_bullets": true
         },
         {
-          "element_type": "bullet_list_short",
-          "position": "页面中部左侧",
-          "current_text": "• 青藏铁路：工程师用热棒技术冻结冻土层，成为世界铁路建筑奇迹！\n• 日本海啸预警：通过海底地震仪网络，让仙台居民提前20分钟逃生！",
-          "word_count": 35,
-          "purpose": "成功案例列表",
+          "element_type": "bullet_list_long",
+          "position": "失败案例区域",
+          "current_text": "失败案例\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性\n\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性 \n\n总结：请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 49,
+          "purpose": "失败案例说明",
           "has_bullets": true
         },
         {
           "element_type": "paragraph_multi",
-          "position": "页面中部左侧底部",
-          "current_text": "总结：如果让你升级南亚海啸预警系统，会加入哪些地理黑科技？",
-          "word_count": 21,
+          "position": "成功案例区域",
+          "current_text": "总结：请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 17,
           "purpose": "成功案例总结",
           "has_bullets": false
         },
         {
-          "element_type": "title",
-          "position": "页面中部右侧",
-          "current_text": "失败案例",
-          "word_count": 4,
-          "purpose": "失败案例标题",
-          "has_bullets": false
-        },
-        {
-          "element_type": "bullet_list_short",
-          "position": "页面中部右侧",
-          "current_text": "• 咸海消失事件：苏联盲目引水种棉，卫星显示咸海面积缩小90%！\n• 湄公河大坝争议：未考虑鱼类洄游路线，东南亚四国渔民集体抗议。",
-          "word_count": 40,
-          "purpose": "失败案例列表",
-          "has_bullets": true
-        },
-        {
           "element_type": "paragraph_multi",
-          "position": "页面中部右侧底部",
-          "current_text": "总结：你若成为湄公河开发顾问，如何在谷歌地球画出生态与经济双赢线？",
-          "word_count": 24,
+          "position": "失败案例区域",
+          "current_text": "总结：请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 17,
           "purpose": "失败案例总结",
           "has_bullets": false
         }
       ],
       "group_structures": [
         {
-          "group_type": "split_screen",
-          "elements_count": 4,
+          "group_type": "comparison_table",
+          "elements_count": 6,
           "element_types": {
-            "title": 2,
-            "bullet_list_short": 2,
-            "paragraph_multi": 2
+            "bullet_list_long": 2,
+            "paragraph_multi": 3
           },
-          "arrangement": "左右两侧分屏布局",
-          "groups_relation": "parallel"
+          "arrangement": "两列并列对比",
+          "groups_relation": "comparison"
         }
       ]
     },
     {
-      "slide_index": 20,
+      "slide_index": 18,
+      "type": "工作内容概述页",
+      "semantic_type": "process_description",
+      "relation_type": "sequence",
+      "layout_description": "页面顶部为工作内容概述标题，中部有四个步骤的流程图，每个步骤下方有对应的文本输入框，流程图通过箭头连接，底部有进度指示条。",
+      "content_structure": {
+        "type": "process_flow",
+        "steps_count": 4
+      },
+      "editable_areas": {
+        "title_elements": 1,
+        "paragraph_single": 4,
+        "total_editable_text_areas": 5
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面顶部居中",
+          "current_text": "工作内容概述",
+          "word_count": 6,
+          "purpose": "页面标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_single",
+          "position": "流程第一步下方",
+          "current_text": "添加标题\n请您单击此处输入文本内容，可根据需要适当地调整文字的颜色,祝您使用愉快！",
+          "word_count": 23,
+          "purpose": "流程步骤1描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_single",
+          "position": "流程第二步下方",
+          "current_text": "添加标题\n请您单击此处输入文本内容，可根据需要适当地调整文字的颜色,祝您使用愉快！",
+          "word_count": 23,
+          "purpose": "流程步骤2描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_single",
+          "position": "流程第三步下方",
+          "current_text": "添加标题\n请您单击此处输入文本内容，可根据需要适当地调整文字的颜色,祝您使用愉快！",
+          "word_count": 23,
+          "purpose": "流程步骤3描述",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_single",
+          "position": "流程第四步下方",
+          "current_text": "添加标题\n请您单击此处输入文本内容，可根据需要适当地调整文字的颜色,祝您使用愉快！",
+          "word_count": 23,
+          "purpose": "流程步骤4描述",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": [
+        {
+          "group_type": "process_flow",
+          "elements_count": 4,
+          "element_types": {
+            "paragraph_single": 4
+          },
+          "arrangement": "水平顺序排列",
+          "connection_type": "箭头连接",
+          "groups_relation": "sequence"
+        }
+      ]
+    },
+    {
+      "slide_index": 19,
       "type": "章节页",
       "semantic_type": "section_header",
       "relation_type": "none",
-      "layout_description": "页面上部有标题区域，中部有引导语文本区域，四周有装饰性花卉图案。",
+      "layout_description": "页面中部上方有一个橙色的圆形按钮状区域，里面包含Part.05的文字，作为章节标题。下方有较大字体的黑色文本作为主标题，提示用户点击此处进行内容添加。黑色大标题下方有两行浅灰色的英文说明文字。页面四周有花卉和叶子图案作为装饰。",
+      "content_structure": {
+        "type": "title_content"
+      },
+      "editable_areas": {
+        "title_elements": 2,
+        "paragraph_single": 1,
+        "total_editable_text_areas": 3
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面中部上方橙色圆形按钮内",
+          "current_text": "Part.05",
+          "word_count": 7,
+          "purpose": "章节标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "title",
+          "position": "页面中部下方",
+          "current_text": "请您单击此处添加",
+          "word_count": 8,
+          "purpose": "内容标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "paragraph_single",
+          "position": "黑色大标题下方",
+          "current_text": "A designer can use default text to simulate what text would look like. It looks even better with you using this text.",
+          "word_count": 22,
+          "purpose": "内容说明",
+          "has_bullets": false
+        }
+      ],
+      "group_structures": []
+    },
+    {
+      "slide_index": 20,
+      "type": "内容页",
+      "semantic_type": "section_header",
+      "relation_type": "none",
+      "layout_description": "页面顶部有标题区域和装饰性图标，中部有引导语文本框，右下角和左上角有装饰性植物图形，左下角有旋转的装饰图形。",
       "content_structure": {
         "type": "title_content"
       },
@@ -1034,29 +1147,63 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面上部",
+          "position": "页面左上角",
           "current_text": "过程与方法",
-          "word_count": 4,
+          "word_count": 5,
           "purpose": "章节标题",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
           "position": "页面中部",
-          "current_text": "引导语\n今天你就是亚洲地理实验室的“00后主理人”！跟着这七步黑科技通关攻略，让地理思维从青铜升王者！",
-          "word_count": 32,
-          "purpose": "引导语",
+          "current_text": "引导语\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 25,
+          "purpose": "内容说明",
           "has_bullets": false
         }
       ],
       "group_structures": []
     },
     {
+      "slide_index": 21,
+      "type": "章节页",
+      "semantic_type": "section_header",
+      "relation_type": "sequence",
+      "layout_description": "页面上部有章节标题区域，中部为七步法详细说明区域，底部有两个装饰性图像。页面整体设计清新，采用黄色和绿色为主的色彩搭配，布有花卉和叶子图案。",
+      "content_structure": {
+        "type": "bullet_list_long"
+      },
+      "editable_areas": {
+        "title_elements": 1,
+        "bullet_list_long": 7,
+        "total_editable_text_areas": 8
+      },
+      "content_elements": [
+        {
+          "element_type": "title",
+          "position": "页面上部",
+          "current_text": "构建思维七步法",
+          "word_count": 8,
+          "purpose": "章节标题",
+          "has_bullets": false
+        },
+        {
+          "element_type": "bullet_list_long",
+          "position": "页面中部，项目符号列表",
+          "current_text": "1. 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n2. 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n3. 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n4. 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n5. 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n6. 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n7. 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 170,
+          "purpose": "七步法详细说明",
+          "has_bullets": true
+        }
+      ],
+      "group_structures": []
+    },
+    {
       "slide_index": 22,
-      "type": "内容页",
-      "semantic_type": "summary",
+      "type": "结束页",
+      "semantic_type": "thank_you",
       "relation_type": "none",
-      "layout_description": "页面中央有大标题，下方有详细的文字描述，底部有两个带文本的矩形框，分别用于汇报人和汇报日期。页面四周装饰有花卉图案。",
+      "layout_description": "页面上部有标题区域，中部偏下有文字说明区域，底部两侧有标签形状的文本框分别用于汇报人和日期。背景装饰有卡通风格的花卉和叶子图案。",
       "content_structure": {
         "type": "title_content"
       },
@@ -1069,34 +1216,34 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面中部上方",
+          "position": "页面上部中央",
           "current_text": "五维导学案结束语",
-          "word_count": 8,
-          "purpose": "主标题",
+          "word_count": 7,
+          "purpose": "标题",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "标题下方",
-          "current_text": "当你在抖音刷到喜马拉雅山雪线后退的视频，在《王者荣耀》用韩信跨越安第斯山脉时——这就是地理技术的主场！拿起你的遥感地图、AR 沙盘和 GIS 神器，去破解东京湾区核辐射扩散模型，去设计让印度农民免于旱灾的种植地图...现在点击教材第 24 页的二维码，开启你的第一个“亚洲地理盲盒任务”——谁将是班级第一个用等高线拯救敦煌莫高窟的超级英雄？",
-          "word_count": 116,
-          "purpose": "详细内容描述",
+          "position": "页面中部偏下",
+          "current_text": "请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 22,
+          "purpose": "内容说明",
           "has_bullets": false
         },
         {
           "element_type": "shape_label",
-          "position": "页面底部左侧",
+          "position": "页面右下方黄色标签",
           "current_text": "汇报人：千库网",
-          "word_count": 6,
+          "word_count": 5,
           "purpose": "汇报人信息",
           "has_bullets": false
         },
         {
           "element_type": "shape_label",
-          "position": "页面底部右侧",
+          "position": "页面右下方绿色标签",
           "current_text": "汇报日期：202X",
-          "word_count": 6,
-          "purpose": "汇报日期",
+          "word_count": 5,
+          "purpose": "汇报日期信息",
           "has_bullets": false
         }
       ],
@@ -1104,12 +1251,13 @@
     },
     {
       "slide_index": 23,
-      "type": "章节标题页",
+      "type": "章节页",
       "semantic_type": "section_header",
-      "relation_type": "hierarchical",
-      "layout_description": "页面主要由花卉装饰和文字区域组成。顶部偏上有橙色矩形框，内有章节编号'Part.04'，中间位置有大标题'工作提升建议'，下方有一段英文说明文本。",
+      "relation_type": "none",
+      "layout_description": "页面顶部有装饰花卉，中间偏左位置有主标题区域，右侧有部分装饰图案和一个橘色圆形标签框，底部有副标题区域。",
       "content_structure": {
-        "type": "title_content"
+        "type": "title_content",
+        "elements_count": 3
       },
       "editable_areas": {
         "title_elements": 2,
@@ -1119,26 +1267,26 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "橙色矩形框内",
+          "position": "中间偏左居中",
           "current_text": "Part.04",
-          "word_count": 7,
-          "purpose": "章节编号",
+          "word_count": 6,
+          "purpose": "章节标题",
           "has_bullets": false
         },
         {
           "element_type": "title",
-          "position": "页面中部",
+          "position": "页面中间偏下居中",
           "current_text": "工作提升建议",
           "word_count": 6,
-          "purpose": "大标题",
+          "purpose": "主标题",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "大标题下方",
+          "position": "标题下方居中",
           "current_text": "A designer can use default text to simulate what text would look like. It looks even better with you using this text.",
-          "word_count": 21,
-          "purpose": "说明文本",
+          "word_count": 20,
+          "purpose": "副标题或描述",
           "has_bullets": false
         }
       ],
@@ -1146,41 +1294,41 @@
     },
     {
       "slide_index": 24,
-      "type": "章节页",
-      "semantic_type": "section_header",
-      "relation_type": "none",
-      "layout_description": "页面顶部有一个标题区域，中间有两个文本框区域，分别用于添加标题和详细说明。页面四周有花卉图案装饰。",
+      "type": "内容页",
+      "semantic_type": "bullet_list",
+      "relation_type": "parallel",
+      "layout_description": "页面顶部有大标题区域，中间左侧和右下部分别有标题和项目符号列表区域。背景装饰以花卉和植物图案为主，设计清新自然。",
       "content_structure": {
-        "type": "detail_content"
+        "type": "title_content"
       },
       "editable_areas": {
         "title_elements": 1,
-        "paragraph_multi": 2,
+        "bullet_list_long": 2,
         "total_editable_text_areas": 3
       },
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面顶部居中",
+          "position": "页面顶部左侧",
           "current_text": "工作成果展示",
           "word_count": 6,
-          "purpose": "章节标题",
+          "purpose": "页面标题",
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "页面中部上方",
-          "current_text": "添加标题\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
-          "word_count": 60,
-          "purpose": "详细说明1",
+          "element_type": "bullet_list_long",
+          "position": "页面中部左侧",
+          "current_text": "添加标题\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 132,
+          "purpose": "上半部分项目列表",
           "has_bullets": true
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "页面中部下方",
-          "current_text": "添加标题\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
-          "word_count": 60,
-          "purpose": "详细说明2",
+          "element_type": "bullet_list_long",
+          "position": "页面下部左侧",
+          "current_text": "添加标题\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。\n• 请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
+          "word_count": 132,
+          "purpose": "下半部分项目列表",
           "has_bullets": true
         }
       ],
@@ -1190,15 +1338,15 @@
       "slide_index": 25,
       "type": "章节页",
       "semantic_type": "section_header",
-      "relation_type": "sequence",
-      "layout_description": "页面顶部有主标题区域，中间部分有四个带箭头连接的圆形图标，每个图标下方有文本框用于输入内容，适合展示步骤或流程。",
+      "relation_type": "parallel",
+      "layout_description": "页面以章节标题「经验不足总结」为起点，通过四个带有圆形标记的内容块进行经验不足的总结，每个区块包含标题和描述，适合展示独立内容但有同等重要性的一组数据或总结。",
       "content_structure": {
-        "type": "process_flow",
-        "steps_count": 4
+        "type": "grid_layout",
+        "cells_count": 4
       },
       "editable_areas": {
         "title_elements": 1,
-        "paragraph_multi": 4,
+        "paragraph_single": 4,
         "total_editable_text_areas": 5
       },
       "content_elements": [
@@ -1211,113 +1359,112 @@
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "左上角圆形图标下方",
+          "element_type": "paragraph_single",
+          "position": "页面左上第二行",
           "current_text": "添加标题\n请您单击此处输入文本内容，可根据需要适当地调整文字的颜色,祝您使用愉快！",
-          "word_count": 24,
-          "purpose": "步骤1描述",
+          "word_count": 25,
+          "purpose": "内容块标题及说明",
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "左下角圆形图标下方",
+          "element_type": "paragraph_single",
+          "position": "页面左下第二行",
           "current_text": "添加标题\n请您单击此处输入文本内容，可根据需要适当地调整文字的颜色,祝您使用愉快！",
-          "word_count": 24,
-          "purpose": "步骤2描述",
+          "word_count": 25,
+          "purpose": "内容块标题及说明",
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "右上角圆形图标下方",
+          "element_type": "paragraph_single",
+          "position": "页面右上第二行",
           "current_text": "添加标题\n请您单击此处输入文本内容，可根据需要适当地调整文字的颜色,祝您使用愉快！",
-          "word_count": 24,
-          "purpose": "步骤3描述",
+          "word_count": 25,
+          "purpose": "内容块标题及说明",
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "右下角圆形图标下方",
+          "element_type": "paragraph_single",
+          "position": "页面右下第二行",
           "current_text": "添加标题\n请您单击此处输入文本内容，可根据需要适当地调整文字的颜色,祝您使用愉快！",
-          "word_count": 24,
-          "purpose": "步骤4描述",
+          "word_count": 25,
+          "purpose": "内容块标题及说明",
           "has_bullets": false
         }
       ],
       "group_structures": [
         {
-          "group_type": "process_flow",
+          "group_type": "grid_layout",
           "elements_count": 4,
           "element_types": {
-            "paragraph_multi": 4
+            "paragraph_single": 4
           },
-          "arrangement": "四个圆形图标按顺序排列，箭头连接表示流程",
-          "connection_type": "箭头连接",
-          "groups_relation": "sequence"
+          "arrangement": "四个内容块的网格排列",
+          "groups_relation": "parallel"
         }
       ]
     },
     {
       "slide_index": 26,
-      "type": "章节页",
-      "semantic_type": "section_header",
+      "type": "经验总结页",
+      "semantic_type": "summary",
       "relation_type": "parallel",
-      "layout_description": "页面顶部有一个大标题区域，左侧有一个圆形图像区域，右侧有五个带有圆形图标和文本说明的内容块，适合总结或分章节介绍。",
+      "layout_description": "页面左侧有大图展示区域，右侧有五个标题和描述文本框排列，顶部是页面标题'经验不足总结'。",
       "content_structure": {
         "type": "grid_layout",
         "cells_count": 5
       },
       "editable_areas": {
         "title_elements": 1,
-        "paragraph_multi": 5,
+        "bullet_list_short": 5,
         "total_editable_text_areas": 6
       },
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面顶部居中",
+          "position": "页面顶部",
           "current_text": "经验不足总结",
           "word_count": 6,
-          "purpose": "主标题",
+          "purpose": "页面标题",
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "右侧内容块1",
+          "element_type": "bullet_list_short",
+          "position": "右上角文本框",
           "current_text": "添加标题\n点击输入简要文字解说解说文字尽量概括精炼括精炼不用多余的文字修饰简洁。",
-          "word_count": 28,
-          "purpose": "内容块1说明",
+          "word_count": 31,
+          "purpose": "条目描述",
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "右侧内容块2",
+          "element_type": "bullet_list_short",
+          "position": "右边中间偏上文本框",
           "current_text": "添加标题\n点击输入简要文字解说解说文字尽量概括精炼括精炼不用多余的文字修饰简洁。",
-          "word_count": 28,
-          "purpose": "内容块2说明",
+          "word_count": 31,
+          "purpose": "条目描述",
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "右侧内容块3",
+          "element_type": "bullet_list_short",
+          "position": "右边中间偏下文本框",
           "current_text": "添加标题\n点击输入简要文字解说解说文字尽量概括精炼括精炼不用多余的文字修饰简洁。",
-          "word_count": 28,
-          "purpose": "内容块3说明",
+          "word_count": 31,
+          "purpose": "条目描述",
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "右侧内容块4",
+          "element_type": "bullet_list_short",
+          "position": "右下角文本框",
           "current_text": "添加标题\n点击输入简要文字解说解说文字尽量概括精炼括精炼不用多余的文字修饰简洁。",
-          "word_count": 28,
-          "purpose": "内容块4说明",
+          "word_count": 31,
+          "purpose": "条目描述",
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "左侧内容块",
+          "element_type": "bullet_list_short",
+          "position": "左下角文本框",
           "current_text": "添加标题\n点击输入简要文字解说解说文字尽量概括精炼括精炼不用多余的文字修饰简洁。",
-          "word_count": 28,
-          "purpose": "内容块5说明",
+          "word_count": 31,
+          "purpose": "条目描述",
           "has_bullets": false
         }
       ],
@@ -1326,19 +1473,19 @@
           "group_type": "grid_layout",
           "elements_count": 5,
           "element_types": {
-            "paragraph_multi": 5
+            "bullet_list_short": 5
           },
-          "arrangement": "右侧五个内容块网格排列",
+          "arrangement": "右侧垂直排列，左下角补充一个",
           "groups_relation": "parallel"
         }
       ]
     },
     {
       "slide_index": 27,
-      "type": "章节页",
+      "type": "内容页",
       "semantic_type": "section_header",
       "relation_type": "parallel",
-      "layout_description": "页面顶部有主标题区域，中间和底部有四个并列的文本框，每个文本框上方有一个圆形箭头图标，适合展示并列的章节或主题内容。",
+      "layout_description": "页面上部有标题“工作提升建议”，页面中间左右各两列文本框用于细节说明，文本框内包含提示信息。四个箭头形状位于中部，可以放置相关图标或图片，整体布局清晰，适合展示并列的工作提升建议或要点。",
       "content_structure": {
         "type": "grid_layout",
         "cells_count": 4
@@ -1351,42 +1498,42 @@
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面顶部居中",
+          "position": "页面顶部",
           "current_text": "工作提升建议",
           "word_count": 6,
-          "purpose": "主标题",
+          "purpose": "页面标题",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "中间左侧",
+          "position": "文本框1（左上）",
           "current_text": "添加标题\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
-          "word_count": 20,
-          "purpose": "章节内容1",
+          "word_count": 26,
+          "purpose": "工作提升细节说明1",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "中间右侧",
+          "position": "文本框2（右上）",
           "current_text": "添加标题\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
-          "word_count": 20,
-          "purpose": "章节内容2",
+          "word_count": 26,
+          "purpose": "工作提升细节说明2",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "底部左侧",
+          "position": "文本框3（左下）",
           "current_text": "添加标题\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
-          "word_count": 20,
-          "purpose": "章节内容3",
+          "word_count": 26,
+          "purpose": "工作提升细节说明3",
           "has_bullets": false
         },
         {
           "element_type": "paragraph_multi",
-          "position": "底部右侧",
+          "position": "文本框4（右下）",
           "current_text": "添加标题\n请您单击此处添加合适文字加以说明，可调整文字大小或者颜色等属性。",
-          "word_count": 20,
-          "purpose": "章节内容4",
+          "word_count": 26,
+          "purpose": "工作提升细节说明4",
           "has_bullets": false
         }
       ],
@@ -1397,58 +1544,81 @@
           "element_types": {
             "paragraph_multi": 4
           },
-          "arrangement": "中间和底部四列网格排列",
+          "arrangement": "两行两列网格排列",
           "groups_relation": "parallel"
         }
       ]
     },
     {
       "slide_index": 28,
-      "type": "特性页",
-      "semantic_type": "feature_list",
-      "relation_type": "grid",
-      "layout_description": "页面顶部有标题区域，页面分为上下两排，每排三个特性展示区域，每个区域包含一个圆形编号形状和一段描述文本。",
+      "type": "内容页",
+      "semantic_type": "bullet_list",
+      "relation_type": "parallel",
+      "layout_description": "该页面包含一个标题区域和六个内容块，每块包含一个编号圆圈和对应的标题与描述。适用于罗列多项内容或要点，内容块分布均匀，视觉上保持平衡。",
       "content_structure": {
         "type": "grid_layout",
         "cells_count": 6
       },
       "editable_areas": {
-        "title_elements": 2,
-        "paragraph_multi": 6,
-        "shape_label": 6,
-        "total_editable_text_areas": 14
+        "title_elements": 1,
+        "bullet_list_short": 6,
+        "total_editable_text_areas": 7
       },
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面上部居中",
+          "position": "页面顶部左侧",
           "current_text": "工作提升建议",
           "word_count": 6,
-          "purpose": "主标题",
+          "purpose": "页面主要标题",
           "has_bullets": false
         },
         {
-          "element_type": "title",
-          "position": "每项特性上方",
-          "current_text": "添加标题",
-          "word_count": 4,
-          "purpose": "特性标题",
+          "element_type": "bullet_list_short",
+          "position": "页面左上内容块",
+          "current_text": "添加标题\n请在此处添加文本，与标题相关并符合整体语言风格内容请简洁,祝您使用愉快。",
+          "word_count": 22,
+          "purpose": "要点提示 01",
           "has_bullets": false
         },
         {
-          "element_type": "paragraph_multi",
-          "position": "每项特性下方",
-          "current_text": "请在此处添加文本，与标题相关并符合整体语言风格内容请简洁,祝您使用愉快。",
-          "word_count": 26,
-          "purpose": "特性描述",
+          "element_type": "bullet_list_short",
+          "position": "页面右上内容块",
+          "current_text": "添加标题\n请在此处添加文本，与标题相关并符合整体语言风格内容请简洁,祝您使用愉快。",
+          "word_count": 22,
+          "purpose": "要点提示 04",
           "has_bullets": false
         },
         {
-          "element_type": "shape_label",
-          "position": "每项特性编号区域",
-          "current_text": "编号（如01,02等）",
-          "word_count": 2,
-          "purpose": "特性编号",
+          "element_type": "bullet_list_short",
+          "position": "页面左中内容块",
+          "current_text": "添加标题\n请在此处添加文本，与标题相关并符合整体语言风格内容请简洁,祝您使用愉快。",
+          "word_count": 22,
+          "purpose": "要点提示 02",
+          "has_bullets": false
+        },
+        {
+          "element_type": "bullet_list_short",
+          "position": "页面右中内容块",
+          "current_text": "添加标题\n请在此处添加文本，与标题相关并符合整体语言风格内容请简洁,祝您使用愉快。",
+          "word_count": 22,
+          "purpose": "要点提示 05",
+          "has_bullets": false
+        },
+        {
+          "element_type": "bullet_list_short",
+          "position": "页面左下内容块",
+          "current_text": "添加标题\n请在此处添加文本，与标题相关并符合整体语言风格内容请简洁,祝您使用愉快。",
+          "word_count": 22,
+          "purpose": "要点提示 03",
+          "has_bullets": false
+        },
+        {
+          "element_type": "bullet_list_short",
+          "position": "页面右下内容块",
+          "current_text": "添加标题\n请在此处添加文本，与标题相关并符合整体语言风格内容请简洁,祝您使用愉快。",
+          "word_count": 22,
+          "purpose": "要点提示 06",
           "has_bullets": false
         }
       ],
@@ -1457,11 +1627,10 @@
           "group_type": "grid_layout",
           "elements_count": 6,
           "element_types": {
-            "shape_label": 6,
-            "paragraph_multi": 6,
-            "title": 2
+            "bullet_list_short": 6
           },
-          "arrangement": "上排三个，下排三个的网格排列",
+          "arrangement": "两列三行的网格排列",
+          "connection_type": "视觉间隔",
           "groups_relation": "parallel"
         }
       ]
@@ -1471,47 +1640,55 @@
       "type": "封面页",
       "semantic_type": "introduction",
       "relation_type": "none",
-      "layout_description": "页面中央有大标题区域，上方有副标题区域，下方有两行文本框和两个带文本的形状框，周围装饰有花卉图案。",
+      "layout_description": "页面中间有大标题，上方有副标题区域，下方有简短的文本区域和两个标签用于标注汇报人和日期。",
       "content_structure": {
         "type": "title_content"
       },
       "editable_areas": {
-        "title_elements": 1,
+        "title_elements": 3,
         "paragraph_multi": 1,
         "shape_label": 2,
-        "total_editable_text_areas": 4
+        "total_editable_text_areas": 6
       },
       "content_elements": [
         {
           "element_type": "title",
-          "position": "页面中部",
+          "position": "页面中部靠上",
           "current_text": "小清新简约通用模板",
           "word_count": 8,
           "purpose": "主标题",
           "has_bullets": false
         },
         {
+          "element_type": "title",
+          "position": "页面上部中央",
+          "current_text": "工作总结/工作计划/竞聘报告/述职报告",
+          "word_count": 16,
+          "purpose": "副标题",
+          "has_bullets": false
+        },
+        {
           "element_type": "paragraph_multi",
           "position": "主标题下方",
           "current_text": "Click enter replacement textClick enter replacement textClick enter replacement textClick enter replacement text Click enter replacement",
-          "word_count": 26,
-          "purpose": "详细描述",
+          "word_count": 65,
+          "purpose": "附加说明",
           "has_bullets": false
         },
         {
           "element_type": "shape_label",
-          "position": "页面右下角",
-          "current_text": "汇报日期：202X",
-          "word_count": 7,
-          "purpose": "日期标签",
-          "has_bullets": false
-        },
-        {
-          "element_type": "shape_label",
-          "position": "页面右下角偏左",
+          "position": "页面底部左下角",
           "current_text": "汇报人：千库网",
-          "word_count": 6,
-          "purpose": "汇报人标签",
+          "word_count": 7,
+          "purpose": "汇报人信息",
+          "has_bullets": false
+        },
+        {
+          "element_type": "shape_label",
+          "position": "页面底部右下角",
+          "current_text": "汇报日期：202X",
+          "word_count": 8,
+          "purpose": "汇报日期",
           "has_bullets": false
         }
       ],
@@ -1520,35 +1697,35 @@
   ],
   "recommendations": {},
   "slideImages": [
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_01.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_02.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_03.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_04.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_05.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_06.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_07.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_08.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_09.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_10.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_11.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_12.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_13.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_14.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_15.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_16.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_17.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_18.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_19.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_20.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_21.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_22.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_23.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_24.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_25.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_26.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_27.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_28.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_29.png",
-    "workspace/sessions/ed8bc636-3b8c-414b-bfa9-d5dcad8672b7/template_images/slide_30.png"
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_01.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_02.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_03.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_04.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_05.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_06.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_07.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_08.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_09.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_10.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_11.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_12.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_13.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_14.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_15.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_16.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_17.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_18.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_19.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_20.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_21.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_22.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_23.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_24.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_25.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_26.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_27.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_28.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_29.png",
+    "workspace/sessions/055f9280-ab80-445f-93d8-4e490bc8e882/template_images/slide_30.png"
   ]
 }
