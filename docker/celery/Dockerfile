@@ -24,6 +24,8 @@ RUN apt-get update && apt-get install -y \
     fonts-liberation \
     fonts-noto-cjk \
     xvfb \
+    poppler-utils \
+    poppler-data \
     && rm -rf /var/lib/apt/lists/*
 
 # 1.3 创建专用用户
@@ -77,15 +79,16 @@ RUN mkdir -p /home/appuser/.config/libreoffice/4/user \
     && echo '#!/bin/bash\nsoffice --headless --nologo --nofirststartwizard --accept="socket,host=127.0.0.1,port=2002;urp;" --norestore "$@"' > /usr/local/bin/soffice-headless \
     && chmod +x /usr/local/bin/soffice-headless
 
-# 4.2 验证LibreOffice安装
+# 4.2 验证LibreOffice和Poppler安装
 RUN soffice --version || (echo "LibreOffice installation failed" && exit 1)
+RUN pdftoppm -h > /dev/null 2>&1 || (echo "Poppler installation failed" && exit 1)
 
 # 5. 切换到应用用户
 USER appuser
 
-# 6. 健康检查 (检查Celery进程和LibreOffice)
+# 6. 健康检查 (检查Celery进程、LibreOffice和Poppler)
 HEALTHCHECK --interval=60s --timeout=30s --start-period=30s --retries=3 \
-    CMD celery -A apps.api.celery_app inspect ping && soffice --version > /dev/null || exit 1
+    CMD celery -A apps.api.celery_app inspect ping && soffice --version > /dev/null && pdftoppm -h > /dev/null 2>&1 || exit 1
 
 # 7. 默认启动命令
-CMD ["celery", "-A", "apps.api.celery_app", "worker", "--loglevel=INFO", "--concurrency=2", "-Q", "ppt_generation,template_analysis"] 
+CMD ["celery", "-A", "apps.api.celery_app", "worker", "--loglevel=INFO", "--concurrency=10", "-Q", "ppt_generation,template_analysis"] 
