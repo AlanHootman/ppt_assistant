@@ -118,6 +118,7 @@ class WorkflowEngine:
     
     async def run_async(self, session_id:Optional[str]=None, raw_md:Optional[str]=None, 
                         ppt_template_path:Optional[str]=None, output_dir:Optional[str]=None, 
+                        enable_multimodal_validation: bool = False,
                         **kwargs) -> AgentState:
         """
         异步执行工作流
@@ -127,6 +128,7 @@ class WorkflowEngine:
             raw_md: 原始Markdown文本
             ppt_template_path: PPT模板路径
             output_dir: 输出目录
+            enable_multimodal_validation: 是否启用多模态验证
             kwargs: 允许传递额外的参数，但会过滤掉progress_callback
             
         Returns:
@@ -145,6 +147,7 @@ class WorkflowEngine:
                 raw_md=raw_md,
                 ppt_template_path=ppt_template_path,
                 output_dir=output_dir,
+                enable_multimodal_validation=enable_multimodal_validation,
                 **kwargs
             )
             logger.info(f"开始异步执行工作流，会话ID: {state.session_id}")

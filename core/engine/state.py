@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class AgentState:
     """工作流状态类"""
     
-    def __init__(self, session_id=None, raw_md=None, ppt_template_path=None, output_dir=None, content_structure=None):
+    def __init__(self, session_id=None, raw_md=None, ppt_template_path=None, output_dir=None, content_structure=None, **kwargs):
         """
         初始化代理状态
         
@@ -30,6 +30,7 @@ class AgentState:
             ppt_template_path (str, optional): PPT模板路径
             output_dir (str, optional): 输出目录路径
             content_structure (dict, optional): 内容结构
+            **kwargs: 其他动态属性
         """
         # 如果没有提供会话ID，自动生成一个
         if not session_id:
@@ -74,6 +75,10 @@ class AgentState:
         self.current_node = None  # 当前执行节点
         
         self.created_at = datetime.now().isoformat()
+        
+        # 处理额外的关键字参数
+        for key, value in kwargs.items():
+            setattr(self, key, value)
         
         logger.debug(f"创建状态: {self.session_id}")
     

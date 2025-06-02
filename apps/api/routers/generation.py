@@ -23,6 +23,7 @@ class ApiResponse(BaseModel):
 class GenerationRequest(BaseModel):
     template_id: int
     markdown_content: str
+    enable_multimodal_validation: bool = False
     
 class TaskStatusResponse(BaseModel):
     task_id: str
@@ -98,7 +99,8 @@ async def create_generation_task(
     generate_ppt_task.apply_async(
         args=[{
             "template_id": request.template_id,
-            "markdown_content": request.markdown_content
+            "markdown_content": request.markdown_content,
+            "enable_multimodal_validation": request.enable_multimodal_validation
         }],
         task_id=task_id  # 强制使用API生成的task_id
     )

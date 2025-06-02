@@ -1,5 +1,19 @@
 <template>
   <div class="generation-controls">
+    <!-- 多模态检测开关 -->
+    <div class="multimodal-switch">
+      <el-switch
+        v-model="enableMultimodalValidation"
+        class="switch"
+        active-text="多模态大模型检测修正"
+        inactive-text="多模态大模型检测修正"
+        :width="60"
+      />
+      <div class="switch-description">
+        开启后将使用视觉模型检测和优化幻灯片内容，但会增加生成时间
+      </div>
+    </div>
+    
     <el-button 
       type="primary" 
       size="default" 
@@ -37,6 +51,9 @@ const progressStore = useProgressStore()
 const templateStore = useTemplateStore()
 const editorStore = useEditorStore()
 const { cancelTask } = useTaskProgress()
+
+// 多模态检测开关状态，默认关闭
+const enableMultimodalValidation = ref(false)
 
 // 是否正在生成
 const isGenerating = computed(() => progressStore.isGenerating)
@@ -78,7 +95,7 @@ function handleGenerate() {
     return
   }
   
-  emit('generate')
+  emit('generate', { enableMultimodalValidation: enableMultimodalValidation.value })
 }
 
 // 处理取消按钮点击
@@ -99,6 +116,35 @@ async function handleCancel() {
 </script>
 
 <style scoped>
+/* ==========================================================================
+   多模态检测开关样式
+   ========================================================================== */
+
+.multimodal-switch {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.multimodal-switch:hover {
+  background-color: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.multimodal-switch .switch {
+  margin-bottom: 0.5rem;
+}
+
+.switch-description {
+  font-size: 0.75rem;
+  color: #64748b;
+  line-height: 1.4;
+  margin-top: 0.25rem;
+}
+
 /* ==========================================================================
    生成控制面板 - 按钮布局
    ========================================================================== */

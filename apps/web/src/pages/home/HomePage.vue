@@ -70,13 +70,13 @@ function navigateToAdmin() {
 }
 
 // 开始生成PPT
-async function startGeneration() {
+async function startGeneration(options: { enableMultimodalValidation: boolean } = { enableMultimodalValidation: false }) {
   try {
     // 重置进度状态
     progressStore.resetProgress()
     
     // 创建任务
-    const taskId = await createPptTask()
+    const taskId = await createPptTask(options)
     
     if (taskId) {
       // 使用条件方式调用 ElMessage

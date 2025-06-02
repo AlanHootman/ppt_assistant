@@ -8,6 +8,7 @@ export interface CreatePptTaskRequest {
   template_id: number
   markdown_content: string
   client_id: string
+  enable_multimodal_validation?: boolean
 }
 
 // 标准API响应结构接口
@@ -28,7 +29,8 @@ export const pptApi = {
     try {
       const response = await axios.post(`${apiBaseUrl}/ppt/generate`, {
         template_id: data.template_id,
-        markdown_content: data.markdown_content
+        markdown_content: data.markdown_content,
+        enable_multimodal_validation: data.enable_multimodal_validation || false
       })
       
       if (response.data && response.data.code && response.data.data) {

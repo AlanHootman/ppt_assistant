@@ -168,7 +168,8 @@ def _execute_workflow(engine: WorkflowEngine, task_id: str, task_data: Dict[str,
         raw_md=task_data["markdown_content"],
         ppt_template_path=template_path,
         output_dir=output_dir,
-        progress_callback=progress_callback
+        progress_callback=progress_callback,
+        enable_multimodal_validation=task_data.get("enable_multimodal_validation", False)
     ))
 
 

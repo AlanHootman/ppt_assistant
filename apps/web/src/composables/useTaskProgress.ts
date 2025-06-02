@@ -50,7 +50,7 @@ export function useTaskProgress() {
   }
   
   // 创建PPT生成任务
-  async function createPptTask() {
+  async function createPptTask(options: { enableMultimodalValidation: boolean } = { enableMultimodalValidation: false }) {
     const templateId = templateStore.currentTemplate?.id
     const markdownContent = editorStore.markdownContent
     
@@ -74,7 +74,8 @@ export function useTaskProgress() {
       const response = await pptApi.createTask({
         template_id: templateId,
         markdown_content: markdownContent,
-        client_id: getClientId()
+        client_id: getClientId(),
+        enable_multimodal_validation: options.enableMultimodalValidation
       })
       
       // 获取任务ID

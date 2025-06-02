@@ -94,7 +94,7 @@ class PPTFinalizerAgent(BaseAgent):
         主要职责：
         1. 删除未使用的模板幻灯片
         2. 根据内容计划重新排序幻灯片
-        3. 对所有幻灯片进行质量验证和优化
+        3. 对所有幻灯片进行质量验证和优化（可选）
         4. 保存最终PPT文件
         
         Args:
@@ -116,8 +116,15 @@ class PPTFinalizerAgent(BaseAgent):
             # 步骤2：清理和排序幻灯片
             await self._process_slides(state, presentation, generated_slides, content_plan)
             
-            # 步骤3：验证和优化幻灯片
-            validated_slides = await self._validate_slides(state, presentation, generated_slides, content_plan)
+            # 步骤3：根据配置决定是否验证和优化幻灯片
+            enable_validation = getattr(state, 'enable_multimodal_validation', False)
+            validated_slides = generated_slides  # 默认使用原始幻灯片列表
+            
+            if enable_validation:
+                logger.info("启用多模态验证，开始验证和优化幻灯片")
+                validated_slides = await self._validate_slides(state, presentation, generated_slides, content_plan)
+            else:
+                logger.info("多模态验证已禁用，跳过验证步骤")
             
             # 步骤4：保存最终PPT文件
             await self._save_presentation(state, presentation, validated_slides)
