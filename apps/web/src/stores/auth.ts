@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { authApi } from '../services/api/auth.api'
+import httpClient from '../services/http'
 import type { UserInfo, LoginRequest } from '../models/admin'
 
 export const useAuthStore = defineStore('auth', () => {
@@ -16,10 +17,8 @@ export const useAuthStore = defineStore('auth', () => {
   // 设置axios默认header
   const setAuthHeader = (authToken: string) => {
     if (authToken) {
-      // 动态导入axios，避免循环依赖
-      import('axios').then(axios => {
-        axios.default.defaults.headers.common['Authorization'] = `Bearer ${authToken}`
-      })
+      // 设置http客户端的Authorization头
+      httpClient.defaults.headers.common['Authorization'] = `Bearer ${authToken}`
     }
   }
 
@@ -30,10 +29,8 @@ export const useAuthStore = defineStore('auth', () => {
     localStorage.removeItem('admin_token')
     localStorage.removeItem('admin_user')
     
-    // 清除axios header
-    import('axios').then(axios => {
-      delete axios.default.defaults.headers.common['Authorization']
-    })
+    // 清除http客户端的Authorization头
+    delete httpClient.defaults.headers.common['Authorization']
   }
 
   // 登录

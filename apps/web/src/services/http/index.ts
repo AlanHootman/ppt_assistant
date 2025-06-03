@@ -1,4 +1,5 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
+import axios from 'axios'
+import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios'
 
 // 创建axios实例
 const httpClient: AxiosInstance = axios.create({
@@ -10,7 +11,7 @@ const httpClient: AxiosInstance = axios.create({
 httpClient.interceptors.request.use(
   (config) => {
     // 从localStorage获取token
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('admin_token')
     
     // 如果有token则添加到请求头
     if (token) {
@@ -37,8 +38,8 @@ httpClient.interceptors.response.use(
     // 处理401未授权错误
     if (status === 401) {
       // 清除本地token
-      localStorage.removeItem('token')
-      localStorage.removeItem('userInfo')
+      localStorage.removeItem('admin_token')
+      localStorage.removeItem('admin_user')
       
       // 重定向到登录页面
       if (window.location.pathname.startsWith('/admin')) {
