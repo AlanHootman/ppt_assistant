@@ -1,60 +1,147 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { UserInfo } from '@/types/api'
+import { authApi } from '../services/api/auth.api'
+import type { UserInfo, LoginRequest } from '../models/admin'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref('')
+  // 状态
+  const token = ref<string>(localStorage.getItem('admin_token') || '')
   const userInfo = ref<UserInfo | null>(null)
-  const isLoggedIn = computed(() => !!token.value)
-  
-  async function login(username: string, password: string) {
-    // 实现登录逻辑，此处只是示例
+  const loading = ref(false)
+  const error = ref<string | null>(null)
+
+  // 计算属性
+  const isLoggedIn = computed(() => !!token.value && !!userInfo.value)
+
+  // 设置axios默认header
+  const setAuthHeader = (authToken: string) => {
+    if (authToken) {
+      // 动态导入axios，避免循环依赖
+      import('axios').then(axios => {
+        axios.default.defaults.headers.common['Authorization'] = `Bearer ${authToken}`
+      })
+    }
+  }
+
+  // 清除认证信息
+  const clearAuth = () => {
+    token.value = ''
+    userInfo.value = null
+    localStorage.removeItem('admin_token')
+    localStorage.removeItem('admin_user')
+    
+    // 清除axios header
+    import('axios').then(axios => {
+      delete axios.default.defaults.headers.common['Authorization']
+    })
+  }
+
+  // 登录
+  const login = async (credentials: LoginRequest) => {
+    loading.value = true
+    error.value = null
+    
     try {
-      // const response = await authApi.login(username, password)
-      // token.value = response.data.token
-      // userInfo.value = response.data.user
+      const response = await authApi.login(credentials)
       
-      // 暂时使用模拟数据
-      token.value = 'mock-token'
-      userInfo.value = {
-        id: 1,
-        username,
-        role: 'admin'
+      if (response.code === 200) {
+        token.value = response.data.token
+        userInfo.value = response.data.user
+        
+        // 保存到localStorage
+        localStorage.setItem('admin_token', response.data.token)
+        localStorage.setItem('admin_user', JSON.stringify(response.data.user))
+        
+        // 设置axios header
+        setAuthHeader(response.data.token)
+        
+        return true
+      } else {
+        throw new Error(response.message || '登录失败')
       }
+    } catch (err: any) {
+      error.value = err.message || '登录失败，请重试'
+      return false
+    } finally {
+      loading.value = false
+    }
+  }
+
+  // 验证令牌
+  const verifyToken = async () => {
+    if (!token.value) return false
+    
+    try {
+      setAuthHeader(token.value)
+      const response = await authApi.verify()
       
-      // 存储到本地存储
-      localStorage.setItem('token', token.value)
-      localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
-      
-      return true
-    } catch (error) {
-      console.error('Login failed:', error)
+      if (response.code === 200) {
+        userInfo.value = response.data.user
+        return true
+      } else {
+        clearAuth()
+        return false
+      }
+    } catch (err) {
+      clearAuth()
       return false
     }
   }
-  
-  function logout() {
-    token.value = ''
-    userInfo.value = null
+
+  // 退出登录
+  const logout = async () => {
+    loading.value = true
     
-    // 清除本地存储
-    localStorage.removeItem('token')
-    localStorage.removeItem('userInfo')
-  }
-  
-  // 初始化时从本地存储恢复登录状态
-  function init() {
-    const storedToken = localStorage.getItem('token')
-    const storedUserInfo = localStorage.getItem('userInfo')
-    
-    if (storedToken && storedUserInfo) {
-      token.value = storedToken
-      userInfo.value = JSON.parse(storedUserInfo)
+    try {
+      if (token.value) {
+        await authApi.logout()
+      }
+    } catch (err) {
+      console.error('退出登录请求失败:', err)
+    } finally {
+      clearAuth()
+      loading.value = false
     }
   }
-  
-  // 调用初始化
-  init()
-  
-  return { token, userInfo, isLoggedIn, login, logout }
+
+  // 初始化认证状态
+  const initAuth = async () => {
+    const savedToken = localStorage.getItem('admin_token')
+    const savedUser = localStorage.getItem('admin_user')
+    
+    if (savedToken && savedUser) {
+      token.value = savedToken
+      userInfo.value = JSON.parse(savedUser)
+      
+      // 验证令牌是否仍然有效
+      const isValid = await verifyToken()
+      if (!isValid) {
+        clearAuth()
+        return false
+      }
+      
+      setAuthHeader(savedToken)
+      return true
+    }
+    
+    return false
+  }
+
+  return {
+    // 状态
+    token,
+    userInfo,
+    loading,
+    error,
+    
+    // 计算属性
+    isLoggedIn,
+    
+    // 方法
+    login,
+    logout,
+    verifyToken,
+    initAuth,
+    clearAuth
+  }
 })

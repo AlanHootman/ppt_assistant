@@ -4,7 +4,7 @@
       <div class="container">
         <h1 class="logo">PPT助手</h1>
         <div class="nav">
-          <el-button type="primary" size="small" @click="navigateToAdmin" disabled title="管理后台功能正在开发中">管理后台</el-button>
+          <el-button type="primary" size="small" @click="navigateToAdmin">管理后台</el-button>
         </div>
       </div>
     </header>
@@ -64,9 +64,7 @@ const taskCompleted = computed(() =>
 
 // 导航到管理后台
 function navigateToAdmin() {
-  // 暂时禁用管理后台功能
-  ElMessage ? ElMessage.info('管理后台功能正在开发中') : console.log('管理后台功能正在开发中')
-  // router.push('/admin')
+  router.push('/admin')
 }
 
 // 开始生成PPT
