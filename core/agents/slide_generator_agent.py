@@ -22,9 +22,7 @@ from core.llm.model_manager import ModelManager
 from core.utils.model_helper import ModelHelper
 from core.utils.ppt_agent_helper import PPTAgentHelper, EnumEncoder
 from core.utils.ppt_operations import PPTOperationExecutor
-from config.prompts.slide_generator_prompts import (
-    LLM_PPT_ELEMENT_MATCHING_PROMPT
-)
+from core.utils.prompt_loader import PromptLoader
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
@@ -43,6 +41,7 @@ class SlideGeneratorAgent(BaseAgent):
         # 初始化模型管理器和辅助工具
         self.model_manager = ModelManager()
         self.model_helper = ModelHelper(self.model_manager)
+        self.prompt_loader = PromptLoader()
         
         # 获取模型配置
         model_config = self.model_helper.get_model_config(config, "text")
@@ -291,8 +290,8 @@ class SlideGeneratorAgent(BaseAgent):
         Returns:
             操作指令列表
         """
-        # 渲染提示词
-        prompt = self.model_manager.render_template(LLM_PPT_ELEMENT_MATCHING_PROMPT, context)
+        # 使用新的yaml格式prompt
+        prompt = self.prompt_loader.render_prompt("slide_generator_prompts", context)
         
         try:
             # 调用LLM获取匹配结果，使用重试机制

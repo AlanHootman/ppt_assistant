@@ -17,8 +17,8 @@ from core.agents.base_agent import BaseAgent
 from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
 from core.utils.model_helper import ModelHelper
-from config.prompts.markdown_agent_prompts import ANALYSIS_PROMPT
-from config.prompts.content_types import (
+from core.utils.prompt_loader import PromptLoader
+from config.content_types import (
     SEMANTIC_TYPES,
     RELATION_TYPES,
     CONTENT_STRUCTURES,
@@ -42,6 +42,7 @@ class MarkdownAgent(BaseAgent):
         # 初始化模型管理器和辅助工具
         self.model_manager = ModelManager()
         self.model_helper = ModelHelper(self.model_manager)
+        self.prompt_loader = PromptLoader()
         
         # 获取模型配置 - 使用深度思考模型
         model_config = self.model_helper.get_model_config(config, "deep_thinking")
@@ -111,8 +112,8 @@ class MarkdownAgent(BaseAgent):
             "RELATION_TYPE_GUIDELINES": RELATION_TYPE_GUIDELINES
         }
         
-        # 使用模型管理器的模板渲染方法
-        prompt = self.model_manager.render_template(ANALYSIS_PROMPT, context)
+        # 使用新的yaml格式prompt
+        prompt = self.prompt_loader.render_prompt("markdown_agent_prompts", context)
         
         try:
             # 调用大模型（使用重试机制）

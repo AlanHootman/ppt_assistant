@@ -17,6 +17,7 @@ from typing import Dict, Any, List, Optional, Tuple
 
 from core.utils.ppt_agent_helper import PPTAgentHelper, EnumEncoder
 from core.utils.model_helper import ModelHelper
+from core.utils.prompt_loader import PromptLoader
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ class SlideValidationManager:
         self.ppt_operation_executor = ppt_operation_executor
         self.model_manager = model_manager
         self.model_helper = model_helper
+        self.prompt_loader = PromptLoader()
         self.vision_model = vision_model
         self.max_iterations = max_iterations
         self.max_vision_retries = max_vision_retries
@@ -57,6 +59,10 @@ class SlideValidationManager:
         self.validation_logs_dir = validation_logs_dir
         if self.validation_logs_dir:
             self.validation_logs_dir.mkdir(parents=True, exist_ok=True)
+        
+        logger.info(f"初始化幻灯片验证管理器，使用视觉模型: {vision_model}，最大迭代次数: {max_iterations}，"
+                   f"最大重试次数: {max_vision_retries}，并行处理: {'启用' if use_parallel else '禁用'}，"
+                   f"最大协程数: {max_workers or '自动'}")
     
     async def validate_all_slides(self, state, presentation, generated_slides, content_plan, slide_cleanup_manager) -> List[Dict[str, Any]]:
         """
@@ -670,7 +676,7 @@ class SlideValidationManager:
     
     async def _analyze_with_vision_model(self, image_path, slide_elements, section_content) -> Dict[str, Any]:
         """
-        使用视觉模型分析幻灯片图像
+        使用视觉模型分析幻灯片
         
         Args:
             image_path: 幻灯片图像路径
@@ -680,16 +686,14 @@ class SlideValidationManager:
         Returns:
             分析结果
         """
-        from config.prompts.slide_validation_prompts import SLIDE_SELF_VALIDATION_PROMPT
-        
         # 准备上下文数据
         context = {
             "section_json": json.dumps(section_content, ensure_ascii=False, indent=2, cls=EnumEncoder),
             "slide_elements_json": json.dumps(slide_elements, ensure_ascii=False, indent=2, cls=EnumEncoder)
         }
         
-        # 渲染提示词
-        prompt = self.model_manager.render_template(SLIDE_SELF_VALIDATION_PROMPT, context)
+        # 使用新的yaml格式prompt
+        prompt = self.prompt_loader.render_prompt("slide_validation_prompts", context)
         
         # 定义分析失败时的默认返回结果
         empty_result = {

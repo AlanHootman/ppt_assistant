@@ -19,8 +19,8 @@ from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
 from core.utils.model_helper import ModelHelper
 from core.utils.ppt_agent_helper import PPTAgentHelper
-from config.prompts.ppt_analyzer_prompts import TEMPLATE_ANALYSIS_PROMPT
-from config.prompts.content_types import (
+from core.utils.prompt_loader import PromptLoader
+from config.content_types import (
     SEMANTIC_TYPES,
     RELATION_TYPES,
     CONTENT_STRUCTURES,
@@ -85,6 +85,7 @@ class PPTAnalysisAgent(BaseAgent):
         # 初始化模型管理器和辅助工具
         self.model_manager = ModelManager()
         self.model_helper = ModelHelper(self.model_manager)
+        self.prompt_loader = PromptLoader()
         
         # 获取模型配置
         model_config = self.model_helper.get_model_config(config, "vision")
@@ -373,8 +374,8 @@ class PPTAnalysisAgent(BaseAgent):
             "RELATION_TYPE_GUIDELINES": RELATION_TYPE_GUIDELINES
         }
         
-        # 使用ModelManager的render_template方法渲染模板
-        return self.model_manager.render_template(TEMPLATE_ANALYSIS_PROMPT, context)
+        # 使用新的yaml格式prompt
+        return self.prompt_loader.render_prompt("ppt_analyzer_prompts", context)
     
     def _merge_batch_results(self, results: List[Dict[str, Any]], template_info: Dict[str, Any]) -> Dict[str, Any]:
         """
