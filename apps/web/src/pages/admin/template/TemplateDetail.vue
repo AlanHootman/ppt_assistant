@@ -2,7 +2,7 @@
   <div class="template-detail">
     <div class="page-header">
       <div class="header-left">
-        <el-button @click="goBack" type="text">
+        <el-button @click="goBack" link>
           <el-icon><ArrowLeft /></el-icon>
           返回列表
         </el-button>
@@ -336,6 +336,44 @@ onMounted(() => {
   
   .template-actions {
     flex-direction: column;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .page-title {
+    color: #e0e0e0;
+  }
+  
+  .detail-card :deep(.el-card__body),
+  .loading-card :deep(.el-card__body),
+  .error-card :deep(.el-card__body) {
+    background-color: #282838;
+    color: #e0e0e0;
+  }
+  
+  .template-name {
+    color: #e0e0e0;
+  }
+  
+  .template-preview {
+    background-color: #22222e;
+  }
+  
+  .template-preview.placeholder {
+    color: #8888a0;
+  }
+  
+  .info-item .label {
+    color: #b0b0c0;
+  }
+  
+  .info-item .value {
+    color: #e0e0e0;
+  }
+  
+  .template-actions {
+    border-top-color: #3c3c4c;
   }
 }
 </style> 

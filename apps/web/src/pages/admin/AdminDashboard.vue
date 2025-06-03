@@ -376,4 +376,65 @@ onMounted(() => {
     padding: 1rem;
   }
 }
+
+/* ==========================================================================
+   深色模式支持
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+  .page-title {
+    color: #e0e0e0;
+  }
+  
+  .page-subtitle {
+    color: #b0b0c0;
+  }
+  
+  .section-title {
+    color: #e0e0e0;
+  }
+  
+  .stat-card {
+    background-color: #282838;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  .stat-number {
+    color: #e0e0e0;
+  }
+  
+  .stat-label {
+    color: #b0b0c0;
+  }
+  
+  .action-card :deep(.el-card__body) {
+    background-color: #282838;
+    color: #e0e0e0;
+  }
+  
+  .action-content h3 {
+    color: #e0e0e0;
+  }
+  
+  .action-content p {
+    color: #b0b0c0;
+  }
+  
+  .system-info :deep(.el-card__body) {
+    background-color: #282838;
+    color: #e0e0e0;
+  }
+  
+  .info-item {
+    border-bottom-color: #3c3c4c;
+  }
+  
+  .info-label {
+    color: #b0b0c0;
+  }
+  
+  .info-value {
+    color: #e0e0e0;
+  }
+}
 </style> 

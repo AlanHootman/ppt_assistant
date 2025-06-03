@@ -311,16 +311,45 @@ watch(() => authStore.isLoggedIn, (isLoggedIn) => {
 
 @media (prefers-color-scheme: dark) {
   .admin-layout {
-    background-color: #1a1a1a;
+    background-color: #1e1e2e;
   }
   
   .admin-header {
-    background-color: #2c2c2c;
-    border-bottom: 1px solid #3c3c3c;
+    background-color: #282838;
+    border-bottom: 1px solid #3c3c4c;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   }
   
   .admin-content {
-    background-color: #1a1a1a;
+    background-color: #1e1e2e;
+  }
+  
+  .sidebar-toggle {
+    color: #e0e0e0;
+  }
+  
+  .user-dropdown {
+    color: #e0e0e0;
+  }
+  
+  .username {
+    color: #e0e0e0;
+  }
+  
+  .user-dropdown:hover {
+    background-color: #383848;
+  }
+  
+  .breadcrumb :deep(.el-breadcrumb__item) {
+    color: #e0e0e0;
+  }
+  
+  .breadcrumb :deep(.el-breadcrumb__inner) {
+    color: #e0e0e0;
+  }
+  
+  .breadcrumb :deep(.el-breadcrumb__separator) {
+    color: #a0a0a0;
   }
 }
 </style> 

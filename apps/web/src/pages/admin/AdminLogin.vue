@@ -61,7 +61,8 @@
 
       <div class="login-footer">
         <p>PPT助手管理后台</p>
-        <el-button type="text" @click="goToHome">
+        <el-button link @click="goToHome">
+          <el-icon><ArrowLeft /></el-icon>
           返回首页
         </el-button>
       </div>

@@ -574,4 +574,55 @@ onMounted(() => {
     width: 100%;
   }
 }
+
+/* ==========================================================================
+   深色模式支持
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+  .page-title {
+    color: #e0e0e0;
+  }
+  
+  .page-subtitle {
+    color: #b0b0c0;
+  }
+  
+  .template-card {
+    background-color: #282838;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
+  }
+  
+  .template-preview {
+    background-color: #22222e;
+  }
+  
+  .preview-placeholder {
+    color: #8888a0;
+  }
+  
+  .template-name {
+    color: #e0e0e0;
+  }
+  
+  .template-meta {
+    color: #b0b0c0;
+  }
+  
+  .template-actions {
+    border-top-color: #3c3c4c;
+  }
+  
+  .empty-state {
+    color: #b0b0c0;
+  }
+  
+  .empty-state .el-icon {
+    color: #5a5a6a;
+  }
+  
+  .empty-state h3 {
+    color: #e0e0e0;
+  }
+}
 </style> 
