@@ -147,16 +147,18 @@ async def upload_template_alias(
 
 @router.get("/", response_model=ApiResponse)
 async def list_templates(
-    skip: int = 0, 
-    limit: int = 100,
-    status_filter: Optional[str] = Query("ready", description="模板状态过滤，多个状态用逗号分隔，例如'ready,analyzing'，传入all表示不过滤"),
+    page: int = Query(1, description="页码，从1开始"),
+    limit: int = Query(10, description="每页条数"), 
+    skip: int = Query(None, description="跳过的记录数，用于兼容旧版本"),
+    status_filter: Optional[str] = Query("all", description="模板状态过滤，多个状态用逗号分隔，例如'ready,analyzing'，传入all表示不过滤"),
     db: Session = Depends(get_db)
 ):
     """获取模板列表
     
     Args:
-        skip: 分页起始位置
-        limit: 分页大小
+        page: 页码，从1开始
+        limit: 每页条数
+        skip: 跳过的记录数，用于兼容旧版本
         status_filter: 模板状态过滤，多个状态用逗号分隔，例如'ready,analyzing'，传入all表示不过滤
         db: 数据库会话
         
@@ -164,13 +166,19 @@ async def list_templates(
         模板列表
     """
     try:
+        # 计算跳过的记录数，优先使用skip参数，否则从page计算
+        if skip is not None:
+            offset = skip
+        else:
+            offset = (page - 1) * limit
+        
         # 解析状态过滤参数
         filter_statuses = None
         if status_filter and status_filter.lower() != "all":
             filter_statuses = [s.strip() for s in status_filter.split(",")]
         
         # 尝试从缓存获取（只有在请求ready状态模板且使用默认分页时）
-        if filter_statuses == ["ready"] and skip == 0 and limit == 100:
+        if filter_statuses == ["ready"] and offset == 0 and limit == 10:
             cached_templates = redis_service.get_cached_template_list(status_filter="ready")
             if cached_templates:
                 logger.info("从缓存中获取模板列表")
@@ -179,7 +187,7 @@ async def list_templates(
                     message="获取成功",
                     data={
                         "total": len(cached_templates),
-                        "page": 1,
+                        "page": page,
                         "limit": limit,
                         "templates": cached_templates
                     }
@@ -196,7 +204,7 @@ async def list_templates(
         total = query.count()
         
         # 执行查询
-        templates = query.offset(skip).limit(limit).all()
+        templates = query.offset(offset).limit(limit).all()
         
         # 序列化模板对象
         serializable_templates = []
@@ -228,7 +236,7 @@ async def list_templates(
                 # 继续处理下一个模板，不中断整个列表的获取
         
         # 如果是请求ready状态的模板且使用默认分页，缓存结果
-        if filter_statuses == ["ready"] and skip == 0 and limit == 100:
+        if filter_statuses == ["ready"] and offset == 0 and limit == 10:
             redis_service.cache_template_list(templates, status_filter="ready")
         
         return ApiResponse(
@@ -236,7 +244,7 @@ async def list_templates(
             message="获取成功",
             data={
                 "total": total,
-                "page": skip // limit + 1 if limit > 0 else 1,
+                "page": page,
                 "limit": limit,
                 "templates": serializable_templates
             }

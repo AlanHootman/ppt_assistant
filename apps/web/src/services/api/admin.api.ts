@@ -15,10 +15,24 @@ export const adminApi = {
   /**
    * 获取模板列表
    */
-  getTemplates: async (page = 1, limit = 10): Promise<ApiResponse<TemplateListResponse>> => {
+  getTemplates: async (
+    page = 1, 
+    limit = 10, 
+    statusFilter = 'all'
+  ): Promise<ApiResponse<TemplateListResponse>> => {
     try {
+      const skip = (page - 1) * limit
+      const params: any = { skip, limit }
+      
+      // 添加状态筛选参数
+      if (statusFilter && statusFilter !== 'all') {
+        params.status_filter = statusFilter
+      } else {
+        params.status_filter = 'all'
+      }
+      
       const response = await axios.get(`${API_BASE_URL}/templates`, {
-        params: { page, limit }
+        params
       })
       return response.data
     } catch (error: any) {

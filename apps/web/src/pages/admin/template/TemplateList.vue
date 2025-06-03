@@ -146,12 +146,19 @@
       />
     </div>
 
-    <!-- 暂时移除这两个对话框组件，直到完全实现 -->
+    <!-- 模板上传对话框 -->
+    <component
+      :is="TemplateUploadDialog"
+      v-if="TemplateUploadDialog"
+      :visible="showUploadDialog"
+      @update:visible="showUploadDialog = $event"
+      @uploaded="handleTemplateUploaded"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
@@ -163,8 +170,14 @@ import {
 } from '@element-plus/icons-vue'
 import { adminApi } from '../../../services/api/admin.api'
 import type { Template } from '../../../models/admin'
-// 暂时注释掉这两个组件，避免导入问题
-// import TemplateUploadDialog from './TemplateUploadDialog.vue'
+
+// 动态导入组件
+const TemplateUploadDialog = shallowRef()
+import('./TemplateUploadDialog.vue').then(module => {
+  TemplateUploadDialog.value = module.default
+})
+
+// 暂时注释掉编辑对话框组件
 // import TemplateEditDialog from './TemplateEditDialog.vue'
 
 const router = useRouter()
@@ -180,8 +193,9 @@ const pageSize = ref(10)
 const searchQuery = ref('')
 const statusFilter = ref('')
 
-// 对话框状态 - 暂时注释掉直到组件完全实现
-// const showUploadDialog = ref(false)
+// 对话框状态
+const showUploadDialog = ref(false)
+// 暂时注释掉编辑对话框状态
 // const showEditDialog = ref(false)
 // const editingTemplate = ref<Template | null>(null)
 
@@ -189,7 +203,9 @@ const statusFilter = ref('')
 const fetchTemplates = async () => {
   loading.value = true
   try {
-    const response = await adminApi.getTemplates(currentPage.value, pageSize.value)
+    // 将前端的状态筛选参数传递给后端
+    const statusParam = statusFilter.value || 'all'
+    const response = await adminApi.getTemplates(currentPage.value, pageSize.value, statusParam)
     
     if (response.code === 200) {
       templates.value = response.data.templates
@@ -204,20 +220,15 @@ const fetchTemplates = async () => {
   }
 }
 
-// 筛选后的模板列表
+// 筛选后的模板列表 - 现在只做客户端搜索筛选，状态筛选由后端处理
 const filteredTemplates = computed(() => {
   let result = templates.value
 
-  // 按名称搜索
+  // 按名称搜索（客户端筛选）
   if (searchQuery.value) {
     result = result.filter(template =>
       template.name.toLowerCase().includes(searchQuery.value.toLowerCase())
     )
-  }
-
-  // 按状态筛选
-  if (statusFilter.value) {
-    result = result.filter(template => template.status === statusFilter.value)
   }
 
   return result
@@ -225,13 +236,14 @@ const filteredTemplates = computed(() => {
 
 // 处理搜索
 const handleSearch = () => {
-  // 实际项目中可以考虑防抖处理
-  // 这里简化为使用computed筛选
+  // 搜索只在客户端进行筛选，不需要重新获取数据
 }
 
 // 处理状态筛选
 const handleStatusFilter = () => {
-  // 实际项目中可以调用API进行服务端筛选
+  // 状态筛选需要重新从后端获取数据
+  currentPage.value = 1  // 重置到第一页
+  fetchTemplates()
 }
 
 // 刷新列表
@@ -295,10 +307,12 @@ const viewTemplate = (template: Template) => {
   router.push(`/admin/templates/${template.id}`)
 }
 
-// 临时处理上传点击 - 直到组件实现完成
+// 处理上传点击
 const handleUploadClick = () => {
-  ElMessage.info('模板上传功能正在开发中，敬请期待')
-  // showUploadDialog.value = true
+  console.log('上传按钮被点击，准备打开对话框')
+  console.log('当前showUploadDialog值:', showUploadDialog.value)
+  showUploadDialog.value = true
+  console.log('设置后showUploadDialog值:', showUploadDialog.value)
 }
 
 // 编辑模板
@@ -329,10 +343,13 @@ const deleteTemplate = async (template: Template) => {
 }
 
 // 处理模板上传完成
-const handleTemplateUploaded = () => {
-  // showUploadDialog.value = false
+const handleTemplateUploaded = (uploadResult?: any) => {
+  showUploadDialog.value = false
   fetchTemplates()
-  ElMessage.success('模板上传成功')
+  
+  if (uploadResult) {
+    ElMessage.success(`模板"${uploadResult.name}"上传成功，正在分析中`)
+  }
 }
 
 // 处理模板更新完成

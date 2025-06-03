@@ -1,10 +1,11 @@
 <template>
   <el-dialog
     title="上传模板"
-    :visible="visible"
-    @update:visible="$emit('update:visible', $event)"
+    v-model="dialogVisible"
     width="550px"
     destroy-on-close
+    :close-on-click-modal="false"
+    class="template-upload-dialog"
   >
     <el-form
       ref="formRef"
@@ -20,7 +21,7 @@
         <el-input
           v-model="form.description"
           type="textarea"
-          rows="3"
+          :rows="3"
           placeholder="请输入模板描述（可选）"
         />
       </el-form-item>
@@ -52,9 +53,14 @@
           :on-change="handleFileChange"
           :limit="1"
           accept=".pptx"
+          :show-file-list="true"
+          :file-list="fileList"
         >
           <template #trigger>
-            <el-button type="primary">选择文件</el-button>
+            <el-button type="primary">
+              <el-icon><Upload /></el-icon>
+              选择PPTX文件
+            </el-button>
           </template>
           <template #tip>
             <div class="el-upload__tip">
@@ -81,8 +87,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Upload } from '@element-plus/icons-vue'
 import { adminApi } from '../../../services/api/admin.api'
 
 // 定义props和emits
@@ -95,6 +102,12 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:visible', 'uploaded'])
+
+// 计算属性处理对话框显示状态
+const dialogVisible = computed({
+  get: () => props.visible,
+  set: (value: boolean) => emit('update:visible', value)
+})
 
 // 表单引用
 const formRef = ref()
@@ -109,6 +122,9 @@ const form = ref({
   tags: [],
   file: null as File | null
 })
+
+// 文件列表（用于显示选中的文件）
+const fileList = ref<any[]>([])
 
 // 预定义标签
 const predefinedTags = [
@@ -176,19 +192,23 @@ const submitForm = async () => {
       tags: form.value.tags.length > 0 ? form.value.tags : undefined
     }
     
-    // 暂时用假数据模拟上传成功
-    // const response = await adminApi.uploadTemplate(uploadData)
+    // 调用API上传模板
+    const response = await adminApi.uploadTemplate(uploadData)
     
-    setTimeout(() => {
-      ElMessage.success('模板上传成功')
+    if (response.code === 201) {
+      ElMessage.success('模板上传成功，正在进行分析')
       emit('update:visible', false)
-      emit('uploaded')
+      emit('uploaded', response.data)
       resetForm()
-      uploading.value = false
-    }, 2000)
+    } else {
+      ElMessage.error(response.message || '模板上传失败')
+    }
     
   } catch (error: any) {
-    console.error('表单验证失败:', error)
+    console.error('上传失败:', error)
+    ElMessage.error(error.message || '模板上传失败，请重试')
+  } finally {
+    uploading.value = false
   }
 }
 
@@ -198,17 +218,230 @@ const resetForm = () => {
     formRef.value.resetFields()
   }
   form.value.file = null
+  fileList.value = []
+}
+</script>
+
+<script lang="ts">
+export default {
+  name: 'TemplateUploadDialog'
 }
 </script>
 
 <style scoped>
+/* 对话框整体样式 */
+.template-upload-dialog :deep(.el-dialog) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.template-upload-dialog :deep(.el-dialog__header) {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  padding: 20px 24px 16px;
+}
+
+.template-upload-dialog :deep(.el-dialog__title) {
+  color: #2c3e50;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.template-upload-dialog :deep(.el-dialog__body) {
+  padding: 24px;
+  background-color: #ffffff;
+}
+
+.template-upload-dialog :deep(.el-dialog__footer) {
+  background-color: #f8f9fa;
+  border-top: 1px solid #e9ecef;
+  padding: 16px 24px;
+}
+
+/* 表单间距优化 */
+:deep(.el-form-item) {
+  margin-bottom: 24px;
+}
+
+:deep(.el-form-item:last-child) {
+  margin-bottom: 0;
+}
+
 .template-upload {
   width: 100%;
+}
+
+.template-upload :deep(.el-upload__tip) {
+  color: #909399;
+  font-size: 12px;
+  margin-top: 8px;
 }
 
 .dialog-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 12px;
+}
+
+/* 确保label文字清晰可见 */
+:deep(.el-form-item__label) {
+  color: #2c3e50 !important;
+  font-weight: 500;
+}
+
+/* 确保输入框背景为浅色 */
+:deep(.el-input__wrapper) {
+  background-color: #ffffff !important;
+  border: 1px solid #dcdfe6;
+  box-shadow: 0 0 0 1px #dcdfe6 inset;
+}
+
+:deep(.el-input__wrapper:hover) {
+  border-color: #c0c4cc;
+}
+
+:deep(.el-input__wrapper.is-focus) {
+  border-color: #409eff;
+  box-shadow: 0 0 0 1px #409eff inset;
+}
+
+/* 确保输入框内文字清晰 */
+:deep(.el-input__inner) {
+  background-color: transparent !important;
+  color: #2c3e50 !important;
+}
+
+/* 文本域样式 */
+:deep(.el-textarea__inner) {
+  background-color: #ffffff !important;
+  border-color: #dcdfe6 !important;
+  color: #2c3e50 !important;
+}
+
+:deep(.el-textarea__inner:hover) {
+  border-color: #c0c4cc;
+}
+
+:deep(.el-textarea__inner:focus) {
+  border-color: #409eff;
+  box-shadow: 0 0 0 1px #409eff inset;
+}
+
+/* 选择器样式 */
+:deep(.el-select .el-input__wrapper) {
+  background-color: #ffffff !important;
+}
+
+:deep(.el-select .el-input__inner) {
+  background-color: transparent !important;
+  color: #2c3e50 !important;
+}
+
+/* 标签样式 */
+:deep(.el-tag) {
+  background-color: #f0f2f5;
+  border-color: #d9d9d9;
+  color: #2c3e50;
+}
+
+/* 上传组件样式 */
+:deep(.el-upload) {
+  background-color: #ffffff;
+}
+
+:deep(.el-upload .el-button) {
+  border: 2px dashed #d9d9d9;
+  background-color: #fafafa;
+  color: #409eff;
+  padding: 12px 20px;
+  border-radius: 6px;
+  transition: all 0.3s;
+}
+
+:deep(.el-upload .el-button:hover) {
+  border-color: #409eff;
+  background-color: #f0f9ff;
+}
+
+/* 文件列表样式 */
+:deep(.el-upload-list) {
+  margin-top: 12px;
+}
+
+:deep(.el-upload-list__item) {
+  background-color: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  padding: 8px 12px;
+}
+
+/* 只在真正的深色模式下应用深色样式 */
+@media (prefers-color-scheme: dark) {
+  .template-upload-dialog :deep(.el-dialog__header) {
+    background-color: #1f1f1f;
+    border-bottom-color: #3c3c4c;
+  }
+  
+  .template-upload-dialog :deep(.el-dialog__title) {
+    color: #e0e0e0;
+  }
+  
+  .template-upload-dialog :deep(.el-dialog__body) {
+    background-color: #2c2c2c;
+  }
+  
+  .template-upload-dialog :deep(.el-dialog__footer) {
+    background-color: #1f1f1f;
+    border-top-color: #3c3c4c;
+  }
+
+  :deep(.el-form-item__label) {
+    color: #e0e0e0 !important;
+  }
+  
+  :deep(.el-input__wrapper) {
+    background-color: #2c2c2c !important;
+    border-color: #3c3c4c !important;
+  }
+  
+  :deep(.el-input__inner) {
+    background-color: transparent !important;
+    color: #e0e0e0 !important;
+  }
+  
+  :deep(.el-textarea__inner) {
+    background-color: #2c2c2c !important;
+    border-color: #3c3c4c !important;
+    color: #e0e0e0 !important;
+  }
+  
+  :deep(.el-select .el-input__wrapper) {
+    background-color: #2c2c2c !important;
+  }
+  
+  :deep(.el-select .el-input__inner) {
+    color: #e0e0e0 !important;
+  }
+  
+  :deep(.el-upload .el-button) {
+    background-color: #2c2c2c;
+    border-color: #3c3c4c;
+    color: #409eff;
+  }
+  
+  :deep(.el-upload .el-button:hover) {
+    background-color: #1e3a5f;
+    border-color: #409eff;
+  }
+  
+  :deep(.el-upload-list__item) {
+    background-color: #1f1f1f;
+    border-color: #3c3c4c;
+    color: #e0e0e0;
+  }
+  
+  .template-upload :deep(.el-upload__tip) {
+    color: #a0a0a0;
+  }
 }
 </style> 
