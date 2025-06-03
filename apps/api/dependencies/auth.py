@@ -9,7 +9,7 @@ from apps.api.models.database import User
 from apps.api.config import settings
 from pydantic import BaseModel
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/token")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 
 class TokenData(BaseModel):
     username: Optional[str] = None

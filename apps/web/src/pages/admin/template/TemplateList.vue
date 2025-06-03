@@ -147,25 +147,19 @@
     </div>
 
     <!-- 上传对话框 -->
-    <!-- TODO: 实现 TemplateUploadDialog 组件 -->
-    <!--
     <TemplateUploadDialog
       :visible="showUploadDialog"
       @update:visible="showUploadDialog = $event"
       @uploaded="handleTemplateUploaded"
     />
-    -->
 
     <!-- 编辑对话框 -->  
-    <!-- TODO: 实现 TemplateEditDialog 组件 -->
-    <!--
     <TemplateEditDialog
       :visible="showEditDialog"
       @update:visible="showEditDialog = $event"
       :template="editingTemplate"
       @updated="handleTemplateUpdated"
     />
-    -->
   </div>
 </template>
 
@@ -182,9 +176,9 @@ import {
 } from '@element-plus/icons-vue'
 import { adminApi } from '../../../services/api/admin.api'
 import type { Template } from '../../../models/admin'
-// TODO: 实现这些组件后取消注释
-// import TemplateUploadDialog from './TemplateUploadDialog.vue'
-// import TemplateEditDialog from './TemplateEditDialog.vue'
+// 使用命名导入
+import * as TemplateUploadDialog from './TemplateUploadDialog.vue'
+import * as TemplateEditDialog from './TemplateEditDialog.vue'
 
 const router = useRouter()
 
@@ -345,6 +339,21 @@ const deleteTemplate = async (template: Template) => {
   } catch (error: any) {
     ElMessage.error(error.message || '删除模板失败')
   }
+}
+
+// 处理模板上传完成
+const handleTemplateUploaded = () => {
+  showUploadDialog.value = false
+  fetchTemplates()
+  ElMessage.success('模板上传成功')
+}
+
+// 处理模板更新完成
+const handleTemplateUpdated = () => {
+  showEditDialog.value = false
+  editingTemplate.value = null
+  fetchTemplates()
+  ElMessage.success('模板信息更新成功')
 }
 
 // 组件挂载时获取数据
