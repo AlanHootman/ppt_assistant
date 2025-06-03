@@ -74,6 +74,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { ArrowLeft } from '@element-plus/icons-vue'
 import { useAuthStore } from '../../stores/auth'
 import type { LoginRequest } from '../../models/admin'
 
