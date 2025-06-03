@@ -146,20 +146,7 @@
       />
     </div>
 
-    <!-- 上传对话框 -->
-    <TemplateUploadDialog
-      :visible="showUploadDialog"
-      @update:visible="showUploadDialog = $event"
-      @uploaded="handleTemplateUploaded"
-    />
-
-    <!-- 编辑对话框 -->  
-    <TemplateEditDialog
-      :visible="showEditDialog"
-      @update:visible="showEditDialog = $event"
-      :template="editingTemplate"
-      @updated="handleTemplateUpdated"
-    />
+    <!-- 暂时移除这两个对话框组件，直到完全实现 -->
   </div>
 </template>
 
@@ -176,9 +163,9 @@ import {
 } from '@element-plus/icons-vue'
 import { adminApi } from '../../../services/api/admin.api'
 import type { Template } from '../../../models/admin'
-// 使用命名导入
-import * as TemplateUploadDialog from './TemplateUploadDialog.vue'
-import * as TemplateEditDialog from './TemplateEditDialog.vue'
+// 暂时注释掉这两个组件，避免导入问题
+// import TemplateUploadDialog from './TemplateUploadDialog.vue'
+// import TemplateEditDialog from './TemplateEditDialog.vue'
 
 const router = useRouter()
 
@@ -193,10 +180,10 @@ const pageSize = ref(10)
 const searchQuery = ref('')
 const statusFilter = ref('')
 
-// 对话框状态
-const showUploadDialog = ref(false)
-const showEditDialog = ref(false)
-const editingTemplate = ref<Template | null>(null)
+// 对话框状态 - 暂时注释掉直到组件完全实现
+// const showUploadDialog = ref(false)
+// const showEditDialog = ref(false)
+// const editingTemplate = ref<Template | null>(null)
 
 // 获取模板列表
 const fetchTemplates = async () => {
@@ -311,11 +298,11 @@ const viewTemplate = (template: Template) => {
 // 临时处理上传点击 - 直到组件实现完成
 const handleUploadClick = () => {
   ElMessage.info('模板上传功能正在开发中，敬请期待')
+  // showUploadDialog.value = true
 }
 
 // 编辑模板
 const editTemplate = (template: Template) => {
-  // 临时提示 - 直到组件实现完成
   ElMessage.info('模板编辑功能正在开发中，敬请期待')
   // editingTemplate.value = template
   // showEditDialog.value = true
@@ -343,15 +330,15 @@ const deleteTemplate = async (template: Template) => {
 
 // 处理模板上传完成
 const handleTemplateUploaded = () => {
-  showUploadDialog.value = false
+  // showUploadDialog.value = false
   fetchTemplates()
   ElMessage.success('模板上传成功')
 }
 
 // 处理模板更新完成
 const handleTemplateUpdated = () => {
-  showEditDialog.value = false
-  editingTemplate.value = null
+  // showEditDialog.value = false
+  // editingTemplate.value = null
   fetchTemplates()
   ElMessage.success('模板信息更新成功')
 }
