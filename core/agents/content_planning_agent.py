@@ -17,7 +17,7 @@ from core.engine.state import AgentState
 from core.llm.model_manager import ModelManager
 from core.utils.model_helper import ModelHelper
 from core.utils.ppt_agent_helper import PPTAgentHelper
-from config.prompts.content_planning_prompts import CONTENT_PLANNING_PROMPT
+from core.utils.prompt_loader import prompt_loader
 
 logger = logging.getLogger(__name__)
 
@@ -79,32 +79,10 @@ class ContentPlanningAgent(BaseAgent):
             subtitle = state.content_structure.get("subtitle", "")
             available_layouts = state.layout_features.get("slideLayouts", [])
             
-            # 获取PPT模板路径
-            ppt_template_path = state.ppt_template_path
-            
-            # 获取母版布局信息
-            master_layouts = []
-            if self.ppt_manager and ppt_template_path:
-                logger.info(f"正在获取PPT母版布局信息: {ppt_template_path}")
-                try:
-                    # 加载PPT演示文稿
-                    presentation = self.ppt_manager.load_presentation(ppt_template_path)
-                    # 获取母版布局信息
-                    master_layouts = self.ppt_manager.get_layouts_json(presentation)
-                    logger.info(f"成功获取母版布局信息，共 {len(master_layouts)} 个布局")
-                except Exception as e:
-                    logger.warning(f"获取母版布局信息失败: {str(e)}，将使用默认布局")
-            else:
-                logger.warning("未初始化PPTManager或未提供PPT模板路径，将使用默认布局")
-                
             # 使用LLM生成完整PPT内容规划（包括开篇页、内容页和结束页）
             content_plan = await self._generate_content_plan(
                 sections, 
-                available_layouts, 
-                title,
-                subtitle,
-                ppt_template_path,
-                master_layouts
+                available_layouts
             )
             
             # 检查内容计划是否为空或无效
@@ -140,11 +118,7 @@ class ContentPlanningAgent(BaseAgent):
     async def _generate_content_plan(
         self, 
         sections: List[Dict[str, Any]], 
-        available_layouts: List[Dict[str, Any]],
-        title: str,
-        subtitle: str,
-        ppt_template_path: Optional[str] = None,
-        master_layouts: Optional[List[Dict[str, Any]]] = None
+        available_layouts: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
         生成完整的内容规划，包括开篇页、内容页和结束页
@@ -152,16 +126,12 @@ class ContentPlanningAgent(BaseAgent):
         Args:
             sections: 内容章节列表
             available_layouts: 基于视觉分析的可用布局列表
-            title: 文档标题
-            subtitle: 文档副标题
-            ppt_template_path: PPT模板文件路径
-            master_layouts: 母版布局信息列表
             
         Returns:
             完整的内容规划
         """
         # 构建提示词
-        prompt = self._build_planning_prompt(sections, available_layouts, title, subtitle, master_layouts)
+        prompt = self._build_planning_prompt(sections, available_layouts)
         
         # 使用重试机制生成内容计划
         empty_plan = {"slides": [], "slide_count": 0}
@@ -179,7 +149,7 @@ class ContentPlanningAgent(BaseAgent):
             )
             
             # 解析LLM响应
-            content_plan = self._parse_llm_response(response, sections, available_layouts, title, subtitle)
+            content_plan = self._parse_llm_response(response, sections, available_layouts)
             
             # 检查规划结果是否有效
             slides_count = len(content_plan.get('slides', []))
@@ -200,10 +170,7 @@ class ContentPlanningAgent(BaseAgent):
     def _build_planning_prompt(
         self, 
         sections: List[Dict[str, Any]], 
-        layouts: List[Dict[str, Any]],
-        title: str,
-        subtitle: str,
-        master_layouts: Optional[List[Dict[str, Any]]] = None
+        layouts: List[Dict[str, Any]]
     ) -> str:
         """
         构建用于内容规划的提示词
@@ -211,9 +178,6 @@ class ContentPlanningAgent(BaseAgent):
         Args:
             sections: 内容章节列表
             layouts: 可用布局列表（基于视觉分析）
-            title: 文档标题
-            subtitle: 文档副标题
-            master_layouts: 母版布局信息列表
             
         Returns:
             提示词
@@ -225,27 +189,17 @@ class ContentPlanningAgent(BaseAgent):
         # 构建上下文
         context = {
             "sections_json": sections_json,
-            "layouts_json": layouts_json,
-            "title": title,
-            "subtitle": subtitle
+            "layouts_json": layouts_json
         }
         
-        # 如果有母版布局信息，添加到上下文
-        if master_layouts:
-            master_layouts_json = json.dumps(master_layouts, ensure_ascii=False, indent=2)
-            context["master_layouts_json"] = master_layouts_json
-            logger.info("已添加母版布局信息到规划提示词")
-        
-        # 使用ModelManager的render_template方法渲染模板
-        return self.model_manager.render_template(CONTENT_PLANNING_PROMPT, context)
+        # 使用新的YAML格式prompt加载器
+        return prompt_loader.render_prompt("content_planning_prompts", context)
     
     def _parse_llm_response(
         self, 
         response: str, 
         sections: List[Dict[str, Any]], 
-        layouts: List[Dict[str, Any]],
-        title: str,
-        subtitle: str
+        layouts: List[Dict[str, Any]]
     ) -> Dict[str, Any]:
         """
         解析LLM响应，提取内容规划
@@ -254,8 +208,6 @@ class ContentPlanningAgent(BaseAgent):
             response: LLM响应文本
             sections: 原始章节列表（用于回退）
             layouts: 可用布局列表（用于回退）
-            title: 文档标题（用于回退）
-            subtitle: 文档副标题（用于回退）
             
         Returns:
             内容规划字典
