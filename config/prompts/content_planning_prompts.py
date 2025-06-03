@@ -186,7 +186,16 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
 13. **生成的所有JSON数据必须符合严格的JSON语法规范，不得有任何格式错误**
 
 # 6. 输出格式
-必须按以下JSON格式返回你的规划：
+
+**重要：JSON格式严格要求**
+你必须按照以下JSON格式返回规划，并严格遵守JSON语法规范：
+
+1. **所有slide对象必须放在slides数组中**
+2. **不允许在slides数组外单独放置slide对象**
+3. **每个slide对象都必须用逗号分隔，最后一个对象后面不加逗号**
+4. **所有字符串必须用双引号包围**
+5. **所有对象和数组的大括号、中括号必须正确配对**
+
 ```json
 {
   "slides": [
@@ -292,205 +301,32 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
           }
         ]
       }
-    },
-    {
-      "page_number": 2,
-      "slide_id": "slide_000002",
-      "slide_type": "section_header",
-      "section": {
-        "title": "章节标题",
-        "type": "section_index",
-        "content": []
-      },
-      "template": {
-        "slide_index": 6,
-        "layout": "Section Header 2"
-      },
-      "reasoning": "选择这个布局的理由，包括与内容的匹配情况",
-      "content_match_details": {
-        "editable_areas_match": "布局有title_elements=1, total=1; 内容需要1个标题，总计1个元素，完美匹配",
-        "word_count_match": "布局title元素word_count为20，内容标题word_count为4（满足容量要求：4 <= 20 <= 5）",
-        "semantic_type_match": "布局semantic_type为section_header，与内容type为section_index匹配",
-        "element_mapping": [
-          {
-            "section_element": "章节标题",
-            "layout_element": {
-              "position": "页面中部居中",
-              "current_text": "章节标题"
-            }
-          }
-        ]
-      }
-    },
-    {
-      "page_number": 3,
-      "slide_id": "slide_000003",
-      "slide_type": "content",
-      "section": {
-        "title": "子章节标题",
-        "content": [
-          {
-            "type": "paragraph",
-            "content": "这是一段解释性文本，包含了这个章节的关键内容。",
-            "word_count": 20
-          },
-          {
-            "type": "bullet_list",
-            "items": [
-              {"content": "内容项1", "word_count": 4},
-              {"content": "内容项2", "word_count": 4}
-            ],
-            "item_count": 2,
-            "total_word_count": 8
-          }
-        ]
-      },
-      "template": {
-        "slide_index": 5,
-        "layout": "Content with Bullets"
-      },
-      "reasoning": "选择这个布局的理由，包括项目符号数量与内容items的匹配情况",
-      "content_match_details": {
-        "editable_areas_match": "布局有title_elements=1, paragraph_single=1, paragraph_multi=1, total=3; 内容需要1个标题、1个段落和1个列表，总计3个元素，完美匹配",
-        "word_count_match": "布局title元素word_count为15，内容标题word_count为6（满足容量要求：6 <= 15 <= 18）; 布局paragraph_single元素word_count为30，内容段落word_count为20（满足容量要求：20 <= 30 <= 24）; 布局paragraph_multi元素word_count为20，内容列表total_word_count为8（满足容量要求：8 <= 20 <= 10）",
-        "semantic_type_match": "布局type为内容页，与内容完全匹配",
-        "element_mapping": [
-          {
-            "section_element": "子章节标题",
-            "layout_element": {
-              "position": "页面上部居中",
-              "current_text": "子章节标题"
-            }
-          },
-          {
-            "section_element": "这是一段解释性文本，包含了这个章节的关键内容。",
-            "layout_element": {
-              "position": "页面中部",
-              "current_text": "这是一段解..."
-            }
-          },
-          {
-            "section_element": ["内容项1", "内容项2"],
-            "layout_element": {
-              "position": "页面下部",
-              "current_text": "• 内容项1..."
-            }
-          }
-        ]
-      }
-    },
-    {
-      "page_number": 4,
-      "slide_id": "slide_000004",
-      "slide_type": "content",
-      "section": {
-        "title": "核心特性",
-        "content": [
-          {
-            "type": "feature_group",
-            "items": [
-              {"title": "特性一", "description": "特性一的详细描述", "title_word_count": 3, "description_word_count": 9},
-              {"title": "特性二", "description": "特性二的详细描述", "title_word_count": 3, "description_word_count": 9},
-              {"title": "特性三", "description": "特性三的详细描述", "title_word_count": 3, "description_word_count": 9},
-              {"title": "特性四", "description": "特性四的详细描述", "title_word_count": 3, "description_word_count": 9}
-            ],
-            "item_count": 4,
-            "total_word_count": 48
-          }
-        ]
-      },
-      "template": {
-        "slide_index": 4,
-        "layout": "Feature Grid"
-      },
-      "reasoning": "选择这个布局的理由，内容包含4个平行概念/特性，适合使用网格布局展示",
-      "content_match_details": {
-        "editable_areas_match": "布局有title_elements=1, shape_label=4, shape_content=4, total=9; 内容需要1个标题和4组特性（每组包含标题和描述），总计9个元素，完美匹配",
-        "word_count_match": "布局title元素word_count为10，内容标题word_count为4（满足容量要求：4 <= 10 <= 5）; 布局shape_label元素word_count均为5，内容特性标题word_count均为3（满足容量要求：3 <= 5 <= 4）; 布局shape_content元素word_count均为12，内容特性描述word_count均为9（满足容量要求：9 <= 12 <= 11）",
-        "semantic_type_match": "布局type为网格布局，与内容relation_type为grid完全匹配",
-        "element_mapping": [
-          {
-            "section_element": "核心特性",
-            "layout_element": {
-              "position": "页面中部居中",
-              "current_text": "核心特性"
-            }
-          },
-          {
-            "section_element": {
-              "title": "特性一",
-              "description": "特性一的详细描述"
-            },
-            "layout_element": {
-              "title": {
-                "position": "页面左上部",
-                "current_text": "特性一"
-              },
-              "description": {
-                "position": "页面左上部标题下",
-                "current_text": "特性一的详..."
-              }
-            }
-          },
-          {
-            "section_element": {
-              "title": "特性二",
-              "description": "特性二的详细描述"
-            },
-            "layout_element": {
-              "title": {
-                "position": "页面左上部",
-                "current_text": "特性二"
-              },
-              "description": {
-                "position": "页面左上部标题下",
-                "current_text": "特性二的详..."
-              }
-            }
-          },
-          {
-            "section_element": {
-              "title": "特性三",
-              "description": "特性三的详细描述"
-            },
-            "layout_element": {
-              "title": {
-                "position": "页面左上部",
-                "current_text": "特性三"
-              },
-              "description": {
-                "position": "页面左上部标题下",
-                "current_text": "特性三的详..."
-              }
-            }
-          },
-          {
-            "section_element": {
-              "title": "特性四",
-              "description": "特性四的详细描述"
-            },
-            "layout_element": {
-              "title": {
-                "position": "页面左上部",
-                "current_text": "特性四"
-              },
-              "description": {
-                "position": "页面左上部标题下",
-                "current_text": "特性四的详..."
-              }
-            }
-          }
-        ]
-      }
     }
   ],
-  "slide_count": 5,
-  "used_slide_indices": [0, 1, 6, 5, 4]
+  "slide_count": 2,
+  "used_slide_indices": [0, 1]
 }
 ```
-}
 
-# 7. 输出检查清单
+# 7. JSON格式检查清单
+
+**在输出前，请严格检查以下JSON格式要求：**
+
+1. ✓ **顶层结构正确**：必须是一个包含"slides"数组、"slide_count"和"used_slide_indices"的对象
+2. ✓ **slides数组完整**：所有slide对象都必须在slides数组内，不允许在数组外出现独立的slide对象
+3. ✓ **JSON语法正确**：
+   - 所有字符串都用双引号包围
+   - 对象属性间用逗号分隔
+   - 对象和数组的大括号、中括号正确配对
+   - 最后一个元素后面不加逗号
+4. ✓ **数据类型正确**：
+   - page_number、slide_index、slide_count必须是数字
+   - slide_id、layout、position、current_text等必须是字符串
+   - content数组、items数组、element_mapping数组格式正确
+5. ✓ **必填字段完整**：每个slide都包含page_number、slide_id、slide_type、section、template、reasoning、content_match_details
+6. ✓ **element_mapping格式正确**：每个映射项都包含section_element和layout_element，且layout_element包含position和current_text字段
+
+# 8. 输出检查清单
 1. ✓ 包含开篇页和结束页
 2. ✓ 为每个章节和子章节选择合适布局，内容较多时适当拆分
 3. ✓ 主章节标题单独作为章节索引页，每个章节页使用不同的布局样式
@@ -507,5 +343,6 @@ CONTENT_PLANNING_PROMPT = """你是一位专业的PPT设计师，需要为以下
 14. ✓ 每个slide的content_match_details中包含element_mapping，清晰记录section元素与布局元素的精确对应关系
 15. ✓ 第一页封面幻灯片必须包含完整的content_match_details.element_mapping，包括标题、副标题、说明文字等所有元素
 16. ✓ 确保每个元素的layout_element都包含正确的position和current_text描述，便于后续精确定位
+17. ✓ **JSON格式完全正确，可以直接被JSON解析器解析，无任何语法错误**
 
-只返回JSON，不要包含其他解释或评论。""" 
+**最终要求：只返回符合JSON格式规范的完整内容，不要包含其他解释或评论。所有slide对象必须在slides数组中，确保JSON可以被正常解析。**""" 
