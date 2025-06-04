@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, Boolean, ForeignKey, Float
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -54,6 +54,25 @@ class GenerationTask(Base):
     completed_at = Column(DateTime)
     
     template = relationship("Template")
+
+class ModelConfig(Base):
+    """大模型配置表"""
+    __tablename__ = "model_configs"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), nullable=False)  # 配置名称，如 "GPT-4"
+    model_type = Column(String(20), nullable=False)  # 模型类型：llm, vision, deepthink
+    api_key = Column(String(255), nullable=False)  # API密钥
+    api_base = Column(String(255), nullable=False)  # API基础URL
+    model_name = Column(String(100), nullable=False)  # 模型名称，如 "gpt-4"
+    max_tokens = Column(Integer, default=128000)  # 最大token数
+    temperature = Column(Float, default=0.7)  # 温度参数
+    is_active = Column(Boolean, default=False)  # 是否为当前激活的配置
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_by = Column(Integer, ForeignKey("users.id"))
+    
+    creator = relationship("User")
 
 # 添加关系
 User.templates = relationship("Template", back_populates="creator") 

@@ -13,7 +13,7 @@ export function useMarkdown() {
   const { markdownContent, setMarkdownContent, clearMarkdownContent } = editorStore
   
   // Markdown编辑器值
-  const editorValue = ref(markdownContent.value)
+  const editorValue = ref(markdownContent)
   
   // 监听编辑器值变化，同步到store
   watch(editorValue, (newValue) => {
