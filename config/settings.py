@@ -84,10 +84,56 @@ class Settings:
         self.CACHE_DIR = self.WORKSPACE_DIR / "cache"
         self.CACHE_DIR.mkdir(parents=True, exist_ok=True)
         
+        # 模型请求间隔配置（毫秒）
+        self.MODEL_REQUEST_INTERVALS = {
+            "text": int(os.environ.get("TEXT_MODEL_REQUEST_INTERVAL", "100")),      # 文本模型请求间隔
+            "vision": int(os.environ.get("VISION_MODEL_REQUEST_INTERVAL", "200")), # 视觉模型请求间隔
+            "deep_thinking": int(os.environ.get("DEEPTHINK_MODEL_REQUEST_INTERVAL", "150")), # 深度思考模型请求间隔
+            "embedding": int(os.environ.get("EMBEDDING_MODEL_REQUEST_INTERVAL", "50"))  # 嵌入模型请求间隔
+        }
+        
         # 保留基础的环境变量配置作为回退方案（如果数据库配置不可用）
         self.FALLBACK_OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
         
         logger.info(f"加载系统配置，项目根目录: {self.BASE_DIR}")
+    
+    def get_model_defaults(self, model_type: str) -> Dict[str, Any]:
+        """
+        获取指定模型类型的默认参数
+        
+        Args:
+            model_type: 模型类型 (text, vision, deep_thinking, embedding)
+            
+        Returns:
+            包含默认参数的字典
+        """
+        # 根据模型类型返回相应的默认参数
+        if model_type == "text":
+            return {
+                "temperature": float(os.environ.get("LLM_TEMPERATURE", "0.2")),
+                "max_tokens": int(os.environ.get("LLM_MAX_TOKENS", "32768"))
+            }
+        elif model_type == "vision":
+            return {
+                "temperature": float(os.environ.get("VISION_TEMPERATURE", "0.2")),
+                "max_tokens": int(os.environ.get("VISION_MAX_TOKENS", "32768"))
+            }
+        elif model_type == "deep_thinking":
+            return {
+                "temperature": float(os.environ.get("DEEPTHINK_TEMPERATURE", "0.2")),
+                "max_tokens": int(os.environ.get("DEEPTHINK_MAX_TOKENS", "40960"))
+            }
+        elif model_type == "embedding":
+            return {
+                "dimensions": int(os.environ.get("EMBEDDING_DIMENSIONS", "1536"))
+            }
+        else:
+            # 对于未知类型，返回文本模型的默认参数
+            logger.warning(f"未知模型类型: {model_type}，使用text类型默认参数")
+            return {
+                "temperature": float(os.environ.get("LLM_TEMPERATURE", "0.2")),
+                "max_tokens": int(os.environ.get("LLM_MAX_TOKENS", "32768"))
+            }
     
     def get_workflow_config_path(self, workflow_name: str) -> Path:
         """

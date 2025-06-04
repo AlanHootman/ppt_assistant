@@ -27,9 +27,16 @@ export const useModelConfigStore = defineStore('modelConfig', () => {
         configs.value = []
       }
     } catch (err) {
-      console.error('获取配置失败:', err)
-      error.value = err instanceof Error ? err.message : '获取配置失败'
-      configs.value = []
+      // 对于401错误（未认证），这在首页是预期的，不需要记录错误
+      if (err instanceof Error && (err.message.includes('401') || err.message.includes('Unauthorized'))) {
+        console.info('未认证访问，使用默认配置')
+        configs.value = []
+        error.value = null // 清除错误状态
+      } else {
+        console.error('获取配置失败:', err)
+        error.value = err instanceof Error ? err.message : '获取配置失败'
+        configs.value = []
+      }
     } finally {
       loading.value = false
     }
@@ -43,7 +50,13 @@ export const useModelConfigStore = defineStore('modelConfig', () => {
         activeConfigs.value = response.data
       }
     } catch (error) {
-      console.error('获取激活配置失败:', error)
+      // 对于401错误，静默处理，保持activeConfigs为空对象
+      if (error instanceof Error && (error.message.includes('401') || error.message.includes('Unauthorized'))) {
+        console.info('未认证访问激活配置，将使用默认配置')
+        activeConfigs.value = {}
+      } else {
+        console.error('获取激活配置失败:', error)
+      }
     }
   }
 

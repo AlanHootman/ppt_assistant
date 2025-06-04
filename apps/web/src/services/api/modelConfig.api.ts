@@ -1,5 +1,5 @@
 import type { AxiosResponse } from 'axios'
-import { get, post, put, del } from '../api'
+import { get, post, put, del } from './index'
 import type { ModelConfig, ModelConfigCreate, ModelConfigUpdate, ActiveModelConfigs } from '../../types/modelConfig'
 
 interface ModelConfigListResponse {
