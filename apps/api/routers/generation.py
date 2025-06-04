@@ -106,13 +106,25 @@ async def create_generation_task(
     )
     
     # 提交Celery任务，使用API生成的task_id
+    # 准备任务数据，确保所有数据都可以JSON序列化
+    task_data = {
+        "template_id": request.template_id,
+        "markdown_content": request.markdown_content,
+        "enable_multimodal_validation": request.enable_multimodal_validation,
+    }
+    
+    # 如果有deepthink配置，转换为字典格式
+    if request.deepthink_config:
+        task_data["deepthink_config"] = {
+            "model_name": request.deepthink_config.model_name,
+            "api_key": request.deepthink_config.api_key,
+            "api_base": request.deepthink_config.api_base,
+            "max_tokens": request.deepthink_config.max_tokens,
+            "temperature": request.deepthink_config.temperature
+        }
+    
     generate_ppt_task.apply_async(
-        args=[{
-            "template_id": request.template_id,
-            "markdown_content": request.markdown_content,
-            "enable_multimodal_validation": request.enable_multimodal_validation,
-            "deepthink_config": request.deepthink_config
-        }],
+        args=[task_data],
         task_id=task_id  # 强制使用API生成的task_id
     )
     
