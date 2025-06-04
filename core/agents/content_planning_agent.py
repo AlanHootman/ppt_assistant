@@ -78,7 +78,7 @@ class ContentPlanningAgent(BaseAgent):
             title = state.content_structure.get("title", "无标题")
             subtitle = state.content_structure.get("subtitle", "")
             available_layouts = state.layout_features.get("slideLayouts", [])
-            
+                
             # 使用LLM生成完整PPT内容规划（包括开篇页、内容页和结束页）
             content_plan = await self._generate_content_plan(
                 sections, 
@@ -213,9 +213,11 @@ class ContentPlanningAgent(BaseAgent):
             内容规划字典
         """
         try:
-            # 提取并清理JSON响应
+            # 直接提取JSON响应，不进行清理
             json_text = self.model_helper.extract_json_from_response(response)
-            json_text = self._clean_json_text(json_text)
+            
+            # 记录提取的JSON文本长度用于调试
+            logger.info(f"提取的JSON文本长度: {len(json_text)} 字符")
             
             # 解析JSON
             content_plan = json.loads(json_text)
@@ -239,36 +241,22 @@ class ContentPlanningAgent(BaseAgent):
                     "slide_count": len(content_plan) if isinstance(content_plan, list) else 0
                 }
                 
-        except Exception as e:
-            logger.error(f"解析LLM响应失败: {str(e)}")
-            logger.error(f"响应内容前100字符: {response[:100]}")
+        except json.JSONDecodeError as e:
+            logger.error(f"JSON解析失败: {str(e)}")
+            logger.error(f"错误位置 - 行: {e.lineno}, 列: {e.colno}, 字符位置: {e.pos}")
+            # 记录问题的JSON片段（错误位置前后50个字符）
+            if hasattr(e, 'pos') and e.pos > 0:
+                start_pos = max(0, e.pos - 50)
+                end_pos = min(len(json_text), e.pos + 50)
+                error_context = json_text[start_pos:end_pos]
+                logger.error(f"错误上下文: ...{error_context}...")
             # 返回空的内容规划
             return {"slides": [], "slide_count": 0}
-    
-    def _clean_json_text(self, json_text: str) -> str:
-        """
-        清理并修复常见的JSON语法错误
-        
-        Args:
-            json_text: 原始JSON文本
-            
-        Returns:
-            清理后的JSON文本
-        """
-        # 删除注释
-        json_text = re.sub(r'//.*?\n', '\n', json_text)
-        json_text = re.sub(r'/\*.*?\*/', '', json_text, flags=re.DOTALL)
-        
-        # 修复尾部逗号
-        json_text = re.sub(r',(\s*[\]}])', r'\1', json_text)
-        
-        # 修复缺少引号的键名
-        json_text = re.sub(r'([{,]\s*)(\w+)(\s*:)', r'\1"\2"\3', json_text)
-        
-        # 修复单引号
-        json_text = re.sub(r"'(.*?)'", r'"\1"', json_text)
-        
-        return json_text
+        except Exception as e:
+            logger.error(f"解析LLM响应失败: {str(e)}")
+            logger.error(f"响应类型: {type(response)}, 响应长度: {len(response) if response else 0}")
+            # 返回空的内容规划
+            return {"slides": [], "slide_count": 0}
     
     def add_checkpoint(self, state: AgentState) -> None:
         """
