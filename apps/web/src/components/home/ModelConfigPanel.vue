@@ -19,7 +19,7 @@
           </el-tag>
           
           <!-- 下拉选择框 -->
-          <div v-if="showDropdown && deepthinkConfigs.length > 1" class="dropdown">
+          <div v-if="showDropdown && deepthinkConfigs.length > 1" class="dropdown" :style="dropdownStyle">
             <div 
               v-for="config in deepthinkConfigs" 
               :key="config.id"
@@ -80,6 +80,7 @@ const {
 } = useUserModels()
 
 const showDropdown = ref(false)
+const dropdownStyle = ref({})
 const loading = computed(() => modelConfigStore.loading)
 
 // 多模态检测设置
@@ -88,9 +89,46 @@ const enableMultimodalValidation = computed({
   set: (value) => emit('update:enableMultimodalValidation', value)
 })
 
+// 计算下拉框位置
+function calculateDropdownPosition() {
+  const tagElement = document.querySelector('.deepthink-selector .el-tag')
+  if (!tagElement) return {}
+  
+  const rect = tagElement.getBoundingClientRect()
+  const viewportHeight = window.innerHeight
+  const dropdownHeight = 180 // 最大高度
+  
+  // 检查下方是否有足够空间
+  const spaceBelow = viewportHeight - rect.bottom
+  const spaceAbove = rect.top
+  
+  let top, left, width
+  
+  if (spaceBelow >= dropdownHeight || spaceBelow >= spaceAbove) {
+    // 下方有足够空间或下方空间比上方多，向下展开
+    top = rect.bottom + 4
+  } else {
+    // 向上展开
+    top = rect.top - Math.min(dropdownHeight, spaceAbove) - 4
+  }
+  
+  left = rect.left
+  width = Math.max(rect.width, 200) // 确保最小宽度
+  
+  return {
+    top: `${top}px`,
+    left: `${left}px`,
+    width: `${width}px`
+  }
+}
+
 // 切换下拉框显示
 function toggleDropdown() {
   if (deepthinkConfigs.value.length > 1) {
+    if (!showDropdown.value) {
+      // 计算位置后再显示
+      dropdownStyle.value = calculateDropdownPosition()
+    }
     showDropdown.value = !showDropdown.value
   }
 }
@@ -110,13 +148,27 @@ function onMultimodalChange(value: boolean) {
 // 点击外部关闭下拉框
 function handleClickOutside(event: Event) {
   const target = event.target as HTMLElement
-  if (!target.closest('.model-config-panel')) {
+  if (!target.closest('.deepthink-selector')) {
     showDropdown.value = false
   }
 }
 
+// 窗口滚动或大小变化时重新计算位置
+function handlePositionUpdate() {
+  if (showDropdown.value) {
+    dropdownStyle.value = calculateDropdownPosition()
+  }
+}
+
+// 窗口大小变化时关闭下拉框
+function handleResize() {
+  showDropdown.value = false
+}
+
 onMounted(async () => {
   document.addEventListener('click', handleClickOutside)
+  window.addEventListener('scroll', handlePositionUpdate, true) // 使用捕获模式监听所有滚动
+  window.addEventListener('resize', handleResize)
   
   try {
     // 尝试初始化模型配置数据
@@ -137,6 +189,8 @@ onMounted(async () => {
 
 onUnmounted(() => {
   document.removeEventListener('click', handleClickOutside)
+  window.removeEventListener('scroll', handlePositionUpdate, true)
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 
@@ -172,11 +226,14 @@ onUnmounted(() => {
 
 .deepthink-selector {
   position: relative;
+  z-index: 10;
 }
 
 .deepthink-selector .el-tag.clickable {
   cursor: pointer;
   transition: all 0.2s ease;
+  position: relative;
+  z-index: 11;
 }
 
 .deepthink-selector .el-tag.clickable:hover {
@@ -190,18 +247,14 @@ onUnmounted(() => {
 }
 
 .dropdown {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  right: 0;
+  position: fixed;
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 6px;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
   max-height: 180px;
   overflow-y: auto;
-  margin-top: 4px;
   min-width: 200px;
 }
 
