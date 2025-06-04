@@ -208,17 +208,6 @@ ppt-assisstant/
 ## 🙏 致谢
 本项目核心思想来源于[PPTAgent](https://github.com/icip-cas/PPTAgent)提出的**多模态大语言模型+Agent框架**。我们诚挚感谢该项目提供的创新思路，这为本工程的设计和实现奠定了关键基础。
 
-## 📚 引用声明
-如果您在研究中使用了本项目，请引用启发我们工作的原始PPTAgent项目：
-```bibtex
-@article{zheng2025pptagent,
-  title={PPTAgent: Generating and Evaluating Presentations Beyond Text-to-Slides},
-  author={Zheng, Hao and Guan, Xinyan and Kong, Hao and Zheng, Jia and Zhou, Weixiang and Lin, Hongyu and Lu, Yaojie and He, Ben and Han, Xianpei and Sun, Le},
-  journal={arXiv preprint arXiv:2501.03936},
-  year={2025}
-}
-```
-
 ## 常见问题
 - 问题1： PPT生成过程中，提示"内容规划失败，无法获取内容规划结果".
   问题原因：这种情况是大模型返回的内容存在异常，比如：未按照要求返回。具体可以通过mlflow调试页面查看返回内容。
