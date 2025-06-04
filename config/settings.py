@@ -92,9 +92,6 @@ class Settings:
             "embedding": int(os.environ.get("EMBEDDING_MODEL_REQUEST_INTERVAL", "50"))  # 嵌入模型请求间隔
         }
         
-        # 保留基础的环境变量配置作为回退方案（如果数据库配置不可用）
-        self.FALLBACK_OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-        
         logger.info(f"加载系统配置，项目根目录: {self.BASE_DIR}")
     
     def get_model_defaults(self, model_type: str) -> Dict[str, Any]:
