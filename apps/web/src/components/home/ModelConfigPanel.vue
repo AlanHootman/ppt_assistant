@@ -3,20 +3,29 @@
     <div class="config-header">
       <span class="config-title">当前模型</span>
       <div class="model-summary">
-        <el-tag size="small" type="primary">{{ currentModels.llm?.model_name || 'LLM未配置' }}</el-tag>
-        <el-tag size="small" type="success">{{ currentModels.vision?.model_name || 'Vision未配置' }}</el-tag>
+        <div class="model-item">
+          <span class="model-label">LLM:</span>
+          <el-tag size="small" type="primary">{{ currentModels.llm?.model_name || '未配置' }}</el-tag>
+        </div>
+        <div class="model-item">
+          <span class="model-label">Vision:</span>
+          <el-tag size="small" type="success">{{ currentModels.vision?.model_name || '未配置' }}</el-tag>
+        </div>
         <div class="deepthink-selector">
-          <el-tag 
-            size="small" 
-            type="warning"
-            :class="{ 'clickable': deepthinkConfigs.length > 1 }"
-            @click="toggleDropdown"
-          >
-            {{ currentModels.deepthink?.model_name || 'DeepThink未配置' }}
-            <el-icon v-if="deepthinkConfigs.length > 1" class="dropdown-icon">
-              <ArrowDown />
-            </el-icon>
-          </el-tag>
+          <div class="model-item">
+            <span class="model-label">DeepThink:</span>
+            <el-tag 
+              size="small" 
+              type="warning"
+              :class="{ 'clickable': deepthinkConfigs.length > 1 }"
+              @click="toggleDropdown"
+            >
+              {{ currentModels.deepthink?.model_name || '未配置' }}
+              <el-icon v-if="deepthinkConfigs.length > 1" class="dropdown-icon">
+                <ArrowDown />
+              </el-icon>
+            </el-tag>
+          </div>
           
           <!-- 下拉选择框 -->
           <div v-if="showDropdown && deepthinkConfigs.length > 1" class="dropdown" :style="dropdownStyle">
@@ -224,6 +233,19 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+.model-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.model-label {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .deepthink-selector {
   position: relative;
   z-index: 10;
@@ -332,6 +354,14 @@ onUnmounted(() => {
   .model-summary {
     flex-wrap: wrap;
     gap: 6px;
+  }
+  
+  .model-item {
+    gap: 3px;
+  }
+  
+  .model-label {
+    font-size: 10px;
   }
   
   .setting-row {
