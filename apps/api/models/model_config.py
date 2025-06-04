@@ -5,7 +5,7 @@ from datetime import datetime
 class ModelConfigBase(BaseModel):
     """大模型配置基础模型"""
     name: str = Field(..., description="配置名称")
-    model_type: str = Field(..., description="模型类型", regex="^(llm|vision|deepthink)$")
+    model_type: str = Field(..., description="模型类型", pattern="^(llm|vision|deepthink)$")
     api_key: str = Field(..., description="API密钥")
     api_base: str = Field(..., description="API基础URL")
     model_name: str = Field(..., description="模型名称")
@@ -49,5 +49,5 @@ class ActiveModelConfigResponse(BaseModel):
 
 class SetActiveModelRequest(BaseModel):
     """设置激活模型请求"""
-    model_type: str = Field(..., regex="^(llm|vision|deepthink)$")
+    model_type: str = Field(..., pattern="^(llm|vision|deepthink)$")
     config_id: int = Field(..., description="配置ID") 

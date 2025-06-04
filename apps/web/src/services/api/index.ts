@@ -15,7 +15,7 @@ apiClient.interceptors.request.use(
   (config) => {
     // 在发送请求之前做些什么
     // 例如添加token
-    const token = localStorage.getItem('access_token')
+    const token = localStorage.getItem('admin_token')
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -38,7 +38,7 @@ apiClient.interceptors.response.use(
     // 例如，可以统一处理401登录状态失效的情况
     if (error.response && error.response.status === 401) {
       // 清除登录状态
-      localStorage.removeItem('access_token')
+      localStorage.removeItem('admin_token')
       // 跳转到登录页
       // router.push('/login')
     }

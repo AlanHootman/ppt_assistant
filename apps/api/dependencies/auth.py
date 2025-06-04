@@ -4,7 +4,7 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
-from apps.api.models import get_db
+from apps.api.dependencies.database import get_db
 from apps.api.models.database import User
 from apps.api.config import settings
 from pydantic import BaseModel

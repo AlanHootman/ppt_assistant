@@ -43,6 +43,15 @@ const adminRoutes: RouteRecordRaw[] = [
           title: '模板详情',
           requiresAuth: true
         }
+      },
+      {
+        path: 'model-config',
+        name: 'model-config-management',
+        component: () => import('../pages/admin/ModelConfigManagement.vue'),
+        meta: { 
+          title: '模型配置',
+          requiresAuth: true
+        }
       }
     ]
   }

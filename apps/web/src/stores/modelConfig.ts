@@ -7,12 +7,29 @@ export const useModelConfigStore = defineStore('modelConfig', () => {
   const configs = ref<ModelConfig[]>([])
   const activeConfigs = ref<ActiveModelConfigs>({})
   const loading = ref(false)
+  const error = ref<string | null>(null)
 
   const fetchConfigs = async (modelType?: string) => {
     loading.value = true
+    error.value = null
     try {
+      console.log('正在获取配置，模型类型:', modelType)
       const response = await modelConfigApi.getConfigs(modelType)
-      configs.value = response.data.configs
+      console.log('API响应:', response)
+      
+      // 处理统一的API响应格式 {code, message, data}
+      if (response && response.data && response.data.configs && Array.isArray(response.data.configs)) {
+        configs.value = response.data.configs
+        console.log('成功获取配置:', configs.value)
+      } else {
+        console.error('API响应数据格式不正确:', response)
+        error.value = 'API响应数据格式不正确'
+        configs.value = []
+      }
+    } catch (err) {
+      console.error('获取配置失败:', err)
+      error.value = err instanceof Error ? err.message : '获取配置失败'
+      configs.value = []
     } finally {
       loading.value = false
     }
@@ -21,44 +38,75 @@ export const useModelConfigStore = defineStore('modelConfig', () => {
   const fetchActiveConfigs = async () => {
     try {
       const response = await modelConfigApi.getActiveConfigs()
-      activeConfigs.value = response.data
+      console.log('获取激活配置响应:', response)
+      if (response && response.data) {
+        activeConfigs.value = response.data
+      }
     } catch (error) {
       console.error('获取激活配置失败:', error)
     }
   }
 
   const createConfig = async (configData: ModelConfigCreate) => {
-    const response = await modelConfigApi.createConfig(configData)
-    configs.value.push(response.data)
-    return response.data
+    try {
+      const response = await modelConfigApi.createConfig(configData)
+      console.log('创建配置响应:', response)
+      if (response && response.data) {
+        configs.value.push(response.data)
+        return response.data
+      }
+      throw new Error('创建配置响应格式不正确')
+    } catch (error) {
+      console.error('创建配置失败:', error)
+      throw error
+    }
   }
 
   const updateConfig = async (id: number, configData: ModelConfigUpdate) => {
-    const response = await modelConfigApi.updateConfig(id, configData)
-    const index = configs.value.findIndex(config => config.id === id)
-    if (index !== -1) {
-      configs.value[index] = response.data
+    try {
+      const response = await modelConfigApi.updateConfig(id, configData)
+      console.log('更新配置响应:', response)
+      if (response && response.data) {
+        const index = configs.value.findIndex(config => config.id === id)
+        if (index !== -1) {
+          configs.value[index] = response.data
+        }
+        return response.data
+      }
+      throw new Error('更新配置响应格式不正确')
+    } catch (error) {
+      console.error('更新配置失败:', error)
+      throw error
     }
-    return response.data
   }
 
   const deleteConfig = async (id: number) => {
-    await modelConfigApi.deleteConfig(id)
-    configs.value = configs.value.filter(config => config.id !== id)
+    try {
+      await modelConfigApi.deleteConfig(id)
+      configs.value = configs.value.filter(config => config.id !== id)
+    } catch (error) {
+      console.error('删除配置失败:', error)
+      throw error
+    }
   }
 
   const setActiveConfig = async (modelType: string, configId: number) => {
-    await modelConfigApi.setActiveConfig(modelType, configId)
-    
-    // 更新本地状态
-    configs.value.forEach(config => {
-      if (config.model_type === modelType) {
-        config.is_active = config.id === configId
-      }
-    })
-    
-    // 重新获取激活配置
-    await fetchActiveConfigs()
+    try {
+      await modelConfigApi.setActiveConfig(modelType, configId)
+      
+      // 更新本地状态
+      configs.value.forEach(config => {
+        if (config.model_type === modelType) {
+          config.is_active = config.id === configId
+        }
+      })
+      
+      // 重新获取激活配置
+      await fetchActiveConfigs()
+    } catch (error) {
+      console.error('设置激活配置失败:', error)
+      throw error
+    }
   }
 
   const getActiveConfigByType = (modelType: string) => {
@@ -69,6 +117,7 @@ export const useModelConfigStore = defineStore('modelConfig', () => {
     configs,
     activeConfigs,
     loading,
+    error,
     fetchConfigs,
     fetchActiveConfigs,
     createConfig,

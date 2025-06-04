@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import logging
 from apps.api.config import settings
 from apps.api.models import init_db
-from apps.api.routers import auth, templates, generation, websocket, files
+from apps.api.routers import auth, templates, generation, websocket, files, model_config
 import os
 import time
 
@@ -69,6 +69,7 @@ app.include_router(templates.router, prefix=api_prefix, tags=["模板"])
 app.include_router(generation.router, prefix=api_prefix, tags=["生成"])
 app.include_router(websocket.router, prefix=api_prefix, tags=["WebSocket"])
 app.include_router(files.router, prefix=api_prefix, tags=["文件"])
+app.include_router(model_config.router, prefix=api_prefix, tags=["模型配置"])
 
 @app.on_event("startup")
 async def startup_event():

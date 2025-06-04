@@ -17,8 +17,26 @@ from ..services.model_config_service import ModelConfigService
 
 router = APIRouter(prefix="/model-configs", tags=["model-configs"])
 
+# 统一API响应格式
+class ApiResponse:
+    @staticmethod
+    def success(data=None, message="操作成功"):
+        return {
+            "code": 200,
+            "message": message,
+            "data": data
+        }
+    
+    @staticmethod
+    def error(message="操作失败", code=400):
+        return {
+            "code": code,
+            "message": message,
+            "data": None
+        }
 
-@router.post("/", response_model=ModelConfigResponse)
+
+@router.post("/")
 async def create_model_config(
     config_data: ModelConfigCreate,
     current_user: User = Depends(get_current_user),
@@ -29,7 +47,7 @@ async def create_model_config(
     
     try:
         config = service.create_config(config_data, current_user.id)
-        return config
+        return ApiResponse.success(config, "配置创建成功")
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -37,7 +55,7 @@ async def create_model_config(
         )
 
 
-@router.get("/", response_model=ModelConfigListResponse)
+@router.get("/")
 async def get_model_configs(
     model_type: Optional[str] = None,
     page: int = 1,
@@ -57,13 +75,13 @@ async def get_model_configs(
     
     configs, total = service.get_configs(model_type, page, limit)
     
-    return ModelConfigListResponse(
-        total=total,
-        configs=configs
-    )
+    return ApiResponse.success({
+        "total": total,
+        "configs": configs
+    }, "获取配置列表成功")
 
 
-@router.get("/active", response_model=ActiveModelConfigResponse)
+@router.get("/active")
 async def get_active_configs(
     db: Session = Depends(get_db)
 ):
@@ -71,14 +89,14 @@ async def get_active_configs(
     service = ModelConfigService(db)
     active_configs = service.get_active_configs()
     
-    return ActiveModelConfigResponse(
-        llm=active_configs["llm"],
-        vision=active_configs["vision"],
-        deepthink=active_configs["deepthink"]
-    )
+    return ApiResponse.success({
+        "llm": active_configs["llm"],
+        "vision": active_configs["vision"],
+        "deepthink": active_configs["deepthink"]
+    }, "获取激活配置成功")
 
 
-@router.get("/{config_id}", response_model=ModelConfigResponse)
+@router.get("/{config_id}")
 async def get_model_config(
     config_id: int,
     current_user: User = Depends(get_current_user),
@@ -94,10 +112,10 @@ async def get_model_config(
             detail="配置不存在"
         )
     
-    return config
+    return ApiResponse.success(config, "获取配置成功")
 
 
-@router.put("/{config_id}", response_model=ModelConfigResponse)
+@router.put("/{config_id}")
 async def update_model_config(
     config_id: int,
     config_data: ModelConfigUpdate,
@@ -114,7 +132,7 @@ async def update_model_config(
             detail="配置不存在"
         )
     
-    return config
+    return ApiResponse.success(config, "配置更新成功")
 
 
 @router.delete("/{config_id}")
@@ -134,7 +152,7 @@ async def delete_model_config(
                 detail="配置不存在"
             )
         
-        return {"message": "配置删除成功"}
+        return ApiResponse.success(None, "配置删除成功")
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -158,4 +176,4 @@ async def set_active_model(
             detail="设置激活配置失败，请检查配置ID和模型类型是否匹配"
         )
     
-    return {"message": f"{request.model_type}模型配置已切换成功"} 
+    return ApiResponse.success(None, f"{request.model_type}模型配置已切换成功") 

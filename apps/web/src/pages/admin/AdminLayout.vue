@@ -26,6 +26,11 @@
             <el-icon><Files /></el-icon>
             <template #title>模板管理</template>
           </el-menu-item>
+          
+          <el-menu-item index="/admin/model-config" route="/admin/model-config">
+            <el-icon><Setting /></el-icon>
+            <template #title>模型配置</template>
+          </el-menu-item>
         </el-menu>
       </nav>
     </aside>
@@ -89,7 +94,8 @@ import {
   Expand, 
   User, 
   ArrowDown, 
-  SwitchButton 
+  SwitchButton,
+  Setting
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '../../stores/auth'
 

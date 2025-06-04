@@ -10,7 +10,7 @@ interface ModelConfigListResponse {
 export const modelConfigApi = {
   // 获取配置列表
   getConfigs(modelType?: string, page = 1, limit = 100) {
-    return get<ModelConfigListResponse>('/model-configs', {
+    return get<ModelConfigListResponse>('/model-configs/', {
       model_type: modelType, 
       page, 
       limit
@@ -29,7 +29,7 @@ export const modelConfigApi = {
 
   // 创建配置
   createConfig(data: ModelConfigCreate) {
-    return post<ModelConfig>('/model-configs', data)
+    return post<ModelConfig>('/model-configs/', data)
   },
 
   // 更新配置

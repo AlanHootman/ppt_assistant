@@ -60,6 +60,14 @@
           </div>
         </el-card>
 
+        <el-card class="action-card" shadow="hover" @click="goToModelConfig">
+          <div class="action-content">
+            <el-icon class="action-icon"><Setting /></el-icon>
+            <h3>模型配置</h3>
+            <p>管理AI模型配置，设置API密钥和模型参数</p>
+          </div>
+        </el-card>
+
         <el-card class="action-card" shadow="hover" @click="goToHome">
           <div class="action-content">
             <el-icon class="action-icon"><House /></el-icon>
@@ -105,7 +113,8 @@ import {
   CircleCheck, 
   Loading, 
   CircleClose, 
-  House 
+  House,
+  Setting
 } from '@element-plus/icons-vue'
 import { useAuthStore } from '../../stores/auth'
 import { adminApi } from '../../services/api/admin.api'
@@ -148,6 +157,11 @@ const fetchTemplateStats = async () => {
 // 跳转到模板管理
 const goToTemplateManagement = () => {
   router.push('/admin/templates')
+}
+
+// 跳转到模型配置
+const goToModelConfig = () => {
+  router.push('/admin/model-config')
 }
 
 // 跳转到首页
