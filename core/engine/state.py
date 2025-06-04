@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 class AgentState:
     """工作流状态类"""
     
-    def __init__(self, session_id=None, raw_md=None, ppt_template_path=None, output_dir=None, content_structure=None, **kwargs):
+    def __init__(self, session_id=None, raw_md=None, ppt_template_path=None, output_dir=None, content_structure=None, 
+                 user_deepthink_config=None, **kwargs):
         """
         初始化代理状态
         
@@ -44,6 +45,7 @@ class AgentState:
             ppt_template_path (str, optional): PPT模板路径
             output_dir (str, optional): 输出目录路径
             content_structure (dict, optional): 内容结构
+            user_deepthink_config (dict, optional): 用户自定义的deepthink模型配置
             **kwargs: 其他动态属性
         """
         # 如果没有提供会话ID，自动生成一个
@@ -56,6 +58,9 @@ class AgentState:
         self.raw_md = raw_md  # 原始Markdown内容
         self.ppt_template_path = ppt_template_path  # PPT模板路径
         self.output_dir = output_dir  # 输出目录
+        
+        # 用户自定义模型配置
+        self.user_deepthink_config = user_deepthink_config  # 用户选择的deepthink模型配置
         
         # Markdown解析结果
         self.content_structure = content_structure  # 解析后的内容结构
@@ -245,7 +250,8 @@ class AgentState:
             raw_md=data.get("raw_md"),
             ppt_template_path=data.get("ppt_template_path"),
             output_dir=data.get("output_dir"),
-            content_structure=data.get("content_structure")
+            content_structure=data.get("content_structure"),
+            user_deepthink_config=data.get("user_deepthink_config")
         )
         
         # 恢复其他属性

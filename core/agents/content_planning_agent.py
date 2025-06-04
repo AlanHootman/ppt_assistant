@@ -36,18 +36,14 @@ class ContentPlanningAgent(BaseAgent):
         self.model_manager = ModelManager()
         self.model_helper = ModelHelper(self.model_manager)
         
-        # 获取模型配置 - 使用深度思考模型
-        model_config = self.model_helper.get_model_config(config, "deep_thinking")
-        self.llm_model = model_config.get("model")
-        self.temperature = model_config.get("temperature")
-        self.max_tokens = model_config.get("max_tokens")
-        self.max_retries = model_config.get("max_retries", 3)
+        # 存储基础配置，实际模型配置将在run方法中根据state动态获取
+        self.base_config = config
         self.model_type = "deep_thinking"  # 记录模型类型
         
         # 初始化PPT管理器
         self.ppt_manager = PPTAgentHelper.init_ppt_manager()
         
-        logger.info(f"初始化 ContentPlanningAgent，使用模型: {self.llm_model}，最大重试次数: {self.max_retries}")
+        logger.info(f"初始化 ContentPlanningAgent")
     
     async def run(self, state: AgentState) -> AgentState:
         """
@@ -61,6 +57,19 @@ class ContentPlanningAgent(BaseAgent):
         """
         logger.info("开始规划内容与模板匹配")
         
+        # 动态获取模型配置，支持用户自定义配置
+        model_config = self.model_helper.get_model_config(self.base_config, "deep_thinking", state)
+        self.llm_model = model_config.get("model")
+        self.temperature = model_config.get("temperature")
+        self.max_tokens = model_config.get("max_tokens")
+        self.max_retries = model_config.get("max_retries", 3)
+        self.custom_api_key = model_config.get("api_key")
+        self.custom_api_base = model_config.get("api_base")
+        
+        logger.info(f"使用模型: {self.llm_model}，最大重试次数: {self.max_retries}")
+        if self.custom_api_key and self.custom_api_base:
+            logger.info(f"使用自定义API: {self.custom_api_base}")
+
         # 检查必要的输入
         if not state.content_structure:
             error_msg = "没有提供内容结构"
@@ -145,7 +154,9 @@ class ContentPlanningAgent(BaseAgent):
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
                 max_retries=self.max_retries,
-                model_type=self.model_type
+                model_type=self.model_type,
+                custom_api_key=self.custom_api_key,
+                custom_api_base=self.custom_api_base
             )
             
             # 解析LLM响应

@@ -53,13 +53,14 @@ class ModelHelper:
         """异步上下文管理器退出"""
         await self.cleanup()
     
-    def get_model_config(self, config: Dict[str, Any], model_type: str = "text") -> Dict[str, Any]:
+    def get_model_config(self, config: Dict[str, Any], model_type: str = "text", state: Optional[Any] = None) -> Dict[str, Any]:
         """
         获取模型配置
         
         Args:
             config: Agent 配置
             model_type: 模型类型，默认为 "text"
+            state: AgentState实例，可能包含用户自定义配置
             
         Returns:
             模型配置字典，包含模型名称、温度和最大 token 数等
@@ -67,8 +68,22 @@ class ModelHelper:
         # 从配置获取模型类型和名称
         model_type = config.get("model_type", model_type)
         
-        # 获取模型配置
+        # 获取基础模型配置
         model_config = self.model_manager.get_model_config(model_type)
+        
+        # 如果是deep_thinking模型且state中有用户自定义配置，优先使用用户配置
+        if model_type == "deep_thinking" and state and hasattr(state, 'user_deepthink_config') and state.user_deepthink_config:
+            user_config = state.user_deepthink_config
+            logger.info(f"使用用户自定义deepthink配置: {user_config.get('model_name', 'unknown')}")
+            
+            # 覆盖默认配置
+            model_config.update({
+                "model": user_config.get("model_name", model_config["model"]),
+                "temperature": user_config.get("temperature", model_config["temperature"]),
+                "max_tokens": user_config.get("max_tokens", model_config["max_tokens"]),
+                "api_key": user_config.get("api_key"),
+                "api_base": user_config.get("api_base")
+            })
         
         # 从配置获取最大重试次数
         max_retries = int(config.get("max_retries", settings.MAX_RETRIES if hasattr(settings, "MAX_RETRIES") else 3))
@@ -82,7 +97,9 @@ class ModelHelper:
                                      temperature: Optional[float] = None, 
                                      max_tokens: Optional[int] = None,
                                      max_retries: int = 3,
-                                     model_type: str = "text") -> str:
+                                     model_type: str = "text",
+                                     custom_api_key: Optional[str] = None,
+                                     custom_api_base: Optional[str] = None) -> str:
         """
         使用重试机制生成文本
         
@@ -93,6 +110,8 @@ class ModelHelper:
             max_tokens: 最大 token 数
             max_retries: 最大重试次数
             model_type: 模型类型，用于选择正确的客户端
+            custom_api_key: 自定义API密钥
+            custom_api_base: 自定义API基础URL
             
         Returns:
             生成的文本
@@ -108,11 +127,20 @@ class ModelHelper:
                 # 等待请求间隔
                 await self.model_manager._wait_for_request_interval(model_type)
                 
-                # 根据模型类型选择适当的客户端
-                if model_type == "deep_thinking":
-                    client = self.model_manager._get_client("deep_thinking")
+                # 如果有自定义API配置，创建临时客户端
+                if custom_api_key and custom_api_base:
+                    from openai import AsyncOpenAI
+                    client = AsyncOpenAI(
+                        api_key=custom_api_key,
+                        base_url=custom_api_base
+                    )
+                    logger.info(f"使用自定义API配置: {custom_api_base}")
                 else:
-                    client = self.model_manager._get_client("text")
+                    # 根据模型类型选择适当的客户端
+                    if model_type == "deep_thinking":
+                        client = self.model_manager._get_client("deep_thinking")
+                    else:
+                        client = self.model_manager._get_client("text")
                 
                 # 创建消息
                 messages = [{"role": "user", "content": prompt}]
@@ -127,12 +155,24 @@ class ModelHelper:
                 
                 # 提取结果
                 result = response.choices[0].message.content
+                
+                # 如果使用了临时客户端，关闭它
+                if custom_api_key and custom_api_base:
+                    await client.close()
+                
                 return result or ""
                 
             except Exception as e:
                 last_error = e
                 logger.warning(f"调用模型 {model} 生成文本时出错 (尝试 {retry_count+1}/{max_retries+1}): {str(e)}")
                 retry_count += 1
+                
+                # 如果使用了临时客户端且出错，确保关闭它
+                if custom_api_key and custom_api_base and 'client' in locals():
+                    try:
+                        await client.close()
+                    except:
+                        pass
                 
                 # 在重试之间添加短暂延迟
                 if retry_count <= max_retries:
