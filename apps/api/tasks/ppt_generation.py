@@ -163,14 +163,28 @@ def _create_workflow_engine(task_data: Dict[str, Any]) -> WorkflowEngine:
 def _execute_workflow(engine: WorkflowEngine, task_id: str, task_data: Dict[str, Any], 
                      template_path: str, output_dir: str, progress_callback) -> Any:
     """执行PPT生成工作流"""
-    return asyncio.run(engine.run_async(
-        session_id=task_id,
-        raw_md=task_data["markdown_content"],
-        ppt_template_path=template_path,
-        output_dir=output_dir,
-        progress_callback=progress_callback,
-        enable_multimodal_validation=task_data.get("enable_multimodal_validation", False)
-    ))
+    workflow_params = {
+        "session_id": task_id,
+        "raw_md": task_data["markdown_content"],
+        "ppt_template_path": template_path,
+        "output_dir": output_dir,
+        "progress_callback": progress_callback,
+        "enable_multimodal_validation": task_data.get("enable_multimodal_validation", False)
+    }
+    
+    # 如果用户提供了deepthink配置，传递给工作流
+    if task_data.get("deepthink_config"):
+        deepthink_config = task_data["deepthink_config"]
+        workflow_params["user_deepthink_config"] = {
+            "model_name": deepthink_config["model_name"],
+            "api_key": deepthink_config["api_key"],
+            "api_base": deepthink_config["api_base"],
+            "max_tokens": deepthink_config["max_tokens"],
+            "temperature": deepthink_config["temperature"]
+        }
+        logger.info(f"使用用户自定义deepthink配置: {deepthink_config['model_name']}")
+    
+    return asyncio.run(engine.run_async(**workflow_params))
 
 
 def _handle_workflow_failure(result: Any, task_id: str, status_manager: TaskStatusManager) -> None:

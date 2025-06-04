@@ -14,16 +14,26 @@ from datetime import datetime
 router = APIRouter(prefix="/ppt")
 redis_service = RedisService()
 
+# DeepThink模型配置
+class DeepThinkConfig(BaseModel):
+    model_name: str
+    api_key: str
+    api_base: str
+    max_tokens: int
+    temperature: float
+
 # 标准API响应格式
 class ApiResponse(BaseModel):
     code: int = 200
     message: str
     data: Optional[Dict[str, Any]] = None
 
+# PPT生成请求模型
 class GenerationRequest(BaseModel):
     template_id: int
     markdown_content: str
     enable_multimodal_validation: bool = False
+    deepthink_config: Optional[DeepThinkConfig] = None
     
 class TaskStatusResponse(BaseModel):
     task_id: str
@@ -100,7 +110,8 @@ async def create_generation_task(
         args=[{
             "template_id": request.template_id,
             "markdown_content": request.markdown_content,
-            "enable_multimodal_validation": request.enable_multimodal_validation
+            "enable_multimodal_validation": request.enable_multimodal_validation,
+            "deepthink_config": request.deepthink_config
         }],
         task_id=task_id  # 强制使用API生成的task_id
     )

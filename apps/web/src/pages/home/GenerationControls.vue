@@ -1,5 +1,8 @@
 <template>
   <div class="generation-controls">
+    <!-- DeepThink模型选择器 -->
+    <deepthink-model-selector />
+    
     <!-- 多模态检测开关 -->
     <div class="multimodal-switch">
       <el-switch
@@ -14,36 +17,41 @@
       </div>
     </div>
     
-    <el-button 
-      type="primary" 
-      size="default" 
-      @click="handleGenerate" 
-      :loading="isGenerating && !hasFailed"
-      :disabled="isGenerating || !canGenerate"
-      class="generate-button"
-    >
-      {{ getButtonText() }}
-    </el-button>
-    
-    <el-button 
-      v-if="showCancelButton" 
-      type="danger" 
-      size="default" 
-      @click="handleCancel"
-      class="cancel-button"
-    >
-      {{ hasFailed ? '重新开始' : '取消生成' }}
-    </el-button>
+    <div class="button-group">
+      <el-button 
+        type="primary" 
+        size="default" 
+        @click="handleGenerate" 
+        :loading="isGenerating && !hasFailed"
+        :disabled="isGenerating || !canGenerate"
+        class="generate-button"
+      >
+        {{ getButtonText() }}
+      </el-button>
+      
+      <el-button 
+        v-if="showCancelButton" 
+        type="danger" 
+        size="default" 
+        @click="handleCancel"
+        class="cancel-button"
+      >
+        {{ hasFailed ? '重新开始' : '取消生成' }}
+      </el-button>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { useProgressStore } from '../../stores/progress'
 import { useTemplateStore } from '../../stores/template'
 import { useEditorStore } from '../../stores/editor'
 import { useTaskProgress } from '../../composables/useTaskProgress'
 import { ElMessage } from 'element-plus'
+
+// 异步加载组件
+const DeepThinkModelSelector = defineAsyncComponent(() => import('../../components/home/DeepThinkModelSelector.vue'))
 
 const emit = defineEmits(['generate'])
 
@@ -146,14 +154,24 @@ async function handleCancel() {
 }
 
 /* ==========================================================================
-   生成控制面板 - 按钮布局
+   生成控制面板 - 整体布局
    ========================================================================== */
 
 .generation-controls {
   display: flex;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 1rem;
   margin-top: 1rem;
   flex-shrink: 0; /* 防止按钮区域被压缩 */
+}
+
+/* ==========================================================================
+   按钮组布局
+   ========================================================================== */
+
+.button-group {
+  display: flex;
+  gap: 0.75rem;
 }
 
 /* ==========================================================================
@@ -219,8 +237,12 @@ async function handleCancel() {
 
 @media (max-width: 767px) {
   .generation-controls {
-    gap: 0.5rem;
+    gap: 0.75rem;
     margin-top: 0.75rem;
+  }
+  
+  .button-group {
+    gap: 0.5rem;
     flex-direction: column; /* 移动端垂直排列 */
   }
   

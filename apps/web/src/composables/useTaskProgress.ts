@@ -6,6 +6,7 @@ import { pptApi } from '@/services/api/ppt.api'
 import { getClientId } from '@/utils/clientId'
 import { useEditorStore } from '@/stores/editor'
 import { useTemplateStore } from '@/stores/template'
+import { useUserModels } from './useUserModels'
 import { ElMessage } from 'element-plus'
 
 export function useTaskProgress() {
@@ -13,6 +14,7 @@ export function useTaskProgress() {
   const clientStore = useClientStore()
   const editorStore = useEditorStore()
   const templateStore = useTemplateStore()
+  const { currentModels } = useUserModels()
   
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -70,13 +72,27 @@ export function useTaskProgress() {
     error.value = null
     
     try {
-      // 调用API创建任务
-      const response = await pptApi.createTask({
+      // 构建请求参数，包含用户选择的模型配置
+      const requestData: any = {
         template_id: templateId,
         markdown_content: markdownContent,
         client_id: getClientId(),
         enable_multimodal_validation: options.enableMultimodalValidation
-      })
+      }
+      
+      // 如果用户选择了deepthink模型，传递模型配置
+      if (currentModels.value.deepthink) {
+        requestData.deepthink_config = {
+          model_name: currentModels.value.deepthink.model_name,
+          api_key: currentModels.value.deepthink.api_key,
+          api_base: currentModels.value.deepthink.api_base,
+          max_tokens: currentModels.value.deepthink.max_tokens,
+          temperature: currentModels.value.deepthink.temperature
+        }
+      }
+      
+      // 调用API创建任务
+      const response = await pptApi.createTask(requestData)
       
       // 获取任务ID
       const taskId = response.data.task_id

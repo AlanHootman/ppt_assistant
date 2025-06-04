@@ -3,12 +3,22 @@ import axios from 'axios'
 // API基础URL
 const apiBaseUrl = '/api/v1'
 
+// DeepThink模型配置
+export interface DeepThinkConfig {
+  model_name: string
+  api_key: string
+  api_base: string
+  max_tokens: number
+  temperature: number
+}
+
 // PPT任务创建请求参数
 export interface CreatePptTaskRequest {
   template_id: number
   markdown_content: string
   client_id: string
   enable_multimodal_validation?: boolean
+  deepthink_config?: DeepThinkConfig
 }
 
 // 标准API响应结构接口
@@ -30,7 +40,8 @@ export const pptApi = {
       const response = await axios.post(`${apiBaseUrl}/ppt/generate`, {
         template_id: data.template_id,
         markdown_content: data.markdown_content,
-        enable_multimodal_validation: data.enable_multimodal_validation || false
+        enable_multimodal_validation: data.enable_multimodal_validation || false,
+        deepthink_config: data.deepthink_config
       })
       
       if (response.data && response.data.code && response.data.data) {

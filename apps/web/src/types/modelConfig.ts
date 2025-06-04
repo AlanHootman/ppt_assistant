@@ -36,4 +36,16 @@ export interface ActiveModelConfigs {
   llm?: ModelConfig
   vision?: ModelConfig
   deepthink?: ModelConfig
+}
+
+// 用户选择的模型配置（用于前端本地存储）
+export interface UserSelectedModels {
+  deepthink?: number // 存储deepthink模型的config_id
+}
+
+// 当前使用的模型信息（用于显示）
+export interface CurrentModels {
+  llm?: ModelConfig
+  vision?: ModelConfig
+  deepthink?: ModelConfig
 } 
