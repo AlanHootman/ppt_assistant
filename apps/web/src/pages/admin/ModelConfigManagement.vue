@@ -53,6 +53,7 @@
               @edit="handleEdit"
               @delete="handleDelete"
               @set-active="handleSetActive"
+              @copy="handleCopy"
             />
           </el-tab-pane>
           <el-tab-pane label="视觉模型(Vision)" name="vision">
@@ -70,6 +71,7 @@
               @edit="handleEdit"
               @delete="handleDelete"
               @set-active="handleSetActive"
+              @copy="handleCopy"
             />
           </el-tab-pane>
           <el-tab-pane label="深度思考(DeepThink)" name="deepthink">
@@ -87,6 +89,7 @@
               @edit="handleEdit"
               @delete="handleDelete"
               @set-active="handleSetActive"
+              @copy="handleCopy"
             />
           </el-tab-pane>
         </el-tabs>
@@ -98,6 +101,7 @@
       v-model="showCreateDialog"
       :config="editingConfig"
       :model-type="activeTab"
+      :mode="dialogMode"
       @success="handleDialogSuccess"
     />
   </div>
@@ -117,6 +121,7 @@ const modelConfigStore = useModelConfigStore()
 const activeTab = ref<string>('llm')
 const showCreateDialog = ref(false)
 const editingConfig = ref<ModelConfig | null>(null)
+const dialogMode = ref<'create' | 'edit' | 'copy'>('create')
 
 // 计算各类型配置
 const llmConfigs = computed(() => 
@@ -137,11 +142,21 @@ const handleTabChange = (tabName: string) => {
 const handleAddConfig = (modelType: string) => {
   activeTab.value = modelType
   editingConfig.value = null
+  dialogMode.value = 'create'
   showCreateDialog.value = true
 }
 
 const handleEdit = (config: ModelConfig) => {
   editingConfig.value = config
+  dialogMode.value = 'edit'
+  activeTab.value = config.model_type
+  showCreateDialog.value = true
+}
+
+const handleCopy = (config: ModelConfig) => {
+  editingConfig.value = config
+  dialogMode.value = 'copy'
+  // 复制时允许用户选择目标类型，默认为当前tab
   showCreateDialog.value = true
 }
 
@@ -173,6 +188,7 @@ const handleSetActive = async (config: ModelConfig) => {
 const handleDialogSuccess = () => {
   showCreateDialog.value = false
   editingConfig.value = null
+  dialogMode.value = 'create'
   loadConfigs()
 }
 

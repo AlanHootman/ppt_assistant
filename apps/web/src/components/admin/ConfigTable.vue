@@ -21,7 +21,7 @@
           {{ formatDate(row.created_at) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200">
+      <el-table-column label="操作" width="280">
         <template #default="{ row }">
           <el-button 
             v-if="!row.is_active" 
@@ -33,6 +33,14 @@
           </el-button>
           <el-button size="small" @click="$emit('edit', row)">
             编辑
+          </el-button>
+          <el-button 
+            type="primary" 
+            size="small" 
+            plain
+            @click="$emit('copy', row)"
+          >
+            复制
           </el-button>
           <el-button 
             v-if="!row.is_active" 
@@ -61,6 +69,7 @@ defineEmits<{
   edit: [config: ModelConfig]
   delete: [config: ModelConfig]
   'set-active': [config: ModelConfig]
+  copy: [config: ModelConfig]
 }>()
 
 // 添加调试信息

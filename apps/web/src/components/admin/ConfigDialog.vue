@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     v-model="dialogVisible"
-    :title="isEdit ? '编辑配置' : '新增配置'"
+    :title="getDialogTitle()"
     width="600px"
     @close="handleClose"
   >
@@ -16,7 +16,7 @@
       </el-form-item>
 
       <el-form-item label="模型类型" prop="model_type">
-        <el-select v-model="formData.model_type" :disabled="isEdit" style="width: 100%">
+        <el-select v-model="formData.model_type" :disabled="isEdit && !isCopy" style="width: 100%">
           <el-option label="文本模型(LLM)" value="llm" />
           <el-option label="视觉模型(Vision)" value="vision" />
           <el-option label="深度思考(DeepThink)" value="deepthink" />
@@ -64,7 +64,7 @@
     <template #footer>
       <el-button @click="handleClose">取消</el-button>
       <el-button type="primary" @click="handleSubmit" :loading="loading">
-        {{ isEdit ? '更新' : '创建' }}
+        {{ getSubmitButtonText() }}
       </el-button>
     </template>
   </el-dialog>
@@ -97,6 +97,7 @@ const props = defineProps<{
   modelValue: boolean
   config?: ModelConfig | null
   modelType: string
+  mode?: 'create' | 'edit' | 'copy'
 }>()
 
 const emit = defineEmits<{
@@ -114,7 +115,9 @@ const dialogVisible = computed({
   set: (value) => emit('update:modelValue', value)
 })
 
-const isEdit = computed(() => !!props.config)
+const isEdit = computed(() => props.mode === 'edit')
+const isCopy = computed(() => props.mode === 'copy')
+const isCreate = computed(() => props.mode === 'create' || !props.mode)
 
 const formData = ref({
   name: '',
@@ -136,12 +139,24 @@ const rules: FormRules = {
   temperature: [{ required: true, message: '请输入温度参数', trigger: 'blur' }]
 }
 
+const getDialogTitle = () => {
+  if (isCopy.value) return '复制配置'
+  if (isEdit.value) return '编辑配置'
+  return '新增配置'
+}
+
+const getSubmitButtonText = () => {
+  if (isCopy.value) return '复制'
+  if (isEdit.value) return '更新'
+  return '创建'
+}
+
 // 监听props.config变化，填充表单
 watch(() => props.config, (config) => {
   if (config) {
     formData.value = {
-      name: config.name,
-      model_type: config.model_type,
+      name: isCopy.value ? `${config.name}_copy` : config.name,
+      model_type: isCopy.value ? (props.modelType as 'llm' | 'vision' | 'deepthink') : config.model_type,
       api_key: config.api_key,
       api_base: config.api_base,
       model_name: config.model_name,
@@ -174,12 +189,14 @@ const handleSubmit = async () => {
       await modelConfigStore.updateConfig(props.config.id, formData.value)
       ElMessage.success('更新成功')
     } else {
+      // 创建或复制都使用创建接口
       await modelConfigStore.createConfig(formData.value)
-      ElMessage.success('创建成功')
+      ElMessage.success(isCopy.value ? '复制成功' : '创建成功')
     }
     emit('success')
   } catch (error) {
-    ElMessage.error(isEdit.value ? '更新失败' : '创建失败')
+    const action = isEdit.value ? '更新' : (isCopy.value ? '复制' : '创建')
+    ElMessage.error(`${action}失败`)
   } finally {
     loading.value = false
   }
