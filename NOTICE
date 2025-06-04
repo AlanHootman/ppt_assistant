@@ -1,0 +1,54 @@
+PPT自动生成系统 (PPT Assistant)
+Copyright 2024 deadwalk
+
+本项目包含以下第三方软件包：
+
+================================================================================
+python-pptx
+许可证：MIT License
+版权：Copyright 2013 Steve Canny
+网址：https://github.com/scanny/python-pptx
+
+================================================================================
+LangChain
+许可证：MIT License  
+版权：Copyright 2022 LangChain Inc.
+网址：https://github.com/langchain-ai/langchain
+
+================================================================================
+FastAPI
+许可证：MIT License
+版权：Copyright 2018 Sebastián Ramírez
+网址：https://github.com/tiangolo/fastapi
+
+================================================================================
+Celery
+许可证：BSD 3-Clause License
+版权：Copyright 2009-2022 Ask Solem and contributors
+网址：https://github.com/celery/celery
+
+================================================================================
+OpenAI Python Library
+许可证：Apache License 2.0
+版权：Copyright 2023 OpenAI
+网址：https://github.com/openai/openai-python
+
+================================================================================
+MLflow
+许可证：Apache License 2.0
+版权：Copyright 2018 Databricks, Inc.
+网址：https://github.com/mlflow/mlflow
+
+================================================================================
+Pydantic
+许可证：MIT License
+版权：Copyright 2017 Samuel Colvin
+网址：https://github.com/pydantic/pydantic
+
+================================================================================
+所有其他依赖包均遵循各自的开源许可证条款。
+完整的依赖列表请参见 requirements.txt 文件。
+
+致谢：
+本项目的核心思想来源于 PPTAgent (https://github.com/icip-cas/PPTAgent) 
+提出的多模态大语言模型+Agent框架设计理念。 
