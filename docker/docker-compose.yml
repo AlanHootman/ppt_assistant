@@ -60,7 +60,7 @@ services:
       - ../apps/api:/app/apps/api
       - ../core:/app/core
       - ../config:/app/config
-    command: celery -A apps.api.celery_app worker --loglevel=INFO --concurrency=2 -Q ppt_generation,template_analysis
+    command: celery -A apps.api.celery_app worker --loglevel=INFO --concurrency=10 -Q ppt_generation,template_analysis
     environment:
       - REDIS_URL=redis://redis:6379/0
       - CELERY_BROKER_URL=redis://redis:6379/0
