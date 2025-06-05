@@ -241,7 +241,7 @@ class ModelManager:
         # 验证API密钥
         if not api_key or api_key.strip() == "":
             raise ValueError(f"模型类型 {model_type} 的API密钥未配置或为空")
-        
+            
         # 创建客户端
         client = AsyncOpenAI(
             api_key=api_key,

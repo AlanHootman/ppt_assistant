@@ -96,6 +96,27 @@ async def get_active_configs(
     }, "获取激活配置成功")
 
 
+@router.get("/public/{model_type}")
+async def get_public_configs(
+    model_type: str,
+    db: Session = Depends(get_db)
+):
+    """获取指定类型的模型配置（无需认证，供前端切换使用）"""
+    # 验证model_type参数
+    if model_type not in ["deepthink"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="当前只支持获取deepthink类型的配置"
+        )
+    
+    service = ModelConfigService(db)
+    configs, _ = service.get_configs(model_type, 1, 100)  # 获取所有配置
+    
+    return ApiResponse.success({
+        "configs": configs
+    }, f"获取{model_type}配置成功")
+
+
 @router.get("/{config_id}")
 async def get_model_config(
     config_id: int,

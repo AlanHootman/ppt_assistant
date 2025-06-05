@@ -60,6 +60,23 @@ export const useModelConfigStore = defineStore('modelConfig', () => {
     }
   }
 
+  const fetchPublicConfigs = async (modelType: string) => {
+    try {
+      const response = await modelConfigApi.getPublicConfigs(modelType)
+      console.log(`获取${modelType}公共配置响应:`, response)
+      if (response && response.data && response.data.configs && Array.isArray(response.data.configs)) {
+        // 将公共配置合并到configs中
+        const publicConfigs = response.data.configs
+        // 移除已存在的同类型配置，然后添加新的
+        configs.value = configs.value.filter(config => config.model_type !== modelType)
+        configs.value.push(...publicConfigs)
+        console.log(`成功获取${modelType}公共配置:`, publicConfigs)
+      }
+    } catch (error) {
+      console.error(`获取${modelType}公共配置失败:`, error)
+    }
+  }
+
   const createConfig = async (configData: ModelConfigCreate) => {
     try {
       const response = await modelConfigApi.createConfig(configData)
@@ -133,6 +150,7 @@ export const useModelConfigStore = defineStore('modelConfig', () => {
     error,
     fetchConfigs,
     fetchActiveConfigs,
+    fetchPublicConfigs,
     createConfig,
     updateConfig,
     deleteConfig,

@@ -23,10 +23,10 @@
               type="warning"
             >
               {{ currentModels.deepthink?.model_name || '未配置' }}
-              <el-icon v-if="deepthinkConfigs.length > 1" class="dropdown-icon">
-                <ArrowDown />
-              </el-icon>
-            </el-tag>
+            <el-icon v-if="deepthinkConfigs.length > 1" class="dropdown-icon">
+              <ArrowDown />
+            </el-icon>
+          </el-tag>
           </div>
           
           <!-- 下拉选择框 -->

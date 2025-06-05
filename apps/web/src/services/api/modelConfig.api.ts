@@ -22,6 +22,11 @@ export const modelConfigApi = {
     return get<ActiveModelConfigs>('/model-configs/active')
   },
 
+  // 获取公共配置（无需认证）
+  getPublicConfigs(modelType: string) {
+    return get<{ configs: ModelConfig[] }>(`/model-configs/public/${modelType}`)
+  },
+
   // 获取单个配置
   getConfig(id: number) {
     return get<ModelConfig>(`/model-configs/${id}`)

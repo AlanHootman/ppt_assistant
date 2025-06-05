@@ -126,7 +126,8 @@ export function useUserModels() {
   // 初始化：确保加载了模型配置
   async function initialize() {
     await modelConfigStore.fetchActiveConfigs()
-    await modelConfigStore.fetchConfigs()
+    // 只获取deepthink的公共配置，用于切换
+    await modelConfigStore.fetchPublicConfigs('deepthink')
   }
   
   return {
