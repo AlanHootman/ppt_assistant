@@ -35,30 +35,16 @@ class ModelManager:
     
     def __init__(self):
         """初始化模型管理器"""
-        # 全局默认配置
-        self.default_api_key = os.environ.get("OPENAI_API_KEY", "")
-        self.default_api_base = os.environ.get("OPENAI_API_BASE", "https://api.openai.com/v1")
+        # 全局默认配置 - 仅作为最后的回退
         self.organization = os.environ.get("OPENAI_ORGANIZATION", "")
         
-        # 文本模型配置
-        self.text_model = os.environ.get("LLM_MODEL", "gpt-4")
-        self.text_api_key = os.environ.get("LLM_API_KEY", self.default_api_key)
-        self.text_api_base = os.environ.get("LLM_API_BASE", self.default_api_base)
+        # 从数据库加载模型配置
+        self._load_model_configs_from_db()
         
-        # 视觉模型配置
-        self.vision_model = os.environ.get("VISION_MODEL", "gpt-4-vision")
-        self.vision_api_key = os.environ.get("VISION_API_KEY", self.default_api_key)
-        self.vision_api_base = os.environ.get("VISION_API_BASE", self.default_api_base)
-        
-        # 深度思考LLM模型配置
-        self.deep_thinking_model = os.environ.get("DEEP_THINKING_MODEL", "o1-preview")
-        self.deep_thinking_api_key = os.environ.get("DEEP_THINKING_API_KEY", self.default_api_key)
-        self.deep_thinking_api_base = os.environ.get("DEEP_THINKING_API_BASE", self.default_api_base)
-        
-        # 嵌入模型配置
+        # 嵌入模型配置 - 暂时保留环境变量方式，因为数据库中没有配置
         self.embedding_model = os.environ.get("EMBEDDING_MODEL", "text-embedding-3-large")
-        self.embedding_api_key = os.environ.get("EMBEDDING_API_KEY", self.default_api_key)
-        self.embedding_api_base = os.environ.get("EMBEDDING_API_BASE", self.default_api_base)
+        self.embedding_api_key = os.environ.get("EMBEDDING_API_KEY", "")
+        self.embedding_api_base = os.environ.get("EMBEDDING_API_BASE", "https://api.openai.com/v1")
         
         # 客户端缓存
         self._clients = {}
@@ -76,6 +62,94 @@ class ModelManager:
         
         logger.info("初始化大模型管理器")
         logger.info(f"请求间隔配置: {self._request_intervals}")
+    
+    def _load_model_configs_from_db(self):
+        """从数据库加载激活的模型配置"""
+        try:
+            # 动态导入以避免循环依赖
+            from apps.api.dependencies.database import get_db
+            from apps.api.services.model_config_service import ModelConfigService
+            
+            # 获取数据库会话
+            db_generator = get_db()
+            db = next(db_generator)
+            
+            try:
+                service = ModelConfigService(db)
+                active_configs = service.get_active_configs()
+                
+                # 加载LLM配置
+                llm_config = active_configs.get("llm")
+                if llm_config:
+                    self.text_model = llm_config.model_name
+                    self.text_api_key = llm_config.api_key
+                    self.text_api_base = llm_config.api_base
+                    self.text_max_tokens = llm_config.max_tokens
+                    self.text_temperature = llm_config.temperature
+                    logger.info(f"加载LLM配置: {llm_config.name} ({llm_config.model_name})")
+                else:
+                    logger.warning("数据库中未找到激活的LLM配置，使用默认值")
+                    self._set_default_text_config()
+                
+                # 加载Vision配置
+                vision_config = active_configs.get("vision")
+                if vision_config:
+                    self.vision_model = vision_config.model_name
+                    self.vision_api_key = vision_config.api_key
+                    self.vision_api_base = vision_config.api_base
+                    self.vision_max_tokens = vision_config.max_tokens
+                    self.vision_temperature = vision_config.temperature
+                    logger.info(f"加载Vision配置: {vision_config.name} ({vision_config.model_name})")
+                else:
+                    logger.warning("数据库中未找到激活的Vision配置，使用默认值")
+                    self._set_default_vision_config()
+                
+                # 加载DeepThink配置
+                deepthink_config = active_configs.get("deepthink")
+                if deepthink_config:
+                    self.deep_thinking_model = deepthink_config.model_name
+                    self.deep_thinking_api_key = deepthink_config.api_key
+                    self.deep_thinking_api_base = deepthink_config.api_base
+                    self.deep_thinking_max_tokens = deepthink_config.max_tokens
+                    self.deep_thinking_temperature = deepthink_config.temperature
+                    logger.info(f"加载DeepThink配置: {deepthink_config.name} ({deepthink_config.model_name})")
+                else:
+                    logger.warning("数据库中未找到激活的DeepThink配置，使用默认值")
+                    self._set_default_deepthink_config()
+                    
+            finally:
+                db.close()
+                
+        except Exception as e:
+            logger.error(f"从数据库加载模型配置失败: {e}")
+            logger.info("使用默认配置")
+            self._set_default_text_config()
+            self._set_default_vision_config()
+            self._set_default_deepthink_config()
+    
+    def _set_default_text_config(self):
+        """设置默认的文本模型配置"""
+        self.text_model = "gpt-4"
+        self.text_api_key = ""
+        self.text_api_base = "https://api.openai.com/v1"
+        self.text_max_tokens = 4000
+        self.text_temperature = 0.7
+    
+    def _set_default_vision_config(self):
+        """设置默认的视觉模型配置"""
+        self.vision_model = "gpt-4-vision-preview"
+        self.vision_api_key = ""
+        self.vision_api_base = "https://api.openai.com/v1"
+        self.vision_max_tokens = 4000
+        self.vision_temperature = 0.7
+    
+    def _set_default_deepthink_config(self):
+        """设置默认的深度思考模型配置"""
+        self.deep_thinking_model = "o1-preview"
+        self.deep_thinking_api_key = ""
+        self.deep_thinking_api_base = "https://api.openai.com/v1"
+        self.deep_thinking_max_tokens = 32768
+        self.deep_thinking_temperature = 1.0
     
     def __enter__(self):
         """进入上下文管理器"""
@@ -160,10 +234,14 @@ class ModelManager:
             api_key = self.embedding_api_key
             api_base = self.embedding_api_base
         else:
-            # 使用默认配置
-            api_key = self.default_api_key
-            api_base = self.default_api_base
+            # 使用文本模型配置作为默认
+            api_key = self.text_api_key
+            api_base = self.text_api_base
             
+        # 验证API密钥
+        if not api_key or api_key.strip() == "":
+            raise ValueError(f"模型类型 {model_type} 的API密钥未配置或为空")
+        
         # 创建客户端
         client = AsyncOpenAI(
             api_key=api_key,
@@ -233,24 +311,24 @@ class ModelManager:
         # 从全局设置中获取模型默认参数
         model_defaults = settings.get_model_defaults(model_type)
         
-        # 根据模型类型返回对应的模型名称和默认参数
+        # 根据模型类型返回对应的模型名称和配置参数
         if model_type == "text":
             return {
                 "model": self.text_model,
-                "temperature": model_defaults.get("temperature"),
-                "max_tokens": model_defaults.get("max_tokens")
+                "temperature": getattr(self, 'text_temperature', model_defaults.get("temperature")),
+                "max_tokens": getattr(self, 'text_max_tokens', model_defaults.get("max_tokens"))
             }
         elif model_type == "vision":
             return {
                 "model": self.vision_model,
-                "temperature": model_defaults.get("temperature"),
-                "max_tokens": model_defaults.get("max_tokens")
+                "temperature": getattr(self, 'vision_temperature', model_defaults.get("temperature")),
+                "max_tokens": getattr(self, 'vision_max_tokens', model_defaults.get("max_tokens"))
             }
         elif model_type == "deep_thinking":
             return {
                 "model": self.deep_thinking_model,
-                "temperature": model_defaults.get("temperature"),
-                "max_tokens": model_defaults.get("max_tokens")
+                "temperature": getattr(self, 'deep_thinking_temperature', model_defaults.get("temperature")),
+                "max_tokens": getattr(self, 'deep_thinking_max_tokens', model_defaults.get("max_tokens"))
             }
         elif model_type == "embedding":
             return {
@@ -259,11 +337,10 @@ class ModelManager:
             }
         else:
             logger.warning(f"未知模型类型: {model_type}，使用text类型")
-            text_defaults = settings.get_model_defaults("text")
             return {
                 "model": self.text_model,
-                "temperature": text_defaults.get("temperature"),
-                "max_tokens": text_defaults.get("max_tokens")
+                "temperature": getattr(self, 'text_temperature', model_defaults.get("temperature")),
+                "max_tokens": getattr(self, 'text_max_tokens', model_defaults.get("max_tokens"))
             }
     
     async def generate_text(self, 
