@@ -14,7 +14,7 @@ export function useTaskProgress() {
   const clientStore = useClientStore()
   const editorStore = useEditorStore()
   const templateStore = useTemplateStore()
-  const { currentModels } = useUserModels()
+  // 注意：不在这里获取currentModels，而是在需要时动态获取
   
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -72,6 +72,15 @@ export function useTaskProgress() {
     error.value = null
     
     try {
+      // 动态获取最新的模型配置，确保使用的是最新切换的模型
+      const userModels = useUserModels()
+      const currentDeepthinkModel = userModels.currentModels.value.deepthink
+      
+      console.log('=== PPT任务创建 - 模型配置调试 ===')
+      console.log('当前deepthink模型配置:', currentDeepthinkModel)
+      console.log('模型名称:', currentDeepthinkModel?.model_name)
+      console.log('模型ID:', currentDeepthinkModel?.id)
+      
       // 构建请求参数，包含用户选择的模型配置
       const requestData: any = {
         template_id: templateId,
@@ -81,14 +90,17 @@ export function useTaskProgress() {
       }
       
       // 如果用户选择了deepthink模型，传递模型配置
-      if (currentModels.value.deepthink) {
+      if (currentDeepthinkModel) {
         requestData.deepthink_config = {
-          model_name: currentModels.value.deepthink.model_name,
-          api_key: currentModels.value.deepthink.api_key,
-          api_base: currentModels.value.deepthink.api_base,
-          max_tokens: currentModels.value.deepthink.max_tokens,
-          temperature: currentModels.value.deepthink.temperature
+          model_name: currentDeepthinkModel.model_name,
+          api_key: currentDeepthinkModel.api_key,
+          api_base: currentDeepthinkModel.api_base,
+          max_tokens: currentDeepthinkModel.max_tokens,
+          temperature: currentDeepthinkModel.temperature
         }
+        console.log('添加deepthink配置到请求:', requestData.deepthink_config)
+      } else {
+        console.warn('未找到deepthink模型配置')
       }
       
       // 调用API创建任务

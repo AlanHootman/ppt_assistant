@@ -57,8 +57,14 @@ export function useUserModels() {
   const currentModels = computed<CurrentModels>(() => {
     const activeConfigs = modelConfigStore.activeConfigs
     
+    console.log('=== currentModels计算 ===')
+    console.log('用户选择:', userSelectedModels.value)
+    console.log('激活配置:', activeConfigs)
+    console.log('可用configs数量:', modelConfigStore.configs.length)
+    
     // 如果没有加载到配置数据，使用默认配置
     if (!activeConfigs.llm && !activeConfigs.vision && !activeConfigs.deepthink) {
+      console.log('使用默认模型配置')
       return defaultModels
     }
     
@@ -70,13 +76,19 @@ export function useUserModels() {
     
     // DeepThink模型优先使用用户选择的，否则使用全局激活的
     if (userSelectedModels.value.deepthink) {
+      console.log('用户选择了deepthink模型ID:', userSelectedModels.value.deepthink)
       const selectedDeepthinkConfig = modelConfigStore.configs.find(
         config => config.id === userSelectedModels.value.deepthink && config.model_type === 'deepthink'
       )
+      console.log('找到的用户选择配置:', selectedDeepthinkConfig?.model_name || '未找到')
       result.deepthink = selectedDeepthinkConfig || activeConfigs.deepthink || defaultModels.deepthink
     } else {
+      console.log('用户未选择deepthink模型，使用激活配置')
       result.deepthink = activeConfigs.deepthink || defaultModels.deepthink
     }
+    
+    console.log('最终deepthink模型:', result.deepthink?.model_name)
+    console.log('=== currentModels计算结束 ===')
     
     return result
   })
@@ -111,11 +123,31 @@ export function useUserModels() {
   
   // 选择deepthink模型
   function selectDeepthinkModel(configId: number) {
+    console.log('=== 切换deepthink模型 ===')
+    console.log('选择的模型ID:', configId)
+    
     const newSelection = {
       ...userSelectedModels.value,
       deepthink: configId
     }
+    
+    // 首先检查选择的模型是否存在于configs中
+    const selectedConfig = modelConfigStore.configs.find(
+      config => config.id === configId && config.model_type === 'deepthink'
+    )
+    
+    if (selectedConfig) {
+      console.log('找到选择的模型配置:', selectedConfig.model_name)
+    } else {
+      console.warn('未在configs中找到选择的模型配置，ID:', configId)
+      console.log('当前可用configs:', modelConfigStore.configs.filter(c => c.model_type === 'deepthink'))
+    }
+    
     saveUserSelectedModels(newSelection)
+    
+    // 输出切换后的状态用于调试
+    console.log('切换后的用户选择:', newSelection)
+    console.log('localStorage中的数据:', localStorage.getItem(USER_MODELS_KEY))
   }
   
   // 重置为默认选择
