@@ -12,13 +12,15 @@
           <el-tag size="small" type="success">{{ currentModels.vision?.model_name || '未配置' }}</el-tag>
         </div>
         <div class="deepthink-selector">
-          <div class="model-item">
+          <div 
+            class="model-item" 
+            :class="{ 'clickable': deepthinkConfigs.length > 1 }"
+            @click="toggleDropdown"
+          >
             <span class="model-label">DeepThink:</span>
             <el-tag 
               size="small" 
               type="warning"
-              :class="{ 'clickable': deepthinkConfigs.length > 1 }"
-              @click="toggleDropdown"
             >
               {{ currentModels.deepthink?.model_name || '未配置' }}
               <el-icon v-if="deepthinkConfigs.length > 1" class="dropdown-icon">
@@ -251,14 +253,17 @@ onUnmounted(() => {
   z-index: 10;
 }
 
-.deepthink-selector .el-tag.clickable {
-  cursor: pointer;
+.deepthink-selector .model-item {
   transition: all 0.2s ease;
   position: relative;
   z-index: 11;
 }
 
-.deepthink-selector .el-tag.clickable:hover {
+.deepthink-selector .model-item.clickable {
+  cursor: pointer;
+}
+
+.deepthink-selector .model-item.clickable:hover {
   opacity: 0.8;
   transform: translateY(-1px);
 }
