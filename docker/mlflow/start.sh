@@ -9,7 +9,7 @@ mkdir -p /app/mlflow_data/mlruns /app/mlflow_data/mlartifacts
 chmod -R 755 /app/mlflow_data
 
 # 安装MLflow
-pip install --no-cache-dir mlflow
+pip install --no-cache-dir mlflow -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # 启动MLflow服务器
 exec mlflow server \
