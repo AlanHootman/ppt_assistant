@@ -10,10 +10,9 @@
 - 自动生成PPT：根据解析结果生成最终的PPT文件
 
 ## 演示Demo
-<video controls width="100%">
-  <source src="https://BJSS-China.github.io/ppt_assistant/docs/assets/demo.mp4" type="video/mp4">
-  您的浏览器不支持视频标签。
-</video>
+
+https://github.com/user-attachments/assets/4292de8d-6f46-43c9-96b3-66e6f5b2add9
+
 
 ## 部署方法
 
